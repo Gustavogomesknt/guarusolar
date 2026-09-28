@@ -1,6 +1,7 @@
-# Guarusolar — API do sistema de gestão
+# Guarusolar — Sistema de gestão
 
-Backend em Node.js + TypeScript + PostgreSQL (Prisma) que atende os dois aplicativos:
+Monorepo (npm workspaces) com o backend em Node.js + TypeScript + PostgreSQL (Prisma),
+em `apps/api`, que atende os dois aplicativos:
 
 - **Escritório (executável Windows)** — comercial, catálogo, orçamentos, agenda e validação.
 - **Técnicos (site no celular, sem instalar nada)** — apenas a própria agenda e o envio das fotos.
@@ -10,12 +11,14 @@ aparecer no escritório em seguida.
 
 ## Como rodar
 
+Requer Node.js 22.12 ou mais recente. Todos os comandos rodam a partir da raiz:
+
 ```bash
-npm install
-cp .env.example .env          # ajuste DATABASE_URL e JWT_SECRET
-npm run db:migrate            # cria as tabelas
-npm run db:seed               # catálogo, equipes, checklist e usuários de teste
-npm run dev                   # http://localhost:3333
+npm install                                # instala todos os workspaces
+cp apps/api/.env.example apps/api/.env     # ajuste DATABASE_URL, DIRECT_URL e JWT_SECRET
+npm run db:migrate                         # cria as tabelas
+npm run db:seed                            # catálogo, equipes, checklist e usuários de teste
+npm run dev:api                            # http://localhost:3333
 ```
 
 Usuários criados pelo seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@` e
@@ -30,14 +33,15 @@ docker run --name guarusolar-db -e POSTGRES_PASSWORD=senha -p 5432:5432 -d postg
 ## Estrutura
 
 ```
-prisma/schema.prisma      tabelas do banco
-prisma/seed.ts            dados iniciais
-src/server.ts             sobe a API e monta as rotas
-src/lib/auth.ts           login por JWT e controle de papéis
-src/lib/calculo.ts        regra de totais, desconto e parcelamento
-src/lib/codigos.ts        GS-2026-0148 / PRJ-2026-0146
-src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
-src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
+apps/api/
+  prisma/schema.prisma      tabelas do banco
+  prisma/seed.ts            dados iniciais
+  src/server.ts             sobe a API e monta as rotas
+  src/lib/auth.ts           login por JWT e controle de papéis
+  src/lib/calculo.ts        regra de totais, desconto e parcelamento
+  src/lib/codigos.ts        GS-2026-0148 / PRJ-2026-0146
+  src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
+  src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
 ```
 
 ## Rotas principais

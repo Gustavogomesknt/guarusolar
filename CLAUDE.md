@@ -30,7 +30,7 @@ instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
 ## Stack
 
 - **Banco:** PostgreSQL + Prisma
-- **API:** Node.js + TypeScript + Express + Zod (este repositório)
+- **API:** Node.js + TypeScript + Express + Zod (`apps/api`)
 - **Front:** React + Vite + Tailwind CSS + shadcn/ui
 - **Auth:** JWT com papéis
 - **Arquivos (fotos e PDFs):** hoje em disco local; em produção no **OneDrive/SharePoint do cliente**
@@ -40,29 +40,36 @@ instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
 
 ## Estrutura
 
+Monorepo com npm workspaces. Instale e rode os comandos sempre a partir da raiz.
+
 ```
-prisma/schema.prisma      tabelas (clientes, produtos, orçamentos, itens, projetos,
-                          equipes, agendamentos, checklist de fotos, fotos, materiais)
-prisma/seed.ts            catálogo inicial, equipes, checklist e usuários de teste
-src/server.ts             sobe a API e monta as rotas
-src/lib/auth.ts           JWT, hash de senha, middleware autenticar/autorizar
-src/lib/calculo.ts        totais, desconto e condições de pagamento
-src/lib/codigos.ts        GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto)
-src/lib/armazenamento.ts  camada de arquivos — trocar por OneDrive sem mexer no resto
-src/lib/erros.ts          ErroHttp, wrapper de rota async, tratador central
-src/rotas/                auth, clientes, produtos, orcamentos, operacao (agenda,
-                          validação e técnico)
+package.json                   workspaces e atalhos (build, dev:api, db:*)
+apps/api/                      API (Express + Prisma)
+  prisma/schema.prisma         tabelas (clientes, produtos, orçamentos, itens, projetos,
+                               equipes, agendamentos, checklist de fotos, fotos, materiais)
+  prisma/seed.ts               catálogo inicial, equipes, checklist e usuários de teste
+  src/server.ts                sobe a API e monta as rotas
+  src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar
+  src/lib/calculo.ts           totais, desconto e condições de pagamento
+  src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto)
+  src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto
+  src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
+  src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
+  src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
+                               validação e técnico)
 ```
+
+O `.env` da API fica em `apps/api/.env`.
 
 ## Regras de negócio que não podem ser quebradas
 
 1. **Quem calcula é o servidor.** O front envia itens, desconto e condição de pagamento;
-   a API recalcula tudo em `src/lib/calculo.ts` e grava. Nunca aceitar total vindo do front.
+   a API recalcula tudo em `apps/api/src/lib/calculo.ts` e grava. Nunca aceitar total vindo do front.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
    gravados no item. Mudança futura no catálogo não altera orçamento antigo.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
-5. **Status seguem transições válidas** (ver mapa `transicoes` em `src/rotas/orcamentos.ts`).
+5. **Status seguem transições válidas** (ver mapa `transicoes` em `apps/api/src/rotas/orcamentos.ts`).
    Orçamento `APROVADO` não pode ser editado.
 6. **Técnico só acessa os serviços da própria equipe**, validado no servidor, nunca apenas
    escondendo botões na interface.
@@ -129,13 +136,16 @@ Próximos passos, nesta ordem:
 
 ## Comandos
 
+Todos a partir da raiz do repositório:
+
 ```bash
-npm install
-cp .env.example .env     # ajustar DATABASE_URL e JWT_SECRET
+npm install                                  # instala todos os workspaces
+cp apps/api/.env.example apps/api/.env       # ajustar DATABASE_URL, DIRECT_URL e JWT_SECRET
 npm run db:migrate       # cria as tabelas
 npm run db:seed          # catálogo, equipes, checklist e usuários de teste
-npm run dev              # API em http://localhost:3333
+npm run dev:api          # API em http://localhost:3333
 npm run db:studio        # inspecionar o banco
+npm run build            # compila todos os workspaces
 ```
 
 Banco local rápido: `docker run --name guarusolar-db -e POSTGRES_PASSWORD=senha -p 5432:5432 -d postgres:16`
@@ -145,7 +155,8 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 
 ## Como trabalhar comigo neste projeto
 
-- Antes de criar arquivo novo, verifique se já existe algo parecido em `src/lib` ou `src/rotas`.
+- Antes de criar arquivo novo, verifique se já existe algo parecido em `apps/api/src/lib` ou
+  `apps/api/src/rotas`.
 - Ao mudar o schema, gere a migration (`npm run db:migrate`) e atualize o seed se necessário.
 - Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
