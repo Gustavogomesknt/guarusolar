@@ -69,7 +69,7 @@ packages/compartilhado/
 | GET | `/api/orcamentos/resumo` | comercial | indicadores do mês |
 | POST/PUT | `/api/orcamentos` | comercial | criar/editar (totais no servidor) |
 | PATCH | `/api/orcamentos/:id/status` | comercial | mudança em 1 clique |
-| GET | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me` |
+| POST | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me`; rascunho passa a ENVIADO |
 | GET | `/api/agenda?inicio&fim` | gestor | semana por equipe |
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |
 | POST | `/api/agenda` | gestor | agendar serviço |

@@ -51,7 +51,8 @@ apps/api/                      API (Express + Prisma)
   src/server.ts                sobe a API e monta as rotas
   src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar
   src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
-  src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto)
+  src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
+                               atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
   src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)

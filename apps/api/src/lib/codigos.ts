@@ -1,24 +1,35 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 
-/** Gera códigos sequenciais por ano: GS-2026-0148 / PRJ-2026-0146. */
-async function proximoNumero(tabela: 'orcamento' | 'projeto', ano: number) {
-  const inicio = new Date(ano, 0, 1);
-  const fim = new Date(ano + 1, 0, 1);
-  const total =
-    tabela === 'orcamento'
-      ? await prisma.orcamento.count({ where: { criadoEm: { gte: inicio, lt: fim } } })
-      : await prisma.projeto.count({ where: { criadoEm: { gte: inicio, lt: fim } } });
-  return total + 1;
+type Banco = Prisma.TransactionClient | typeof prisma;
+
+/**
+ * Próximo número do prefixo no ano, à prova de concorrência.
+ * Um único comando cria o contador do ano (começando em 1) ou incrementa o existente e
+ * devolve o valor novo; o Postgres trava a linha durante o incremento, então dois
+ * pedidos simultâneos nunca recebem o mesmo número.
+ * Dentro de uma transação (`banco = tx`), se ela for desfeita o número volta junto.
+ */
+async function proximoNumero(banco: Banco, prefixo: 'GS' | 'PRJ', ano: number) {
+  const [linha] = await banco.$queryRaw<{ ultimo: number }[]>`
+    INSERT INTO "SequenciaCodigo" ("prefixo", "ano", "ultimo")
+    VALUES (${prefixo}, ${ano}, 1)
+    ON CONFLICT ("prefixo", "ano")
+    DO UPDATE SET "ultimo" = "SequenciaCodigo"."ultimo" + 1
+    RETURNING "ultimo"`;
+  return Number(linha.ultimo);
 }
 
-export async function gerarCodigoOrcamento() {
+const formatar = (prefixo: string, ano: number, n: number) => `${prefixo}-${ano}-${String(n).padStart(4, '0')}`;
+
+/** GS-2026-0148 */
+export async function gerarCodigoOrcamento(banco: Banco = prisma) {
   const ano = new Date().getFullYear();
-  const n = await proximoNumero('orcamento', ano);
-  return `GS-${ano}-${String(n).padStart(4, '0')}`;
+  return formatar('GS', ano, await proximoNumero(banco, 'GS', ano));
 }
 
-export async function gerarCodigoProjeto() {
+/** PRJ-2026-0146 */
+export async function gerarCodigoProjeto(banco: Banco = prisma) {
   const ano = new Date().getFullYear();
-  const n = await proximoNumero('projeto', ano);
-  return `PRJ-${ano}-${String(n).padStart(4, '0')}`;
+  return formatar('PRJ', ano, await proximoNumero(banco, 'PRJ', ano));
 }

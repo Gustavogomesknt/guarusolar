@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
 import { LogOut } from 'lucide-react';
 import { useSessao } from '@/lib/sessao';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,7 @@ import { MENU } from './menu';
 import { NOME_DO_PAPEL, podeAcessar } from './permissoes';
 
 export function Layout() {
-  const { usuario, sair } = useSessao();
+  const { usuario } = useSessao();
   if (!usuario) return null;
 
   const itens = MENU.filter((item) => podeAcessar(usuario.papel, item.papeis));
@@ -55,14 +55,14 @@ export function Layout() {
         <div className="border-t border-sidebar-border px-5 py-4">
           <p className="truncate text-sm font-medium">{usuario.nome}</p>
           <p className="text-xs text-sidebar-foreground/70">{NOME_DO_PAPEL[usuario.papel]}</p>
-          <button
-            type="button"
-            onClick={() => sair()}
-            className="mt-3 flex items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
+          {/* Link para /sair (e não sair() direto): passa pela confirmação de alterações não salvas */}
+          <Link
+            to="/sair"
+            className="mt-3 flex min-h-10 items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
           >
             <LogOut className="size-4" aria-hidden />
             Sair
-          </button>
+          </Link>
         </div>
       </aside>
 

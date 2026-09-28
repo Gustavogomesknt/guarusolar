@@ -12,6 +12,20 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
+// Numeração dos códigos (GS-2026-0148, PRJ-2026-0146)
+// Um contador por prefixo e ano, incrementado com um único INSERT ... ON CONFLICT
+// ... RETURNING (src/lib/codigos.ts): dois cadastros ao mesmo tempo nunca recebem
+// o mesmo número.
+// ---------------------------------------------------------------------------
+model SequenciaCodigo {
+  prefixo String // GS | PRJ
+  ano     Int
+  ultimo  Int // último número já entregue
+
+  @@id([prefixo, ano])
+}
+
+// ---------------------------------------------------------------------------
 // Usuários e equipes
 // ---------------------------------------------------------------------------
 

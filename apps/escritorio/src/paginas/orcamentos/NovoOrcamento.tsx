@@ -105,7 +105,11 @@ export function NovoOrcamento() {
     const janela = window.open('', '_blank');
     setEnviandoWhatsApp(true);
     try {
-      const { link } = await api.get<{ link: string; mensagem: string }>(`/api/orcamentos/${salvo.id}/whatsapp`);
+      // a API também passa o rascunho para ENVIADO; o selo do cabeçalho acompanha
+      const { link, status } = await api.post<{ link: string; mensagem: string; status: OrcamentoSalvo['status'] }>(
+        `/api/orcamentos/${salvo.id}/whatsapp`,
+      );
+      setSalvo((atual) => (atual ? { ...atual, status } : atual));
       if (janela) {
         janela.opener = null;
         janela.location.href = link;

@@ -174,27 +174,30 @@ rotasOrcamentos.post(
       parcelas: dados.parcelas,
     });
 
-    const orcamento = await prisma.orcamento.create({
-      data: {
-        codigo: await gerarCodigoOrcamento(),
-        clienteId: dados.clienteId,
-        vendedorId: req.usuario!.id,
-        validade: dados.validade,
-        descontoTipo: dados.descontoTipo,
-        descontoValor: dados.descontoValor,
-        condicaoPagamento: dados.condicaoPagamento,
-        descontoAVistaPct: dados.descontoAVistaPct,
-        entradaPct: dados.entradaPct,
-        parcelas: dados.parcelas,
-        bancoFinanciamento: dados.bancoFinanciamento,
-        observacoes: dados.observacoes,
-        subtotal: totais.subtotal,
-        descontoAplicado: totais.descontoAplicado,
-        valorTotal: totais.valorTotal,
-        itens: { create: itens.map(({ _calculo, ...item }) => item) },
-      },
-      include: { itens: true, cliente: true },
-    });
+    // o código sai dentro da mesma transação: se a criação falhar, o número não é perdido
+    const orcamento = await prisma.$transaction(async (tx) =>
+      tx.orcamento.create({
+        data: {
+          codigo: await gerarCodigoOrcamento(tx),
+          clienteId: dados.clienteId,
+          vendedorId: req.usuario!.id,
+          validade: dados.validade,
+          descontoTipo: dados.descontoTipo,
+          descontoValor: dados.descontoValor,
+          condicaoPagamento: dados.condicaoPagamento,
+          descontoAVistaPct: dados.descontoAVistaPct,
+          entradaPct: dados.entradaPct,
+          parcelas: dados.parcelas,
+          bancoFinanciamento: dados.bancoFinanciamento,
+          observacoes: dados.observacoes,
+          subtotal: totais.subtotal,
+          descontoAplicado: totais.descontoAplicado,
+          valorTotal: totais.valorTotal,
+          itens: { create: itens.map(({ _calculo, ...item }) => item) },
+        },
+        include: { itens: true, cliente: true },
+      }),
+    );
 
     res.status(201).json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
   }),
@@ -277,51 +280,60 @@ rotasOrcamentos.patch(
       throw new ErroHttp(409, `Não é possível mudar de ${orcamento.status} para ${status}`);
     }
 
-    const agora = new Date();
-    const atualizado = await prisma.$transaction(async (tx) => {
-      const novo = await tx.orcamento.update({
-        where: { id: orcamento.id },
-        data: {
-          status,
-          enviadoEm: status === 'ENVIADO' ? agora : orcamento.enviadoEm,
-          aprovadoEm: status === 'APROVADO' ? agora : orcamento.aprovadoEm,
-          recusadoEm: status === 'RECUSADO' ? agora : orcamento.recusadoEm,
-          motivoRecusa: status === 'RECUSADO' ? observacao : orcamento.motivoRecusa,
-        },
-      });
-
-      await tx.historicoStatus.create({
-        data: {
-          orcamentoId: orcamento.id,
-          de: orcamento.status,
-          para: status,
-          usuarioId: req.usuario!.id,
-          observacao,
-        },
-      });
-
-      // Orçamento aprovado vira projeto e entra na fila de agendamento
-      if (status === 'APROVADO') {
-        await tx.projeto.create({
-          data: {
-            codigo: await gerarCodigoProjeto(),
-            orcamentoId: orcamento.id,
-            clienteId: orcamento.clienteId,
-          },
-        });
-      }
-
-      return novo;
-    });
-
+    const atualizado = await prisma.$transaction((tx) =>
+      mudarStatus(tx, orcamento, status, req.usuario!.id, observacao),
+    );
     res.json(atualizado);
   }),
 );
 
+/**
+ * Aplica uma transição já validada: grava o status, a data do evento, o histórico e,
+ * na aprovação, cria o projeto. Usada pelo PATCH /status e pelo envio via WhatsApp.
+ */
+async function mudarStatus(
+  tx: Prisma.TransactionClient,
+  orcamento: { id: string; status: StatusOrcamento; clienteId: string; enviadoEm: Date | null; aprovadoEm: Date | null; recusadoEm: Date | null; motivoRecusa: string | null },
+  status: StatusOrcamento,
+  usuarioId: string,
+  observacao?: string,
+) {
+  const agora = new Date();
+  const novo = await tx.orcamento.update({
+    where: { id: orcamento.id },
+    data: {
+      status,
+      enviadoEm: status === 'ENVIADO' ? agora : orcamento.enviadoEm,
+      aprovadoEm: status === 'APROVADO' ? agora : orcamento.aprovadoEm,
+      recusadoEm: status === 'RECUSADO' ? agora : orcamento.recusadoEm,
+      motivoRecusa: status === 'RECUSADO' ? observacao : orcamento.motivoRecusa,
+    },
+  });
+
+  await tx.historicoStatus.create({
+    data: { orcamentoId: orcamento.id, de: orcamento.status, para: status, usuarioId, observacao },
+  });
+
+  // Orçamento aprovado vira projeto e entra na fila de agendamento
+  if (status === 'APROVADO') {
+    await tx.projeto.create({
+      data: {
+        codigo: await gerarCodigoProjeto(tx),
+        orcamentoId: orcamento.id,
+        clienteId: orcamento.clienteId,
+      },
+    });
+  }
+
+  return novo;
+}
+
 // --------------------------------------------------------------------------
-// Mensagem pronta de WhatsApp (o front abre o link retornado)
+// Mensagem pronta de WhatsApp (o front abre o link retornado).
+// POST porque altera dados: o rascunho enviado passa a ENVIADO (transição do mapa).
+// Reenviar um orçamento que já saiu do rascunho não muda o status.
 // --------------------------------------------------------------------------
-rotasOrcamentos.get(
+rotasOrcamentos.post(
   '/:id/whatsapp',
   rota(async (req, res) => {
     const orcamento = await prisma.orcamento.findUnique({
@@ -360,10 +372,19 @@ rotasOrcamentos.get(
       `${req.usuario!.nome} · Guarusolar`,
     ].join('\n');
 
+    let status = orcamento.status;
+    if (orcamento.status === 'RASCUNHO' && transicoes.RASCUNHO.includes('ENVIADO')) {
+      const atualizado = await prisma.$transaction((tx) =>
+        mudarStatus(tx, orcamento, 'ENVIADO', req.usuario!.id, 'Enviado pelo WhatsApp'),
+      );
+      status = atualizado.status;
+    }
+
     const telefone = `55${orcamento.cliente.whatsapp.replace(/\D/g, '')}`;
     res.json({
       mensagem,
       link: `https://wa.me/${telefone}?text=${encodeURIComponent(mensagem)}`,
+      status,
     });
   }),
 );

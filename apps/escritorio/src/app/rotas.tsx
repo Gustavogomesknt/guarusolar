@@ -2,6 +2,7 @@ import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route 
 import { SessaoProvider } from '@/lib/sessao';
 import { Login } from '@/paginas/Login';
 import { Inicio } from '@/paginas/Inicio';
+import { Sair } from '@/paginas/Sair';
 import { NovoOrcamento } from '@/paginas/orcamentos/NovoOrcamento';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
@@ -27,6 +28,7 @@ export const roteador = createBrowserRouter(
   createRoutesFromElements(
     <Route element={<RaizDoApp />}>
       <Route path="/login" element={<Login />} />
+      <Route path="/sair" element={<Sair />} />
 
       <Route element={<RotaProtegida papeis={PAPEIS_DO_ESCRITORIO} />}>
         <Route element={<Layout />}>
