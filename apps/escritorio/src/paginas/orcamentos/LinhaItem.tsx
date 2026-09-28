@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { numeroOuZero, precoFoiAjustado, type FormularioOrcamento } from './formulario';
 
 /** Mesmas colunas no cabeçalho e nas linhas: item, quantidade, preço, subtotal, remover. */
-export const COLUNAS_ITENS = 'grid-cols-[minmax(0,1fr)_132px_140px_124px_40px]';
+export const COLUNAS_ITENS = 'grid-cols-[minmax(0,1fr)_122px_132px_112px_40px]';
 
 export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: () => void }) {
   const { control, register, setValue } = useFormContext<FormularioOrcamento>();

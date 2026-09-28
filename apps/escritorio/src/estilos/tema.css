@@ -2,6 +2,12 @@
 @import 'tw-animate-css';
 
 /*
+ * O escritório só tem tema claro. Sem esta linha, as classes dark: dos componentes do
+ * shadcn seguiriam o modo escuro do Windows e escureceriam campos e botões.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * Tema da Guarusolar (cores aprovadas pelo cliente, ver CLAUDE.md).
  * As variáveis seguem os nomes do shadcn/ui, então todo componente já nasce com a marca.
  *

@@ -196,7 +196,7 @@ export function DialogNovoCliente({
 
   return (
     <Dialog open={aberto} onOpenChange={onAbertoChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-[18px] p-0 sm:max-w-[680px]">
+      <DialogContent className="max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-[18px] bg-card p-0 sm:max-w-[680px]">
         <form onSubmit={enviar} noValidate>
           <DialogHeader className="gap-1 px-7 pt-6 pb-4 pr-20 text-left">
             <DialogTitle className="font-titulo text-2xl font-bold">Novo cliente</DialogTitle>

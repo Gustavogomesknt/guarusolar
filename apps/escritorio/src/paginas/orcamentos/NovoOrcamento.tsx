@@ -28,7 +28,9 @@ export function NovoOrcamento() {
           </div>
         </header>
 
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_368px]">
+        {/* Duas colunas só a partir de 1360px: abaixo disso a tabela de itens fica sem espaço
+            para o nome (1366px, comum no escritório, já pega as duas colunas). */}
+        <div className="grid items-start gap-6 min-[1360px]:grid-cols-[minmax(0,1fr)_368px]">
           <div className="flex min-w-0 flex-col gap-5">
             <CartaoCliente />
             <CartaoItens subtotal={resultado.subtotal} />

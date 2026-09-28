@@ -35,7 +35,7 @@ export function CartaoCliente() {
   }
 
   return (
-    <section aria-labelledby="titulo-cliente" className="flex flex-col gap-3.5 rounded-[14px] border bg-card px-6 py-[22px]">
+    <section aria-labelledby="titulo-cliente" className="@container flex flex-col gap-3.5 rounded-[14px] border bg-card px-6 py-[22px]">
       <div className="flex items-center justify-between gap-3">
         <h2 id="titulo-cliente" className="text-xl font-bold">
           1. Cliente
@@ -102,7 +102,8 @@ function ClienteSelecionado({ cliente, onTrocar }: { cliente: Cliente; onTrocar:
     .join(' · ');
 
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-xl border border-[#C3D8F0] bg-[#EAF2FB] px-[18px] py-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+    // três colunas conforme a largura do próprio cartão (container query), não da janela
+    <div className="grid grid-cols-2 gap-4 rounded-xl border border-[#C3D8F0] bg-[#EAF2FB] px-[18px] py-4 @xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="text-xs text-[#2C5484]">Cliente selecionado</div>
         <div className="truncate text-[15px] font-semibold">{cliente.nome}</div>
