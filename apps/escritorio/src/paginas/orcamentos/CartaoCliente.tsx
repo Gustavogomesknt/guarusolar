@@ -8,7 +8,7 @@ import { documentoParaExibir, mascararCep, mascararTelefone } from '@/lib/format
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { Button } from '@/components/ui/button';
 import { CampoBusca } from '@/components/CampoBusca';
-import { DialogNovoCliente } from './DialogNovoCliente';
+import { DialogCliente } from '@/components/DialogCliente';
 import type { FormularioOrcamento } from './formulario';
 
 const MINIMO_BUSCA = 2;
@@ -97,11 +97,14 @@ export function CartaoCliente() {
         </p>
       )}
 
-      <DialogNovoCliente
+      <DialogCliente
         aberto={dialogAberto}
         onAbertoChange={setDialogAberto}
         buscaAtual={cliente ? '' : termo}
         onSalvo={selecionar}
+        descricao="Cadastro rápido. Ao salvar, o cliente já entra selecionado no orçamento."
+        rotuloSalvar="Salvar e usar no orçamento"
+        mensagemAoCriar={(nome) => `${nome} cadastrado e selecionado no orçamento`}
       />
     </section>
   );

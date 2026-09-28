@@ -12,6 +12,8 @@ import { PAPEIS_DO_ESCRITORIO } from './permissoes';
 // O <Suspense> fica no Layout.
 const PaginaOrcamento = lazy(() => import('@/paginas/orcamentos/PaginaOrcamento').then((m) => ({ default: m.PaginaOrcamento })));
 const Pipeline = lazy(() => import('@/paginas/orcamentos/Pipeline').then((m) => ({ default: m.Pipeline })));
+const ListaClientes = lazy(() => import('@/paginas/clientes/ListaClientes').then((m) => ({ default: m.ListaClientes })));
+const FichaCliente = lazy(() => import('@/paginas/clientes/FichaCliente').then((m) => ({ default: m.FichaCliente })));
 const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
 
 /** A sessão fica dentro do roteador porque usa useNavigate para voltar ao login. */
@@ -44,6 +46,8 @@ export const roteador = createBrowserRouter(
             {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
             <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
             <Route path="pipeline" element={<Pipeline />} />
+            <Route path="clientes" element={<ListaClientes />} />
+            <Route path="clientes/:id" element={<FichaCliente />} />
             <Route path="catalogo" element={<PaginaCatalogo />} />
           </Route>
         </Route>

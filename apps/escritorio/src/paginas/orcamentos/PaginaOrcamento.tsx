@@ -1,10 +1,10 @@
 import { useRef } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { calcularOrcamento } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@/lib/api';
-import type { OrcamentoCompleto } from '@/lib/tipos';
+import type { Cliente, OrcamentoCompleto } from '@/lib/tipos';
 import { Button } from '@/components/ui/button';
 import { GeradorOrcamento, type OrcamentoInicial } from './GeradorOrcamento';
 import { entradaDoCalculo, salvoDoOrcamento, valoresDoOrcamento } from './formulario';
@@ -33,6 +33,15 @@ export function PaginaOrcamento() {
 
   const emEdicaoLocal = id === 'novo' || id === criadoAqui.current;
 
+  // /orcamentos/novo?cliente=<id>: novo orçamento já com o cliente selecionado
+  const [parametros] = useSearchParams();
+  const clienteId = id === 'novo' ? parametros.get('cliente') : null;
+  const cliente = useQuery({
+    queryKey: ['clientes', 'ficha', clienteId],
+    queryFn: ({ signal }) => api.get<Cliente>(`/api/clientes/${clienteId}`, { signal }),
+    enabled: clienteId !== null,
+  });
+
   const consulta = useQuery({
     queryKey: ['orcamentos', 'detalhe', id],
     queryFn: ({ signal }) => api.get<OrcamentoCompleto>(`/api/orcamentos/${id}`, { signal }),
@@ -44,9 +53,18 @@ export function PaginaOrcamento() {
   });
 
   if (emEdicaoLocal) {
+    // vindo da ficha do cliente: espera o cliente chegar para já abrir com ele selecionado
+    if (id === 'novo' && clienteId && cliente.isPending) {
+      return (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden /> Carregando cliente…
+        </p>
+      );
+    }
     return (
       <GeradorOrcamento
         key={chave.current}
+        clienteInicial={cliente.data}
         onCriado={(novoId) => {
           criadoAqui.current = novoId;
           navegar(`/orcamentos/${novoId}`, { replace: true });

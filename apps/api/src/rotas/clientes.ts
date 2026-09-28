@@ -30,24 +30,43 @@ const clienteSchema = z.object({
   observacoes: z.string().optional(),
 });
 
-// Busca usada no autocomplete do gerador de orçamentos
+/** Documento já usado por outro cliente: 409 com o nome, em vez de erro do banco. */
+async function conferirDocumentoLivre(documento: string, idAtual?: string) {
+  const existente = await prisma.cliente.findUnique({ where: { documento } });
+  if (existente && existente.id !== idAtual) {
+    throw new ErroHttp(409, `Já existe cliente com este documento: ${existente.nome}`);
+  }
+}
+
+// Busca usada no autocomplete do gerador (q, até 20) e na tela de clientes (limite maior,
+// incluirInativos). Sem incluirInativos, só clientes ativos: é assim que o desativado some
+// das buscas de novos orçamentos.
 rotasClientes.get(
   '/',
   rota(async (req, res) => {
-    const q = (req.query.q as string) ?? '';
+    const { q = '', incluirInativos, limite } = req.query as Record<string, string | undefined>;
+    const termo = q.trim();
+    const digitos = somenteDigitos(termo);
     const where: Prisma.ClienteWhereInput = {
-      ativo: true,
-      ...(q
+      ...(incluirInativos === 'true' ? {} : { ativo: true }),
+      ...(termo
         ? {
             OR: [
-              { nome: { contains: q, mode: 'insensitive' } },
-              { documento: { contains: somenteDigitos(q) } },
-              { whatsapp: { contains: somenteDigitos(q) } },
+              { nome: { contains: termo, mode: 'insensitive' } },
+              // sem dígitos no termo, "contém vazio" casaria com todos os clientes
+              ...(digitos ? [{ documento: { contains: digitos } }, { whatsapp: { contains: digitos } }] : []),
             ],
           }
         : {}),
     };
-    res.json(await prisma.cliente.findMany({ where, orderBy: { nome: 'asc' }, take: 20 }));
+    const take = Math.min(Math.max(Number(limite) || 20, 1), 200);
+    const clientes = await prisma.cliente.findMany({
+      where,
+      orderBy: { nome: 'asc' },
+      take,
+      include: { _count: { select: { orcamentos: true } } },
+    });
+    res.json(clientes.map(({ _count, ...c }) => ({ ...c, quantidadeOrcamentos: _count.orcamentos })));
   }),
 );
 
@@ -56,7 +75,13 @@ rotasClientes.get(
   rota(async (req, res) => {
     const cliente = await prisma.cliente.findUnique({
       where: { id: req.params.id },
-      include: { orcamentos: { orderBy: { criadoEm: 'desc' }, take: 10 } },
+      include: {
+        // todos os orçamentos, só com o que a ficha mostra
+        orcamentos: {
+          orderBy: { criadoEm: 'desc' },
+          select: { id: true, codigo: true, status: true, criadoEm: true, validade: true, valorTotal: true },
+        },
+      },
     });
     if (!cliente) throw new ErroHttp(404, 'Cliente não encontrado');
     res.json(cliente);
@@ -67,8 +92,7 @@ rotasClientes.post(
   '/',
   rota(async (req, res) => {
     const dados = clienteSchema.parse(req.body);
-    const existente = await prisma.cliente.findUnique({ where: { documento: dados.documento } });
-    if (existente) throw new ErroHttp(409, `Já existe cliente com este documento: ${existente.nome}`);
+    await conferirDocumentoLivre(dados.documento);
     res.status(201).json(await prisma.cliente.create({ data: dados }));
   }),
 );
@@ -77,15 +101,21 @@ rotasClientes.put(
   '/:id',
   rota(async (req, res) => {
     const dados = clienteSchema.partial().parse(req.body);
-    res.json(await prisma.cliente.update({ where: { id: req.params.id }, data: dados }));
+    const atual = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+    if (!atual) throw new ErroHttp(404, 'Cliente não encontrado');
+    if (dados.documento) await conferirDocumentoLivre(dados.documento, atual.id);
+    res.json(await prisma.cliente.update({ where: { id: atual.id }, data: dados }));
   }),
 );
 
-// Cliente nunca é apagado: vira inativo para preservar o histórico de orçamentos
-rotasClientes.delete(
-  '/:id',
+// Cliente nunca é apagado (regra 3): desativado, sai das buscas de novos orçamentos,
+// e os orçamentos dele continuam como estão.
+rotasClientes.patch(
+  '/:id/ativo',
   rota(async (req, res) => {
-    await prisma.cliente.update({ where: { id: req.params.id }, data: { ativo: false } });
-    res.status(204).end();
+    const { ativo } = z.object({ ativo: z.boolean() }).parse(req.body);
+    const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+    if (!cliente) throw new ErroHttp(404, 'Cliente não encontrado');
+    res.json(await prisma.cliente.update({ where: { id: cliente.id }, data: { ativo } }));
   }),
 );

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { calcularOrcamento, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
 import { api, ErroApi, tokenSalvo, urlDaApi } from '@/lib/api';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
+import type { Cliente } from '@/lib/tipos';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,13 +46,18 @@ export type OrcamentoInicial = {
  */
 export function GeradorOrcamento({
   inicial,
+  clienteInicial,
   onCriado,
 }: {
   inicial?: OrcamentoInicial;
+  /** Orçamento novo já com este cliente selecionado (vindo da ficha do cliente). */
+  clienteInicial?: Cliente;
   /** Chamado quando um orçamento novo é salvo pela primeira vez (a página troca a URL). */
   onCriado?: (id: string) => void;
 }) {
-  const formulario = useForm<FormularioOrcamento>({ defaultValues: inicial?.valores ?? valoresIniciais() });
+  const formulario = useForm<FormularioOrcamento>({
+    defaultValues: inicial?.valores ?? { ...valoresIniciais(), cliente: clienteInicial ?? null },
+  });
   const { control, formState, getValues, reset, setError, clearErrors } = formulario;
   const clienteConsultas = useQueryClient();
   const [salvo, setSalvo] = useState<OrcamentoSalvo | null>(inicial?.salvo ?? null);

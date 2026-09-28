@@ -100,7 +100,7 @@ export function PaginaCatalogo() {
         </div>
       </div>
 
-      <section aria-label="Itens do catálogo" className="overflow-x-auto rounded-[14px] border bg-card">
+      <section aria-label="Itens do catálogo" className="relative overflow-x-auto rounded-[14px] border bg-card">
         <div role="table" aria-label="Itens do catálogo" className="min-w-[940px]">
           <div
             role="row"

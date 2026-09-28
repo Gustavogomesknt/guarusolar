@@ -26,6 +26,16 @@ export type Cliente = {
   bairro: string | null;
   cidade: string | null;
   uf: string | null;
+  ativo: boolean;
+  observacoes?: string | null;
+};
+
+/** Cliente na tela de clientes (GET /api/clientes com a contagem de orçamentos). */
+export type ClienteNaLista = Cliente & { quantidadeOrcamentos: number };
+
+/** Ficha do cliente (GET /api/clientes/:id). */
+export type FichaDoCliente = Cliente & {
+  orcamentos: { id: string; codigo: string; status: StatusOrcamento; criadoEm: string; validade: string; valorTotal: string }[];
 };
 
 /** Linha da lista (GET /api/orcamentos). */

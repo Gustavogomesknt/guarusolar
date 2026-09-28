@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -86,6 +86,24 @@ function paraApi(dados: DadosCliente) {
   };
 }
 
+/** Cliente gravado -> formulário (com as máscaras de exibição). */
+function valoresDoCliente(c: Cliente): DadosCliente {
+  return {
+    tipoPessoa: c.tipoPessoa,
+    nome: c.nome,
+    documento: mascararDocumento(c.documento),
+    whatsapp: mascararTelefone(c.whatsapp),
+    email: c.email ?? '',
+    cep: c.cep ? mascararCep(c.cep) : '',
+    logradouro: c.logradouro ?? '',
+    numero: c.numero ?? '',
+    complemento: c.complemento ?? '',
+    bairro: c.bairro ?? '',
+    cidade: c.cidade ?? '',
+    uf: c.uf ?? '',
+  };
+}
+
 /** Preenche nome ou documento com o que o vendedor já tinha digitado na busca. */
 function preencherComBusca(busca: string): Partial<DadosCliente> {
   const texto = busca.trim();
@@ -102,17 +120,32 @@ function preencherComBusca(busca: string): Partial<DadosCliente> {
 const CLASSE_CAMPO = 'h-11 rounded-[10px] text-sm';
 const CLASSE_PREENCHIDO_PELO_CEP = 'bg-[#F8FAFD]';
 
-export function DialogNovoCliente({
+/**
+ * Formulário completo de cliente, num diálogo. Usado no gerador de orçamentos (cadastro
+ * rápido) e na tela de clientes (novo e editar). Com `cliente`, edita (PUT); sem, cria (POST).
+ */
+export function DialogCliente({
   aberto,
   onAbertoChange,
-  buscaAtual,
+  cliente = null,
+  buscaAtual = '',
   onSalvo,
+  descricao,
+  rotuloSalvar,
+  mensagemAoCriar = (nome) => `${nome} cadastrado`,
 }: {
   aberto: boolean;
   onAbertoChange: (aberto: boolean) => void;
-  buscaAtual: string;
+  cliente?: Cliente | null;
+  /** texto que estava na busca, usado para pré-preencher nome ou documento ao criar */
+  buscaAtual?: string;
   onSalvo: (cliente: Cliente) => void;
+  descricao?: string;
+  rotuloSalvar?: string;
+  mensagemAoCriar?: (nome: string) => string;
 }) {
+  const editando = cliente !== null;
+  const clienteConsultas = useQueryClient();
   const {
     register,
     control,
@@ -129,13 +162,13 @@ export function DialogNovoCliente({
   const buscaCep = useRef<AbortController | null>(null);
   const tipoPessoa = watch('tipoPessoa');
 
-  // Ao abrir, começa limpo (com o que foi digitado na busca, se houver).
+  // Ao abrir: dados do cliente (editar) ou limpo com o que foi digitado na busca (criar).
   useEffect(() => {
     if (!aberto) return;
-    reset({ ...VAZIO, ...preencherComBusca(buscaAtual) });
+    reset(cliente ? valoresDoCliente(cliente) : { ...VAZIO, ...preencherComBusca(buscaAtual) });
     setCepStatus('ocioso');
     // buscaAtual fica de fora das dependências de propósito: só importa no momento de abrir
-  }, [aberto, reset]);
+  }, [aberto, cliente, reset]);
 
   async function completarEndereco(cep: string) {
     if (somenteDigitos(cep).length !== 8) return;
@@ -162,11 +195,16 @@ export function DialogNovoCliente({
   }
 
   const salvar = useMutation({
-    mutationFn: (dados: DadosCliente) => api.post<Cliente>('/api/clientes', paraApi(dados)),
+    mutationFn: (dados: DadosCliente) =>
+      cliente
+        ? api.put<Cliente>(`/api/clientes/${cliente.id}`, paraApi(dados))
+        : api.post<Cliente>('/api/clientes', paraApi(dados)),
     meta: { erroTratadoNoFormulario: true },
-    onSuccess: (cliente) => {
-      toast.success(`${cliente.nome} cadastrado e selecionado no orçamento`);
-      onSalvo(cliente);
+    onSuccess: (salvo) => {
+      toast.success(editando ? `Dados de ${salvo.nome} atualizados` : mensagemAoCriar(salvo.nome));
+      // lista de clientes, ficha e busca do gerador
+      void clienteConsultas.invalidateQueries({ queryKey: ['clientes'] });
+      onSalvo(salvo);
       onAbertoChange(false);
     },
     onError: (erro) => {
@@ -199,9 +237,14 @@ export function DialogNovoCliente({
       <DialogContent className="max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-[18px] bg-card p-0 sm:max-w-[680px]">
         <form onSubmit={enviar} noValidate>
           <DialogHeader className="gap-1 px-7 pt-6 pb-4 pr-20 text-left">
-            <DialogTitle className="font-titulo text-2xl font-bold">Novo cliente</DialogTitle>
+            <DialogTitle className="font-titulo text-2xl font-bold">
+              {editando ? 'Editar cliente' : 'Novo cliente'}
+            </DialogTitle>
             <DialogDescription>
-              Cadastro rápido. Ao salvar, o cliente já entra selecionado no orçamento.
+              {descricao ??
+                (editando
+                  ? 'As alterações aparecem também nos PDFs dos orçamentos deste cliente.'
+                  : 'Preencha os dados do cliente e o endereço da instalação.')}
             </DialogDescription>
           </DialogHeader>
 
@@ -425,7 +468,7 @@ export function DialogNovoCliente({
               </Button>
               <Button type="submit" className="h-11 rounded-[10px] px-5 font-semibold" disabled={salvar.isPending}>
                 {salvar.isPending && <Loader2 className="animate-spin" aria-hidden />}
-                Salvar e usar no orçamento
+                {rotuloSalvar ?? (editando ? 'Salvar alterações' : 'Cadastrar cliente')}
               </Button>
             </div>
           </DialogFooter>

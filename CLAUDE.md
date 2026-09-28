@@ -78,6 +78,10 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                o menu de status do cartão é a alternativa por teclado
   src/paginas/orcamentos/MenuStatus.tsx  useMudancaDeStatus: confirmações de aprovar/recusar e
                                atualização otimista, usada na lista e no pipeline
+  src/paginas/clientes/        lista (/clientes) e ficha (/clientes/:id) com os orçamentos do
+                               cliente; desativar/reativar com confirmação
+  src/components/DialogCliente formulário de cliente (criar e editar, com ViaCEP), usado no
+                               gerador e na tela de clientes
   src/paginas/catalogo/        catálogo (/catalogo): filtros, ativar/desativar e painel lateral
                                de criar/editar com margem ao vivo (calcularMargem)
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
@@ -129,6 +133,8 @@ O `.env` da API fica em `apps/api/.env`.
 - Rotas assíncronas envolvidas no helper `rota()`; erros de regra com `new ErroHttp(status, msg)`.
 - Dinheiro em `Decimal(12,2)` no banco e arredondado para centavos no cálculo.
 - Documento e WhatsApp gravados **somente com dígitos**; a formatação é responsabilidade do front.
+- Tabelas largas rolam dentro do próprio quadro (`relative overflow-x-auto`), nunca a página.
+  O `relative` é obrigatório: sem ele, textos `sr-only` (absolutos) esticam a página.
 - Mensagens de erro escritas para o usuário final, não para o desenvolvedor.
   Bom: "Faltam 2 fotos obrigatórias: Aterramento, Medidor".
 

@@ -132,7 +132,7 @@ export function Pipeline() {
           <Loader2 className="size-4 animate-spin" aria-hidden /> Carregando orçamentos…
         </p>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="relative flex gap-4 overflow-x-auto pb-2">
           {STATUS_ORCAMENTO.map((status) => (
             <Coluna
               key={status}

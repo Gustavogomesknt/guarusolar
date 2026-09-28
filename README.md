@@ -60,8 +60,10 @@ packages/compartilhado/
 | Método | Rota | Quem acessa | Para quê |
 | --- | --- | --- | --- |
 | POST | `/api/auth/login` | todos | login, devolve o token |
-| GET | `/api/clientes?q=` | comercial | autocomplete de clientes |
-| POST | `/api/clientes` | comercial | cadastro rápido no modal |
+| GET | `/api/clientes?q=&incluirInativos=&limite=` | comercial | busca (nome, CPF/CNPJ, WhatsApp) e lista |
+| GET | `/api/clientes/:id` | comercial | ficha com os orçamentos do cliente |
+| POST/PUT | `/api/clientes` | comercial | cadastro e edição (mesmo formulário) |
+| PATCH | `/api/clientes/:id/ativo` | comercial | desativar/reativar (nada é apagado) |
 | GET | `/api/produtos?q=` | comercial | autocomplete do catálogo |
 | POST/PUT | `/api/produtos` | comercial | CRUD do catálogo |
 | PATCH | `/api/produtos/:id/ativo` | comercial | ativar/desativar item |

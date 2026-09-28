@@ -232,7 +232,7 @@ function Tabela({
   const nenhumAinda = !filtrando && orcamentos?.length === 0;
 
   return (
-    <section aria-label="Lista de orçamentos" className="overflow-x-auto rounded-[14px] border bg-card">
+    <section aria-label="Lista de orçamentos" className="relative overflow-x-auto rounded-[14px] border bg-card">
       <div role="table" aria-label="Orçamentos" className="min-w-[980px]">
         <div role="rowgroup">
           <div
