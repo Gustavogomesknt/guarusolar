@@ -19,7 +19,11 @@ cp apps/api/.env.example apps/api/.env     # ajuste DATABASE_URL, DIRECT_URL e J
 npm run db:migrate                         # cria as tabelas
 npm run db:seed                            # catálogo, equipes, checklist e usuários de teste
 npm run dev:api                            # http://localhost:3333
+npm run dev:escritorio                     # front do escritório em http://localhost:5173
 ```
+
+Com a API e o front rodando, abra http://localhost:5173 e entre com um usuário do seed.
+No desenvolvimento, o Vite repassa `/api` para a API, então não é preciso configurar CORS.
 
 Usuários criados pelo seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@` e
 `tecnico.a@guarusolar.com.br`.
@@ -41,6 +45,11 @@ apps/api/
   src/lib/codigos.ts        GS-2026-0148 / PRJ-2026-0146
   src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
   src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
+apps/escritorio/            front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
+  src/lib/api.ts            cliente HTTP com token e tratamento central de erro
+  src/lib/sessao.tsx        login, saída e sessão expirada
+  src/app/                  rotas protegidas por papel, menu e layout
+  src/paginas/              telas (por enquanto: login e início)
 packages/compartilhado/
   src/enums.ts              enums do banco, usados pelos fronts sem depender do Prisma
   src/calculo.ts            regra de totais, desconto e parcelamento

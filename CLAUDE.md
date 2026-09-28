@@ -57,6 +57,16 @@ apps/api/                      API (Express + Prisma)
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
+apps/escritorio/               front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
+  src/estilos/tema.css         cores e fontes da marca como variáveis do shadcn
+  src/lib/api.ts               cliente HTTP: token no cabeçalho, ErroApi, 401 encerra a sessão
+  src/lib/sessao.tsx           usuário logado, entrar(), sair() e aviso de sessão expirada
+  src/lib/consultas.ts         React Query com aviso global de erro (toast)
+  src/app/rotas.tsx            rotas; cada tela fica dentro de <RotaProtegida papeis={...}>
+  src/app/menu.ts              itens do menu e os papéis de cada um
+  src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
+  src/components/ui/           gerados pelo shadcn (npx shadcn@latest add ... --cwd apps/escritorio)
+  src/paginas/                 Login, Inicio, SemAcesso
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
   src/calculo.ts               totais, desconto e condições de pagamento
@@ -109,6 +119,10 @@ Cores da marca: **azul, laranja e branco**.
 | Cartões | `#FFFFFF`, borda `#D9E0EA` |
 | Texto principal / secundário | `#10243D` / `#5A6675` |
 
+**Laranja só em ícones, bordas, selos e no logo — nunca como fundo com texto branco**
+(contraste de ~2,8:1, abaixo do mínimo de 4,5:1). Selo laranja = borda laranja, fundo
+`destaque-suave` e texto `destaque-texto` (componente `Selo`). Botões usam o azul de ação.
+
 Verde e vermelho ficam reservados para "Aprovado" e "Recusado". Tipografia do protótipo:
 Bricolage Grotesque nos títulos, IBM Plex Sans no texto, IBM Plex Mono em códigos e valores.
 
@@ -127,7 +141,8 @@ app do técnico (celular), validação do serviço (gestor) e agenda das equipes
 ## Estado atual
 
 Pronto: schema do Prisma, seed e API completa (auth, clientes, produtos, orçamentos com
-status e WhatsApp, agenda, validação e rotas do técnico).
+status e WhatsApp, agenda, validação e rotas do técnico). Monorepo com o pacote compartilhado.
+Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegidas por papel.
 
 Próximos passos, nesta ordem:
 
@@ -152,6 +167,7 @@ cp apps/api/.env.example apps/api/.env       # ajustar DATABASE_URL, DIRECT_URL 
 npm run db:migrate       # cria as tabelas
 npm run db:seed          # catálogo, equipes, checklist e usuários de teste
 npm run dev:api          # API em http://localhost:3333
+npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
 npm run db:studio        # inspecionar o banco
 npm run build            # compila todos os workspaces
 ```

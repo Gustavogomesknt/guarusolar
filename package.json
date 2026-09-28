@@ -13,6 +13,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev:api": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/api",
+    "dev:escritorio": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/escritorio",
     "db:migrate": "npm run db:migrate -w @guarusolar/api",
     "db:seed": "npm run db:seed -w @guarusolar/api",
     "db:studio": "npm run db:studio -w @guarusolar/api"
