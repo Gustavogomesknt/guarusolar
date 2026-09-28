@@ -36,6 +36,9 @@ export type OrcamentoNaLista = {
   criadoEm: string;
   validade: string;
   valorTotal: string;
+  enviadoEm: string | null;
+  aprovadoEm: string | null;
+  recusadoEm: string | null;
   cliente: { id: string; nome: string; cidade: string | null; uf: string | null; whatsapp: string };
 };
 

@@ -5,10 +5,6 @@ import { FileText, Loader2, MessageCircle, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   formatarData,
-  FUSO_EMPRESA,
-  inicioDoDia,
-  inicioDoMes,
-  partesNoFuso,
   ROTULO_STATUS_ORCAMENTO,
   STATUS_ORCAMENTO,
   type StatusOrcamento,
@@ -20,51 +16,9 @@ import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MenuStatus } from './MenuStatus';
-
-// ---------------------------------------------------------------------------
-// Período
-// ---------------------------------------------------------------------------
-type Periodo = 'ESTE_MES' | 'MES_PASSADO' | 'ULTIMOS_90' | 'ESTE_ANO' | 'TUDO';
-
-const nomeDoMes = (instante: Date) =>
-  instante
-    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: FUSO_EMPRESA })
-    .replace(/^./, (c) => c.toUpperCase());
-
-function opcoesDePeriodo(): { valor: Periodo; rotulo: string }[] {
-  return [
-    { valor: 'ESTE_MES', rotulo: nomeDoMes(new Date()) },
-    // meio do mês passado: qualquer instante dele serve para o nome
-    { valor: 'MES_PASSADO', rotulo: nomeDoMes(new Date(inicioDoMes(-1).getTime() + 15 * 864e5)) },
-    { valor: 'ULTIMOS_90', rotulo: 'Últimos 90 dias' },
-    { valor: 'ESTE_ANO', rotulo: `Ano de ${partesNoFuso().ano}` },
-    { valor: 'TUDO', rotulo: 'Todo o período' },
-  ];
-}
-
-/**
- * Intervalo de criação (de/até) enviado à API, com os limites no fuso da empresa
- * (America/Sao_Paulo), qualquer que seja o fuso do computador.
- */
-function intervalo(periodo: Periodo): { de?: string; ate?: string } {
-  const { ano, mes, dia } = partesNoFuso();
-  switch (periodo) {
-    case 'ESTE_MES':
-      return { de: inicioDoMes(0).toISOString() };
-    case 'MES_PASSADO':
-      return {
-        de: inicioDoMes(-1).toISOString(),
-        ate: new Date(inicioDoMes(0).getTime() - 1).toISOString(),
-      };
-    case 'ULTIMOS_90':
-      return { de: inicioDoDia(ano, mes, dia - 90).toISOString() };
-    case 'ESTE_ANO':
-      return { de: inicioDoDia(ano, 0, 1).toISOString() };
-    case 'TUDO':
-      return {};
-  }
-}
+import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
+import { AlternadorVisao } from './AlternadorVisao';
+import { intervalo, opcoesDePeriodo, SeletorPeriodo, type Periodo } from './periodo';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
@@ -76,6 +30,7 @@ export function ListaOrcamentos() {
   const [periodo, setPeriodo] = useState<Periodo>('ESTE_MES');
   const buscaAtrasada = useValorAtrasado(busca.trim(), 300);
   const opcoes = useMemo(opcoesDePeriodo, []);
+  const mudancaDeStatus = useMudancaDeStatus();
 
   const filtrosBase = useMemo(() => {
     const p = new URLSearchParams();
@@ -113,12 +68,15 @@ export function ListaOrcamentos() {
           <p className="text-[13px] text-muted-foreground">Comercial · {opcoes[0].rotulo}</p>
           <h1 className="text-4xl font-bold tracking-[-0.02em]">Orçamentos</h1>
         </div>
-        <Button asChild className="h-11 rounded-[10px] px-[18px] font-semibold">
-          <Link to="/orcamentos/novo">
-            <Plus aria-hidden />
-            Novo orçamento
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <AlternadorVisao />
+          <Button asChild className="h-11 rounded-[10px] px-[18px] font-semibold">
+            <Link to="/orcamentos/novo">
+              <Plus aria-hidden />
+              Novo orçamento
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <Indicadores />
@@ -157,20 +115,7 @@ export function ListaOrcamentos() {
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </label>
-          <label className="flex h-10 items-center gap-2 rounded-[10px] border border-input bg-card pr-2.5 pl-3 text-[13px] text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30">
-            Período
-            <select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value as Periodo)}
-              className="h-full bg-transparent text-sm font-medium text-foreground outline-none"
-            >
-              {opcoes.map((o) => (
-                <option key={o.valor} value={o.valor}>
-                  {o.rotulo}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SeletorPeriodo valor={periodo} onChange={setPeriodo} />
         </div>
       </div>
 
@@ -185,7 +130,10 @@ export function ListaOrcamentos() {
           setBusca('');
           setPeriodo('ESTE_MES');
         }}
+        pedir={mudancaDeStatus.pedir}
+        pendenteId={mudancaDeStatus.pendenteId}
       />
+      {mudancaDeStatus.dialogo}
     </div>
   );
 }
@@ -269,6 +217,8 @@ function Tabela({
   totalSemFiltroDeStatus,
   filtrando,
   onLimparFiltros,
+  pedir,
+  pendenteId,
 }: {
   orcamentos: OrcamentoNaLista[] | undefined;
   carregando: boolean;
@@ -276,6 +226,8 @@ function Tabela({
   totalSemFiltroDeStatus: number | null;
   filtrando: boolean;
   onLimparFiltros: () => void;
+  pedir: PedirMudanca;
+  pendenteId: string | null;
 }) {
   const nenhumAinda = !filtrando && orcamentos?.length === 0;
 
@@ -301,7 +253,9 @@ function Tabela({
           </div>
         </div>
         <div role="rowgroup">
-          {orcamentos?.map((o) => <Linha key={o.id} orcamento={o} />)}
+          {orcamentos?.map((o) => (
+            <Linha key={o.id} orcamento={o} pedir={pedir} pendente={pendenteId === o.id} />
+          ))}
         </div>
       </div>
 
@@ -352,7 +306,15 @@ function Tabela({
   );
 }
 
-function Linha({ orcamento: o }: { orcamento: OrcamentoNaLista }) {
+function Linha({
+  orcamento: o,
+  pedir,
+  pendente,
+}: {
+  orcamento: OrcamentoNaLista;
+  pedir: PedirMudanca;
+  pendente: boolean;
+}) {
   const navegar = useNavigate();
   const clienteConsultas = useQueryClient();
   const abrir = () => navegar(`/orcamentos/${o.id}`);
@@ -400,7 +362,7 @@ function Linha({ orcamento: o }: { orcamento: OrcamentoNaLista }) {
         {formatarBRL(Number(o.valorTotal))}
       </span>
       <span role="cell">
-        <MenuStatus orcamento={o} />
+        <MenuStatus orcamento={o} pedir={pedir} pendente={pendente} />
       </span>
       <span role="cell" className="flex justify-end gap-1.5">
         <Link

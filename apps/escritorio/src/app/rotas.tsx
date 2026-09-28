@@ -1,13 +1,18 @@
+import { lazy } from 'react';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
 import { SessaoProvider } from '@/lib/sessao';
 import { Login } from '@/paginas/Login';
 import { Sair } from '@/paginas/Sair';
 import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';
-import { PaginaOrcamento } from '@/paginas/orcamentos/PaginaOrcamento';
-import { PaginaCatalogo } from '@/paginas/catalogo/PaginaCatalogo';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
+
+// Telas carregadas sob demanda: ficam fora do JavaScript inicial (a lista é a tela de entrada).
+// O <Suspense> fica no Layout.
+const PaginaOrcamento = lazy(() => import('@/paginas/orcamentos/PaginaOrcamento').then((m) => ({ default: m.PaginaOrcamento })));
+const Pipeline = lazy(() => import('@/paginas/orcamentos/Pipeline').then((m) => ({ default: m.Pipeline })));
+const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
 
 /** A sessão fica dentro do roteador porque usa useNavigate para voltar ao login. */
 function RaizDoApp() {
@@ -38,6 +43,7 @@ export const roteador = createBrowserRouter(
             <Route path="orcamentos" element={<ListaOrcamentos />} />
             {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
             <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
+            <Route path="pipeline" element={<Pipeline />} />
             <Route path="catalogo" element={<PaginaCatalogo />} />
           </Route>
         </Route>

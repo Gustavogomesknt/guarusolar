@@ -1,5 +1,6 @@
+import { Suspense } from 'react';
 import { Link, NavLink, Outlet } from 'react-router';
-import { LogOut } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
 import { useSessao } from '@/lib/sessao';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/Logo';
@@ -67,7 +68,16 @@ export function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 px-8 py-8">
-        <Outlet />
+        {/* telas carregadas sob demanda (lazy) mostram isto enquanto o arquivo chega */}
+        <Suspense
+          fallback={
+            <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden /> Carregando…
+            </p>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

@@ -73,6 +73,11 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                e gerador (/orcamentos/:id, com "novo" para criar): prévia com
                                calcularOrcamento, salvar via POST/PUT, WhatsApp; APROVADO
                                abre só para leitura
+  src/paginas/orcamentos/Pipeline.tsx  Kanban (/pipeline): arrastar e soltar com
+                               @atlaskit/pragmatic-drag-and-drop respeitando TRANSICOES_STATUS;
+                               o menu de status do cartão é a alternativa por teclado
+  src/paginas/orcamentos/MenuStatus.tsx  useMudancaDeStatus: confirmações de aprovar/recusar e
+                               atualização otimista, usada na lista e no pipeline
   src/paginas/catalogo/        catálogo (/catalogo): filtros, ativar/desativar e painel lateral
                                de criar/editar com margem ao vivo (calcularMargem)
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas

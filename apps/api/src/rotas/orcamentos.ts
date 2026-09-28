@@ -10,6 +10,7 @@ import {
   formatarData,
   inicioDoMes,
   podeMudarStatus,
+  ROTULO_STATUS_ORCAMENTO,
   type CondicaoPagamento,
   type ResultadoCalculo,
 } from '@guarusolar/compartilhado';
@@ -342,7 +343,10 @@ rotasOrcamentos.patch(
     const orcamento = await prisma.orcamento.findUnique({ where: { id: req.params.id } });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
     if (!podeMudarStatus(orcamento.status, status)) {
-      throw new ErroHttp(409, `Não é possível mudar de ${orcamento.status} para ${status}`);
+      throw new ErroHttp(
+        409,
+        `Um orçamento ${ROTULO_STATUS_ORCAMENTO[orcamento.status].toLowerCase()} não pode ir para ${ROTULO_STATUS_ORCAMENTO[status].toLowerCase()}`,
+      );
     }
 
     const atualizado = await prisma.$transaction((tx) =>
