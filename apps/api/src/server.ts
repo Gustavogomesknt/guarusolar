@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';

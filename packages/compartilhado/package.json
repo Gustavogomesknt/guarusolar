@@ -2,6 +2,9 @@
   "name": "@guarusolar/compartilhado",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "description": "Enums e regra de calculo usados pela API e pelos fronts da Guarusolar",
   "type": "module",
   "main": "dist/index.js",

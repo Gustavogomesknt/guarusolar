@@ -55,6 +55,7 @@ apps/api/                      API (Express + Prisma)
   src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
+  src/lib/zod-pt.ts            mensagens padrão do Zod em português (importado no server.ts)
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
 apps/escritorio/               front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
@@ -99,7 +100,9 @@ O `.env` da API fica em `apps/api/.env`.
 
 - Código, nomes de variáveis, rotas, mensagens de erro e comentários **em português**.
 - Enums e valores do banco em MAIÚSCULAS com underscore: `EM_NEGOCIACAO`, `PAINEL_SOLAR`.
-- Validação de entrada sempre com **Zod**, no início da rota.
+- Validação de entrada sempre com **Zod**, no início da rota. As mensagens padrão já saem em
+  português (`apps/api/src/lib/zod-pt.ts`); passe mensagem própria só quando a padrão não
+  explicar o problema ao usuário (ex.: `.min(3, 'Informe o nome completo')`).
 - Rotas assíncronas envolvidas no helper `rota()`; erros de regra com `new ErroHttp(status, msg)`.
 - Dinheiro em `Decimal(12,2)` no banco e arredondado para centavos no cálculo.
 - Documento e WhatsApp gravados **somente com dígitos**; a formatação é responsabilidade do front.

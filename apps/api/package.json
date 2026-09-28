@@ -2,6 +2,9 @@
   "name": "@guarusolar/api",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "description": "API do sistema de gestao da Guarusolar (comercial, agenda e validacao de servicos)",
   "scripts": {
     "dev": "tsx watch src/server.ts",

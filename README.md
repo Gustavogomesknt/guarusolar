@@ -108,6 +108,18 @@ A API aceita apenas `image/jpeg`, `image/png` e `image/webp`, até 15 MB, no cam
 Uma foto maior é recusada com status 413, e um formato diferente com status 400, os dois com
 mensagem pronta para mostrar ao técnico.
 
+## Hospedagem
+
+- **Node.js 22.12 ou mais recente**, obrigatório (declarado em `engines` em todos os
+  `package.json`). A API é CommonJS e carrega o `@guarusolar/compartilhado`, que é ESM, pelo
+  `require()` de módulos ESM, que só é estável a partir do Node 22.12. Em versão anterior a API
+  nem sobe. Ao escolher o serviço de hospedagem, confira a versão do Node e fixe 22 ou mais nova.
+- **Banco:** PostgreSQL gerenciado (plano gratuito do Supabase, Neon ou similar). Use
+  `DATABASE_URL` com a conexão pooled e `DIRECT_URL` com a conexão direta, que as migrations
+  usam (detalhes em `apps/api/.env.example`).
+- **Publicar a API:** `npm ci`, `npm run build`, `npx prisma migrate deploy` (em `apps/api`) e
+  `npm start -w @guarusolar/api`, com `JWT_SECRET` e as variáveis do banco configuradas.
+
 ## Próximos passos
 
 1. Front do escritório (React + Tailwind + shadcn/ui) seguindo o design aprovado.

@@ -2,6 +2,9 @@
   "name": "@guarusolar/escritorio",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "description": "Front do escritorio da Guarusolar (comercial e gestor)",
   "type": "module",
   "scripts": {
