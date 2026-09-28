@@ -1,9 +1,9 @@
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
 import { SessaoProvider } from '@/lib/sessao';
 import { Login } from '@/paginas/Login';
-import { Inicio } from '@/paginas/Inicio';
 import { Sair } from '@/paginas/Sair';
-import { NovoOrcamento } from '@/paginas/orcamentos/NovoOrcamento';
+import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';
+import { PaginaOrcamento } from '@/paginas/orcamentos/PaginaOrcamento';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
@@ -32,9 +32,11 @@ export const roteador = createBrowserRouter(
 
       <Route element={<RotaProtegida papeis={PAPEIS_DO_ESCRITORIO} />}>
         <Route element={<Layout />}>
-          <Route index element={<Inicio />} />
+          <Route index element={<Navigate to="/orcamentos" replace />} />
           <Route element={<RotaProtegida papeis={['COMERCIAL', 'GESTOR']} />}>
-            <Route path="orcamentos/novo" element={<NovoOrcamento />} />
+            <Route path="orcamentos" element={<ListaOrcamentos />} />
+            {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
+            <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
           </Route>
         </Route>
       </Route>

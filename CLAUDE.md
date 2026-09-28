@@ -66,8 +66,10 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
   src/lib/consultas.ts         React Query com aviso global de erro (toast)
   src/app/rotas.tsx            roteador de dados (createBrowserRouter, necessário para o
                                useBlocker); cada tela fica dentro de <RotaProtegida papeis={...}>
-  src/paginas/orcamentos/      gerador de orçamentos (/orcamentos/novo): prévia com
-                               calcularOrcamento, salvar via POST/PUT, WhatsApp
+  src/paginas/orcamentos/      lista (/orcamentos: indicadores, filtros, status em 1 clique)
+                               e gerador (/orcamentos/:id, com "novo" para criar): prévia com
+                               calcularOrcamento, salvar via POST/PUT, WhatsApp; APROVADO
+                               abre só para leitura
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
   src/app/menu.ts              itens do menu e os papéis de cada um
   src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
@@ -96,7 +98,8 @@ O `.env` da API fica em `apps/api/.env`.
    gravados no item. Mudança futura no catálogo não altera orçamento antigo.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
-5. **Status seguem transições válidas** (ver mapa `transicoes` em `apps/api/src/rotas/orcamentos.ts`).
+5. **Status seguem transições válidas** (mapa `TRANSICOES_STATUS` em
+   `packages/compartilhado/src/status.ts`, usado pela API e pelo menu de status da lista).
    Orçamento `APROVADO` não pode ser editado.
 6. **Técnico só acessa os serviços da própria equipe**, validado no servidor, nunca apenas
    escondendo botões na interface.
@@ -154,8 +157,8 @@ app do técnico (celular), validação do serviço (gestor) e agenda das equipes
 Pronto: schema do Prisma, seed e API completa (auth, clientes, produtos, orçamentos com
 status e WhatsApp, agenda, validação e rotas do técnico). Monorepo com o pacote compartilhado.
 Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegidas por papel.
-Gerador de orçamentos (novo orçamento): cliente, itens, condições, salvar e WhatsApp. Falta
-abrir um orçamento já salvo para editar.
+Orçamentos no escritório: lista com indicadores e mudança de status, gerador para criar e
+editar (cliente, itens, condições, salvar, WhatsApp) e modo leitura para aprovados.
 
 Próximos passos, nesta ordem:
 

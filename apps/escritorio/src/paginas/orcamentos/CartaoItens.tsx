@@ -70,46 +70,48 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
         </p>
       </div>
 
-      <CampoBusca<Produto>
-        inputRef={campoBusca}
-        destacado
-        rotulo="Adicionar item do catálogo"
-        placeholder="Digite para buscar no catálogo: painel, inversor, cabo…"
-        dica="Enter adiciona"
-        termo={termo}
-        onTermoChange={setTermo}
-        resultados={termoBusca === termo.trim() ? busca.data : undefined}
-        carregando={termo.trim().length >= MINIMO_BUSCA && atualizando}
-        minimo={MINIMO_BUSCA}
-        chave={(p) => p.id}
-        onEscolher={adicionar}
-        renderItem={(p) => {
-          const noOrcamento = quantidadeNoOrcamento(p.id);
-          return (
-            <div className="grid grid-cols-[minmax(0,1fr)_120px_110px] items-center gap-3">
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-sm font-medium">{p.nome}</span>
-                <span className="text-xs text-muted-foreground">
-                  {ROTULO_CATEGORIA[p.categoria]} · por {ROTULO_UNIDADE[p.unidade]}
-                  {noOrcamento && ` · já no orçamento (${noOrcamento})`}
+      <div className="busca-catalogo">
+        <CampoBusca<Produto>
+          inputRef={campoBusca}
+          destacado
+          rotulo="Adicionar item do catálogo"
+          placeholder="Digite para buscar no catálogo: painel, inversor, cabo…"
+          dica="Enter adiciona"
+          termo={termo}
+          onTermoChange={setTermo}
+          resultados={termoBusca === termo.trim() ? busca.data : undefined}
+          carregando={termo.trim().length >= MINIMO_BUSCA && atualizando}
+          minimo={MINIMO_BUSCA}
+          chave={(p) => p.id}
+          onEscolher={adicionar}
+          renderItem={(p) => {
+            const noOrcamento = quantidadeNoOrcamento(p.id);
+            return (
+              <div className="grid grid-cols-[minmax(0,1fr)_120px_110px] items-center gap-3">
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-sm font-medium">{p.nome}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {ROTULO_CATEGORIA[p.categoria]} · por {ROTULO_UNIDADE[p.unidade]}
+                    {noOrcamento && ` · já no orçamento (${noOrcamento})`}
+                  </span>
                 </span>
-              </span>
-              <span className="text-right font-mono text-sm">{formatarBRL(Number(p.precoVenda))}</span>
-              <span className="justify-self-end text-[13px] font-semibold text-primary" aria-hidden>
-                + Adicionar
-              </span>
-            </div>
-          );
-        }}
-        vazio={
-          <>
-            Nenhum item encontrado no catálogo.{' '}
-            <Link to="/catalogo" className="font-medium text-primary underline-offset-2 hover:underline">
-              Cadastrar novo item
-            </Link>
-          </>
-        }
-      />
+                <span className="text-right font-mono text-sm">{formatarBRL(Number(p.precoVenda))}</span>
+                <span className="justify-self-end text-[13px] font-semibold text-primary" aria-hidden>
+                  + Adicionar
+                </span>
+              </div>
+            );
+          }}
+          vazio={
+            <>
+              Nenhum item encontrado no catálogo.{' '}
+              <Link to="/catalogo" className="font-medium text-primary underline-offset-2 hover:underline">
+                Cadastrar novo item
+              </Link>
+            </>
+          }
+        />
+      </div>
 
       {fields.length === 0 ? (
         <p

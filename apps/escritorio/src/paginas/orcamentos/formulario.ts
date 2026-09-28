@@ -6,8 +6,8 @@ import type {
   TipoDesconto,
   Unidade,
 } from '@guarusolar/compartilhado';
-import type { Cliente, Produto } from '@/lib/tipos';
-import { formatarBRL, formatarDecimal, lerNumero } from '@/lib/formatar';
+import type { Cliente, OrcamentoCompleto, Produto } from '@/lib/tipos';
+import { formatarBRL, formatarDecimal, formatarQuantidade, lerNumero } from '@/lib/formatar';
 
 /*
  * Estado do gerador de orçamentos. Valores digitados ficam como texto (como o usuário
@@ -39,7 +39,11 @@ export type FormularioOrcamento = {
   observacoes: string;
 };
 
-export const OPCOES_ENTRADA = ['0', '10', '20', '30', '40', '50'];
+/** Modo leitura (fieldset desabilitado): esconde a busca do catálogo e esmaece botões e campos. */
+export const ESTILO_SOMENTE_LEITURA =
+  '[&:disabled_.busca-catalogo]:hidden [&:disabled_button]:cursor-not-allowed [&:disabled_button]:opacity-40 [&:disabled_input]:opacity-60 [&:disabled_select]:opacity-60';
+
+export const OPCOES_ENTRADA =['0', '10', '20', '30', '40', '50'];
 export const OPCOES_PARCELAS = ['2', '3', '4', '6', '10', '12'];
 export const DIAS_DE_VALIDADE = 30;
 
@@ -193,10 +197,41 @@ export type OrcamentoSalvo = {
   resumoPagamento: string;
 };
 
-export const ROTULO_STATUS: Record<StatusOrcamento, string> = {
-  RASCUNHO: 'Rascunho',
-  ENVIADO: 'Enviado',
-  EM_NEGOCIACAO: 'Em negociação',
-  APROVADO: 'Aprovado',
-  RECUSADO: 'Recusado',
-};
+/** Orçamento gravado -> formulário do gerador (para abrir e editar). */
+export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
+  const numeroTexto = (v: string | number | null | undefined, padrao: string) =>
+    v === null || v === undefined ? padrao : formatarQuantidade(Number(v));
+  return {
+    cliente: o.cliente,
+    itens: o.itens.map((item) => ({
+      produtoId: item.produtoId,
+      nome: item.descricao,
+      categoria: item.produto.categoria,
+      unidade: item.unidade,
+      precoTabela: Number(item.precoTabela),
+      quantidade: formatarQuantidade(Number(item.quantidade)),
+      precoUnitario: formatarDecimal(Number(item.precoUnitario)),
+    })),
+    descontoTipo: o.descontoTipo,
+    descontoValor:
+      o.descontoTipo === 'VALOR' ? formatarDecimal(Number(o.descontoValor)) : numeroTexto(o.descontoValor, '0'),
+    condicaoPagamento: o.condicaoPagamento,
+    descontoAVistaPct: numeroTexto(o.descontoAVistaPct, '0'),
+    // os selects só têm estas opções; valores fora delas voltam ao padrão
+    entradaPct: OPCOES_ENTRADA.includes(String(Number(o.entradaPct))) ? String(Number(o.entradaPct)) : '30',
+    parcelas: OPCOES_PARCELAS.includes(String(o.parcelas)) ? String(o.parcelas) : '6',
+    // gravada ao meio-dia UTC: os 10 primeiros caracteres são a data certa
+    validade: o.validade.slice(0, 10),
+    observacoes: o.observacoes ?? '',
+  };
+}
+
+export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string): OrcamentoSalvo => ({
+  id: o.id,
+  codigo: o.codigo,
+  status: o.status,
+  subtotal: o.subtotal,
+  descontoAplicado: o.descontoAplicado,
+  valorTotal: o.valorTotal,
+  resumoPagamento,
+});

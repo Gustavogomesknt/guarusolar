@@ -4,7 +4,7 @@ import { Prisma, type StatusOrcamento } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { calcularOrcamento, formatarBRL } from '@guarusolar/compartilhado';
+import { calcularOrcamento, formatarBRL, podeMudarStatus } from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 
 export const rotasOrcamentos = Router();
@@ -129,6 +129,8 @@ rotasOrcamentos.get(
       totalOrcadoMes: Number(totalMes._sum.valorTotal ?? 0),
       quantidadeMes: totalMes._count,
       taxaAprovacao: enviados ? Math.round((aprovados / enviados) * 100) : 0,
+      aprovadosMes: aprovados,
+      enviadosMes: enviados,
       quantidadeEmAberto: emAberto,
       valorEmAberto:
         Number(busca('ENVIADO')?._sum.valorTotal ?? 0) +
@@ -146,7 +148,8 @@ rotasOrcamentos.get(
       include: {
         cliente: true,
         vendedor: { select: { id: true, nome: true, telefone: true } },
-        itens: { orderBy: { ordem: 'asc' } },
+        // a categoria fica no produto; o resto do item é cópia gravada no orçamento
+        itens: { orderBy: { ordem: 'asc' }, include: { produto: { select: { categoria: true } } } },
         historico: { orderBy: { criadoEm: 'desc' }, include: { usuario: { select: { nome: true } } } },
         projeto: true,
       },
@@ -255,15 +258,8 @@ rotasOrcamentos.put(
 
 // --------------------------------------------------------------------------
 // Mudança de status em 1 clique (botão da tabela e do Kanban)
+// O mapa de transições fica em @guarusolar/compartilhado: o menu da lista usa o mesmo.
 // --------------------------------------------------------------------------
-const transicoes: Record<StatusOrcamento, StatusOrcamento[]> = {
-  RASCUNHO: ['ENVIADO'],
-  ENVIADO: ['EM_NEGOCIACAO', 'APROVADO', 'RECUSADO'],
-  EM_NEGOCIACAO: ['ENVIADO', 'APROVADO', 'RECUSADO'],
-  APROVADO: [],
-  RECUSADO: ['EM_NEGOCIACAO'],
-};
-
 rotasOrcamentos.patch(
   '/:id/status',
   rota(async (req, res) => {
@@ -276,7 +272,7 @@ rotasOrcamentos.patch(
 
     const orcamento = await prisma.orcamento.findUnique({ where: { id: req.params.id } });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
-    if (!transicoes[orcamento.status].includes(status)) {
+    if (!podeMudarStatus(orcamento.status, status)) {
       throw new ErroHttp(409, `Não é possível mudar de ${orcamento.status} para ${status}`);
     }
 
@@ -373,7 +369,7 @@ rotasOrcamentos.post(
     ].join('\n');
 
     let status = orcamento.status;
-    if (orcamento.status === 'RASCUNHO' && transicoes.RASCUNHO.includes('ENVIADO')) {
+    if (orcamento.status === 'RASCUNHO' && podeMudarStatus('RASCUNHO', 'ENVIADO')) {
       const atualizado = await prisma.$transaction((tx) =>
         mudarStatus(tx, orcamento, 'ENVIADO', req.usuario!.id, 'Enviado pelo WhatsApp'),
       );

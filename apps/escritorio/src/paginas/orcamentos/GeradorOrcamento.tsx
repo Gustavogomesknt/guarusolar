@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useBlocker } from 'react-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useBlocker } from 'react-router';
 import { FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
-import { Loader2, Save } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { calcularOrcamento } from '@guarusolar/compartilhado';
+import { calcularOrcamento, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
 import { api, ErroApi, tokenSalvo } from '@/lib/api';
+import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,8 +22,8 @@ import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
 import {
   campoDoFormulario,
   entradaDoCalculo,
+  ESTILO_SOMENTE_LEITURA,
   paraApi,
-  ROTULO_STATUS,
   validarParaSalvar,
   valoresIniciais,
   type FormularioOrcamento,
@@ -30,20 +31,42 @@ import {
   type ProblemaFormulario,
 } from './formulario';
 
-const horaCurta = (data: Date) => data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const horaCurta =(data: Date) => data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-export function NovoOrcamento() {
-  const formulario = useForm<FormularioOrcamento>({ defaultValues: valoresIniciais() });
+export type OrcamentoInicial = {
+  valores: FormularioOrcamento;
+  salvo: OrcamentoSalvo;
+};
+
+/**
+ * O gerador de orçamentos: cria (sem `inicial`) ou edita um orçamento salvo.
+ * Orçamento APROVADO abre só para leitura: a API não aceita alterá-lo.
+ */
+export function GeradorOrcamento({
+  inicial,
+  onCriado,
+}: {
+  inicial?: OrcamentoInicial;
+  /** Chamado quando um orçamento novo é salvo pela primeira vez (a página troca a URL). */
+  onCriado?: (id: string) => void;
+}) {
+  const formulario = useForm<FormularioOrcamento>({ defaultValues: inicial?.valores ?? valoresIniciais() });
   const { control, formState, getValues, reset, setError, clearErrors } = formulario;
-  const [salvo, setSalvo] = useState<OrcamentoSalvo | null>(null);
+  const clienteConsultas = useQueryClient();
+  const [salvo, setSalvo] = useState<OrcamentoSalvo | null>(inicial?.salvo ?? null);
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
+  const somenteLeitura = salvo?.status === 'APROVADO';
 
   // Recalcula a cada digitação. É só a prévia: a API recalcula com a mesma função ao salvar.
   const valores = useWatch({ control }) as FormularioOrcamento;
   const previa = useMemo(() => calcularOrcamento(entradaDoCalculo(valores)), [valores]);
 
   const alterado = formState.isDirty;
+  // lido pelo bloqueio de navegação, que pode rodar antes da próxima renderização
+  const alteradoRef = useRef(alterado);
+  alteradoRef.current = alterado;
+
   // Salvo e sem alterações depois disso: mostra os valores que a API gravou, que são os que valem.
   const confirmado = salvo !== null && !alterado;
   const totais: Totais = confirmado
@@ -75,11 +98,15 @@ export function NovoOrcamento() {
         : api.post<OrcamentoSalvo>('/api/orcamentos', paraApi(dados)),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: (resposta, dados) => {
+      const eraNovo = salvo === null;
       setSalvo(resposta);
       setSalvoEm(new Date());
       // o que foi salvo vira a nova referência: isDirty volta a false
       reset(dados);
+      alteradoRef.current = false;
       toast.success(`Orçamento ${resposta.codigo} salvo`);
+      void clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] });
+      if (eraNovo) onCriado?.(resposta.id);
     },
     onError: (erro) => {
       if (erro instanceof ErroApi && erro.detalhes.length > 0) {
@@ -101,23 +128,13 @@ export function NovoOrcamento() {
 
   async function aoEnviarWhatsApp() {
     if (!salvo) return;
-    // abre a aba já no clique: aberta depois do await, o navegador bloquearia como pop-up
-    const janela = window.open('', '_blank');
     setEnviandoWhatsApp(true);
     try {
       // a API também passa o rascunho para ENVIADO; o selo do cabeçalho acompanha
-      const { link, status } = await api.post<{ link: string; mensagem: string; status: OrcamentoSalvo['status'] }>(
-        `/api/orcamentos/${salvo.id}/whatsapp`,
-      );
+      const status = await enviarPeloWhatsApp(salvo.id);
       setSalvo((atual) => (atual ? { ...atual, status } : atual));
-      if (janela) {
-        janela.opener = null;
-        janela.location.href = link;
-      } else {
-        window.open(link, '_blank', 'noopener');
-      }
+      void clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] });
     } catch (erro) {
-      janela?.close();
       if (!(erro instanceof ErroApi && erro.status === 401)) {
         toast.error(erro instanceof ErroApi ? erro.message : 'Não foi possível montar a mensagem do WhatsApp.');
       }
@@ -126,11 +143,11 @@ export function NovoOrcamento() {
     }
   }
 
-  // Sair da tela com alterações não salvas: confirma antes (menu, voltar do navegador...).
+  // Sair da tela com alterações não salvas: confirma antes (menu, Sair, voltar do navegador).
   // Saída forçada por sessão expirada não pergunta: o token já foi apagado e não daria para salvar.
   const bloqueio = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      alterado && currentLocation.pathname !== nextLocation.pathname && tokenSalvo.ler() !== null,
+      alteradoRef.current && currentLocation.pathname !== nextLocation.pathname && tokenSalvo.ler() !== null,
   );
 
   // Fechar ou recarregar a janela: o navegador mostra a confirmação dele.
@@ -144,13 +161,17 @@ export function NovoOrcamento() {
     return () => window.removeEventListener('beforeunload', aoSairDaJanela);
   }, [alterado]);
 
-  const situacao = salvo
-    ? alterado
-      ? 'Alterações não salvas'
-      : `Salvo às ${horaCurta(salvoEm!)}`
-    : alterado
-      ? 'Ainda não salvo'
-      : '';
+  const situacao = somenteLeitura
+    ? ''
+    : salvo
+      ? alterado
+        ? 'Alterações não salvas'
+        : salvoEm
+          ? `Salvo às ${horaCurta(salvoEm)}`
+          : 'Sem alterações'
+      : alterado
+        ? 'Ainda não salvo'
+        : '';
 
   return (
     <FormProvider {...formulario}>
@@ -158,45 +179,69 @@ export function NovoOrcamento() {
         <header className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-col gap-1">
             <nav aria-label="Caminho" className="text-[13px] text-muted-foreground">
-              <span>Orçamentos</span> <span aria-hidden>/</span> <span aria-current="page">Novo orçamento</span>
+              <Link to="/orcamentos" className="hover:underline">
+                Orçamentos
+              </Link>{' '}
+              <span aria-hidden>/</span>{' '}
+              <span aria-current="page">{salvo ? salvo.codigo : 'Novo orçamento'}</span>
             </nav>
             <div className="flex flex-wrap items-center gap-3.5">
-              <h1 className="text-[34px] font-bold tracking-[-0.02em]">Novo orçamento</h1>
+              <h1 className="text-[34px] font-bold tracking-[-0.02em]">
+                {inicial ? 'Orçamento' : 'Novo orçamento'}
+              </h1>
               <span className="rounded-full bg-[#E7EBF2] px-2.5 py-1 font-mono text-[13px] text-[#414F60]">
-                {salvo ? `${salvo.codigo} · ${ROTULO_STATUS[salvo.status]}` : 'Código gerado ao salvar · Rascunho'}
+                {salvo
+                  ? `${salvo.codigo} · ${ROTULO_STATUS_ORCAMENTO[salvo.status]}`
+                  : 'Código gerado ao salvar · Rascunho'}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {situacao && (
-              <span className="text-[13px] text-muted-foreground" role="status">
-                {situacao}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={aoSalvar}
-              disabled={salvar.isPending || confirmado}
-              className="h-11 rounded-[10px] bg-card px-[18px]"
-            >
-              {salvar.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
-              {salvo ? 'Salvar alterações' : 'Salvar rascunho'}
-            </Button>
-          </div>
+          {!somenteLeitura && (
+            <div className="flex items-center gap-3">
+              {situacao && (
+                <span className="text-[13px] text-muted-foreground" role="status">
+                  {situacao}
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={aoSalvar}
+                disabled={salvar.isPending || confirmado}
+                className="h-11 rounded-[10px] bg-card px-[18px]"
+              >
+                {salvar.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
+                {salvo ? 'Salvar alterações' : 'Salvar rascunho'}
+              </Button>
+            </div>
+          )}
         </header>
+
+        {somenteLeitura && (
+          <p
+            role="status"
+            className="flex items-start gap-2.5 rounded-xl border border-[#9FD3B4] bg-[#DCF0E3] px-4 py-3 text-sm text-[#17653E]"
+          >
+            <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Este orçamento foi aprovado e virou projeto. Ele fica disponível só para consulta: itens,
+            valores e condições não podem mais ser alterados.
+          </p>
+        )}
 
         {/* Duas colunas só a partir de 1360px: abaixo disso a tabela de itens fica sem espaço
             para o nome (1366px, comum no escritório, já pega as duas colunas). */}
         <div className="grid items-start gap-6 min-[1360px]:grid-cols-[minmax(0,1fr)_368px]">
-          <div className="flex min-w-0 flex-col gap-5">
+          {/* fieldset desabilitado trava todos os campos e botões no modo leitura */}
+          <fieldset disabled={somenteLeitura} className={`flex min-w-0 flex-col gap-5 ${ESTILO_SOMENTE_LEITURA}`}>
+            <legend className="sr-only">Cliente e itens</legend>
             <CartaoCliente />
             <CartaoItens subtotal={totais.subtotal} />
-          </div>
+          </fieldset>
           <ResumoOrcamento
             totais={totais}
             confirmado={confirmado}
             salvo={salvo !== null}
+            somenteLeitura={somenteLeitura}
             alteradoDepoisDeSalvar={salvo !== null && alterado}
             enviandoWhatsApp={enviandoWhatsApp}
             onWhatsApp={aoEnviarWhatsApp}

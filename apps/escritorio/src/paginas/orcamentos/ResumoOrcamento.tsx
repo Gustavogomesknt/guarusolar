@@ -2,6 +2,7 @@ import { FileText, Loader2, MessageCircle } from 'lucide-react';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { CartaoCondicoes } from './CartaoCondicoes';
+import { ESTILO_SOMENTE_LEITURA } from './formulario';
 
 export type Totais = {
   subtotal: number;
@@ -18,6 +19,7 @@ export function ResumoOrcamento({
   totais,
   confirmado,
   salvo,
+  somenteLeitura = false,
   alteradoDepoisDeSalvar,
   enviandoWhatsApp,
   onWhatsApp,
@@ -25,6 +27,7 @@ export function ResumoOrcamento({
   totais: Totais;
   confirmado: boolean;
   salvo: boolean;
+  somenteLeitura?: boolean;
   alteradoDepoisDeSalvar: boolean;
   enviandoWhatsApp: boolean;
   onWhatsApp: () => void;
@@ -38,7 +41,10 @@ export function ResumoOrcamento({
 
   return (
     <aside aria-label="Resumo do orçamento" className="flex flex-col gap-4">
-      <CartaoCondicoes subtotal={totais.subtotal} descontoAplicado={totais.descontoAplicado} />
+      <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
+        <legend className="sr-only">Condições</legend>
+        <CartaoCondicoes subtotal={totais.subtotal} descontoAplicado={totais.descontoAplicado} />
+      </fieldset>
 
       <section aria-labelledby="titulo-total" className="flex flex-col gap-1.5 rounded-[14px] bg-sidebar p-[22px]">
         <h2 id="titulo-total" className="font-sans text-[13px] font-normal tracking-normal text-[#CBDBF0]">
