@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { Login } from '@/paginas/Login';
 import { Inicio } from '@/paginas/Inicio';
+import { NovoOrcamento } from '@/paginas/orcamentos/NovoOrcamento';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
@@ -20,6 +21,9 @@ export function Rotas() {
       <Route element={<RotaProtegida papeis={PAPEIS_DO_ESCRITORIO} />}>
         <Route element={<Layout />}>
           <Route index element={<Inicio />} />
+          <Route element={<RotaProtegida papeis={['COMERCIAL', 'GESTOR']} />}>
+            <Route path="orcamentos/novo" element={<NovoOrcamento />} />
+          </Route>
         </Route>
       </Route>
 

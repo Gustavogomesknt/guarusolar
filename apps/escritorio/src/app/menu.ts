@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   ClipboardCheck,
+  FilePlus2,
   FileText,
   FolderKanban,
   House,
@@ -24,6 +25,7 @@ export type ItemMenu = {
 // e registre a rota em rotas.tsx com os mesmos papéis.
 export const MENU: ItemMenu[] = [
   { rotulo: 'Início', caminho: '/', icone: House, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true },
+  { rotulo: 'Novo orçamento', caminho: '/orcamentos/novo', icone: FilePlus2, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true },
   { rotulo: 'Orçamentos', caminho: '/orcamentos', icone: FileText, papeis: ['COMERCIAL'], disponivel: false },
   { rotulo: 'Pipeline', caminho: '/pipeline', icone: KanbanSquare, papeis: ['COMERCIAL'], disponivel: false },
   { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: ['COMERCIAL'], disponivel: false },
