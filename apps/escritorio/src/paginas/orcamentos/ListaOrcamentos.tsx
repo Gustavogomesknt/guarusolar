@@ -207,13 +207,16 @@ function Indicadores() {
         >
           <span className="block h-full rounded-full bg-destaque" style={{ width: `${r?.taxaAprovacao ?? 0}%` }} />
         </span>
-        {r ? `${r.aprovadosMes} ${r.aprovadosMes === 1 ? 'aprovado' : 'aprovados'} de ${r.enviadosMes} ${r.enviadosMes === 1 ? 'enviado' : 'enviados'}` : ' '}
+        {/* mesma turma no numerador e no denominador: os orçamentos criados no mês */}
+        {r
+          ? `${r.aprovadosMes} ${r.aprovadosMes === 1 ? 'aprovado' : 'aprovados'} de ${r.enviadosMes} ${r.enviadosMes === 1 ? 'enviado' : 'enviados'} entre os criados no mês`
+          : ' '}
       </Cartao>
       <Cartao titulo="Em aberto" valor={r ? String(r.quantidadeEmAberto) : '–'}>
-        Enviados e em negociação · {valor(r?.valorEmAberto)}
+        Enviados e em negociação hoje · {valor(r?.valorEmAberto)}
       </Cartao>
       <Cartao titulo="Valor aprovado no mês" valor={valor(r?.valorAprovadoMes)} escuro>
-        Receita confirmada para instalação
+        Aprovados neste mês, confirmados para instalação
       </Cartao>
     </section>
   );

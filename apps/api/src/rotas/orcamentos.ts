@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, type StatusOrcamento } from '@prisma/client';
+import { Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -30,8 +30,25 @@ const orcamentoSchema = z.object({
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
 });
 
-/** Monta os itens com os dados do catálogo e devolve os totais calculados. */
-async function prepararItens(itens: z.infer<typeof itemSchema>[]) {
+/** Dados do item que são cópia gravada no orçamento (regra 2 do CLAUDE.md). */
+type CopiaDoItem = {
+  produtoId: string;
+  descricao: string;
+  unidade: Unidade;
+  precoTabela: Prisma.Decimal;
+};
+
+/**
+ * Monta os itens e os dados para o cálculo dos totais.
+ * Regra 2: item do orçamento é cópia. Na edição, `existentes` traz os itens já gravados:
+ * para um produto que já estava no orçamento, descrição, unidade e preço de tabela ficam
+ * como foram gravados, mesmo que o catálogo tenha mudado. Só produtos novos na edição
+ * copiam os dados do catálogo atual.
+ */
+async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: CopiaDoItem[] = []) {
+  const copias = new Map<string, CopiaDoItem>();
+  for (const e of existentes) if (!copias.has(e.produtoId)) copias.set(e.produtoId, e);
+
   const produtos = await prisma.produto.findMany({
     where: { id: { in: itens.map((i) => i.produtoId) } },
   });
@@ -41,12 +58,15 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[]) {
 
   return itens.map((item, ordem) => {
     const produto = produtos.find((p) => p.id === item.produtoId)!;
-    const precoTabela = Number(produto.precoVenda);
+    const copia = copias.get(item.produtoId);
+    const descricao = copia?.descricao ?? produto.nome;
+    const unidade = copia?.unidade ?? produto.unidade;
+    const precoTabela = copia ? Number(copia.precoTabela) : Number(produto.precoVenda);
     const precoUnitario = item.precoUnitario ?? precoTabela;
     return {
       produtoId: produto.id,
-      descricao: produto.nome,
-      unidade: produto.unidade,
+      descricao,
+      unidade,
       quantidade: new Prisma.Decimal(item.quantidade),
       precoUnitario: new Prisma.Decimal(precoUnitario),
       precoTabela: new Prisma.Decimal(precoTabela),
@@ -98,44 +118,60 @@ rotasOrcamentos.get(
 );
 
 // --------------------------------------------------------------------------
-// Indicadores do topo da tela comercial
+// Indicadores do topo da tela comercial. Cada um usa a data do que mede:
+//
+// - Total orçado e quantidade: orçamentos CRIADOS no mês (criadoEm) — o que foi emitido.
+// - Valor aprovado: orçamentos APROVADOS no mês (aprovadoEm), qualquer que seja a data de
+//   criação — a venda fechada no mês.
+// - Taxa de aprovação: numerador e denominador da MESMA turma, os orçamentos criados no
+//   mês. Denominador = os que já saíram do rascunho (foram enviados); numerador = os que,
+//   entre eles, estão aprovados. Misturar critérios (aprovados no mês ÷ enviados no mês)
+//   contaria no numerador orçamentos que não estão no denominador. Orçamentos recentes
+//   ainda em negociação puxam a taxa para baixo até serem decididos.
+// - Em aberto: situação atual do funil (ENVIADO + EM_NEGOCIACAO), sem filtro de data —
+//   um orçamento de meses anteriores ainda em negociação continua em aberto hoje.
+//
+// O mês é calculado no fuso do servidor.
 // --------------------------------------------------------------------------
 rotasOrcamentos.get(
   '/resumo',
-  rota(async (req, res) => {
+  rota(async (_req, res) => {
     const hoje = new Date();
     const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
-    const periodo = { criadoEm: { gte: inicio, lt: fim } };
+    const doMes = { gte: inicio, lt: fim };
 
-    const [totalMes, porStatus] = await Promise.all([
-      prisma.orcamento.aggregate({ where: periodo, _sum: { valorTotal: true }, _count: true }),
-      prisma.orcamento.groupBy({
-        by: ['status'],
-        where: periodo,
+    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto] = await Promise.all([
+      prisma.orcamento.aggregate({ where: { criadoEm: doMes }, _sum: { valorTotal: true }, _count: true }),
+      prisma.orcamento.groupBy({ by: ['status'], where: { criadoEm: doMes }, _count: true }),
+      prisma.orcamento.aggregate({
+        where: { status: 'APROVADO', aprovadoEm: doMes },
+        _sum: { valorTotal: true },
+      }),
+      prisma.orcamento.aggregate({
+        where: { status: { in: ['ENVIADO', 'EM_NEGOCIACAO'] } },
         _sum: { valorTotal: true },
         _count: true,
       }),
     ]);
 
-    const busca = (s: StatusOrcamento) => porStatus.find((p) => p.status === s);
-    const aprovados = busca('APROVADO')?._count ?? 0;
-    const enviados = porStatus
+    // taxa de aprovação: turma dos criados no mês
+    const quantos = (s: StatusOrcamento) => criadosPorStatus.find((p) => p.status === s)?._count ?? 0;
+    const aprovadosDaTurma = quantos('APROVADO');
+    const enviadosDaTurma = criadosPorStatus
       .filter((p) => p.status !== 'RASCUNHO')
       .reduce((soma, p) => soma + p._count, 0);
-    const emAberto = (busca('ENVIADO')?._count ?? 0) + (busca('EM_NEGOCIACAO')?._count ?? 0);
 
     res.json({
-      totalOrcadoMes: Number(totalMes._sum.valorTotal ?? 0),
-      quantidadeMes: totalMes._count,
-      taxaAprovacao: enviados ? Math.round((aprovados / enviados) * 100) : 0,
-      aprovadosMes: aprovados,
-      enviadosMes: enviados,
-      quantidadeEmAberto: emAberto,
-      valorEmAberto:
-        Number(busca('ENVIADO')?._sum.valorTotal ?? 0) +
-        Number(busca('EM_NEGOCIACAO')?._sum.valorTotal ?? 0),
-      valorAprovadoMes: Number(busca('APROVADO')?._sum.valorTotal ?? 0),
+      totalOrcadoMes: Number(criadosNoMes._sum.valorTotal ?? 0),
+      quantidadeMes: criadosNoMes._count,
+      taxaAprovacao: enviadosDaTurma ? Math.round((aprovadosDaTurma / enviadosDaTurma) * 100) : 0,
+      // numerador e denominador da taxa (orçamentos criados no mês)
+      aprovadosMes: aprovadosDaTurma,
+      enviadosMes: enviadosDaTurma,
+      quantidadeEmAberto: emAberto._count,
+      valorEmAberto: Number(emAberto._sum.valorTotal ?? 0),
+      valorAprovadoMes: Number(aprovadosNoMes._sum.valorTotal ?? 0),
     });
   }),
 );
@@ -210,13 +246,17 @@ rotasOrcamentos.put(
   '/:id',
   rota(async (req, res) => {
     const dados = orcamentoSchema.parse(req.body);
-    const atual = await prisma.orcamento.findUnique({ where: { id: req.params.id } });
+    const atual = await prisma.orcamento.findUnique({
+      where: { id: req.params.id },
+      include: { itens: { orderBy: { ordem: 'asc' } } },
+    });
     if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
     if (atual.status === 'APROVADO') {
       throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
     }
 
-    const itens = await prepararItens(dados.itens);
+    // itens que já estavam no orçamento mantêm a cópia gravada (regra 2)
+    const itens = await prepararItens(dados.itens, atual.itens);
     const totais = calcularOrcamento({
       itens: itens.map((i) => i._calculo),
       descontoTipo: dados.descontoTipo,

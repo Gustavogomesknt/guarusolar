@@ -95,7 +95,8 @@ O `.env` da API fica em `apps/api/.env`.
    a API recalcula tudo com `calcularOrcamento` (`packages/compartilhado/src/calculo.ts`) e grava.
    Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
-   gravados no item. Mudança futura no catálogo não altera orçamento antigo.
+   gravados no item. Mudança futura no catálogo não altera orçamento antigo. Na edição (PUT),
+   itens que já estavam no orçamento mantêm a cópia gravada; só itens novos copiam o catálogo.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
 5. **Status seguem transições válidas** (mapa `TRANSICOES_STATUS` em

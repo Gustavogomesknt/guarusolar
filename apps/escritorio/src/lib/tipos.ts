@@ -39,7 +39,11 @@ export type OrcamentoNaLista = {
   cliente: { id: string; nome: string; cidade: string | null; uf: string | null; whatsapp: string };
 };
 
-/** Indicadores do mês (GET /api/orcamentos/resumo). */
+/**
+ * Indicadores (GET /api/orcamentos/resumo). O critério de data de cada um está documentado
+ * na rota: total e quantidade por criação, valor aprovado por aprovação no mês, taxa sobre a
+ * turma criada no mês, em aberto sem filtro de data.
+ */
 export type ResumoOrcamentos = {
   totalOrcadoMes: number;
   quantidadeMes: number;
