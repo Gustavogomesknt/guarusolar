@@ -8,6 +8,7 @@ import { rotasAuth } from './rotas/auth';
 import { rotasClientes } from './rotas/clientes';
 import { rotasProdutos } from './rotas/produtos';
 import { rotasOrcamentos } from './rotas/orcamentos';
+import { rotasOrcamentoPdf } from './rotas/orcamentoPdf';
 import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
 
 const app = express();
@@ -27,6 +28,8 @@ app.get('/saude', (_req, res) => res.json({ ok: true, hora: new Date().toISOStri
 app.use('/api/auth', rotasAuth);
 app.use('/api/clientes', rotasClientes);
 app.use('/api/produtos', rotasProdutos);
+// antes das rotas com login: o PDF é aberto pelo cliente final, com token no link
+app.use('/api/orcamentos', rotasOrcamentoPdf);
 app.use('/api/orcamentos', rotasOrcamentos);
 app.use('/api/agenda', rotasAgenda);
 app.use('/api/validacao', rotasValidacao);

@@ -23,6 +23,7 @@ export function ResumoOrcamento({
   alteradoDepoisDeSalvar,
   enviandoWhatsApp,
   onWhatsApp,
+  onPdf,
 }: {
   totais: Totais;
   confirmado: boolean;
@@ -31,13 +32,15 @@ export function ResumoOrcamento({
   alteradoDepoisDeSalvar: boolean;
   enviandoWhatsApp: boolean;
   onWhatsApp: () => void;
+  onPdf: () => void;
 }) {
+  // PDF e WhatsApp mostram o que está gravado: só com o orçamento salvo e sem alterações
   const podeEnviar = salvo && !alteradoDepoisDeSalvar;
   const dicaAcoes = !salvo
     ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
     : alteradoDepoisDeSalvar
-      ? 'Há alterações não salvas. Salve antes de enviar, para o cliente receber a versão atual.'
-      : 'A geração do PDF entra na próxima etapa.';
+      ? 'Há alterações não salvas. Salve antes, para o PDF e o cliente terem a versão atual.'
+      : 'O PDF abre numa nova aba, com o mesmo link que o cliente recebe.';
 
   return (
     <aside aria-label="Resumo do orçamento" className="flex flex-col gap-4">
@@ -73,8 +76,8 @@ export function ResumoOrcamento({
         <Button
           type="button"
           variant="outline"
-          // preparado para o passo 3 do CLAUDE.md (PDF com o logo); ainda sem ação
-          disabled
+          onClick={onPdf}
+          disabled={!podeEnviar}
           aria-describedby="dica-acoes"
           className="h-12 rounded-xl bg-card text-[15px]"
         >

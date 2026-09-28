@@ -1,3 +1,4 @@
+import { partesNoFuso } from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
@@ -47,12 +48,11 @@ export const OPCOES_ENTRADA =['0', '10', '20', '30', '40', '50'];
 export const OPCOES_PARCELAS = ['2', '3', '4', '6', '10', '12'];
 export const DIAS_DE_VALIDADE = 30;
 
-/** Data local no formato AAAA-MM-DD, `dias` à frente de hoje. */
+/** Data AAAA-MM-DD `dias` à frente de hoje, contando "hoje" no fuso da empresa. */
 export function dataDaquiA(dias: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + dias);
-  const doisDigitos = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}`;
+  const { ano, mes, dia } = partesNoFuso();
+  const d = new Date(Date.UTC(ano, mes, dia + dias));
+  return d.toISOString().slice(0, 10);
 }
 
 export function valoresIniciais(): FormularioOrcamento {
@@ -195,7 +195,13 @@ export type OrcamentoSalvo = {
   descontoAplicado: string;
   valorTotal: string;
   resumoPagamento: string;
+  /** chave do link público do PDF */
+  tokenPdf: string;
 };
+
+/** Caminho do PDF na API (o mesmo link que vai para o cliente pelo WhatsApp). */
+export const caminhoDoPdf = (o: Pick<OrcamentoSalvo, 'id' | 'tokenPdf'>) =>
+  `/api/orcamentos/${o.id}/pdf?token=${encodeURIComponent(o.tokenPdf)}`;
 
 /** Orçamento gravado -> formulário do gerador (para abrir e editar). */
 export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
@@ -234,4 +240,5 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   descontoAplicado: o.descontoAplicado,
   valorTotal: o.valorTotal,
   resumoPagamento,
+  tokenPdf: o.tokenPdf,
 });

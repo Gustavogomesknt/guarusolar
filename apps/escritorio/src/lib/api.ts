@@ -23,6 +23,9 @@ export class ErroApi extends Error {
 export const SEM_CONEXAO = 0;
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
+/** Endereço completo de um caminho da API, para links abertos fora do fetch (ex.: PDF). */
+export const urlDaApi = (caminho: string) => `${BASE_URL}${caminho}`;
 const CHAVE_TOKEN = 'guarusolar.escritorio.token';
 
 // O armazenamento do navegador pode estar bloqueado; nesse caso a sessão dura só a aba aberta.

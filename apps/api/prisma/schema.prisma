@@ -190,6 +190,16 @@ model Orcamento {
   parcelas           Int?
   bancoFinanciamento String? // usado em FINANCIAMENTO
 
+  // resultado do cálculo do pagamento, gravado junto com os totais: PDF e WhatsApp leem
+  // daqui e nunca recalculam
+  valorEntrada    Decimal? @db.Decimal(12, 2) // ENTRADA_PARCELAS
+  valorParcela    Decimal? @db.Decimal(12, 2) // ENTRADA_PARCELAS
+  resumoPagamento String? // "Entrada de R$ 5.318,67 + 6x de R$ 2.068,37"
+
+  // chave do link público do PDF (/api/orcamentos/:id/pdf?token=...), enviado ao cliente
+  // pelo WhatsApp; 64 caracteres hexadecimais aleatórios gerados pelo próprio Postgres
+  tokenPdf String @unique @default(dbgenerated("replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')"))
+
   validade    DateTime
   observacoes String?
   enviadoEm   DateTime?

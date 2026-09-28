@@ -4,7 +4,15 @@ import { Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { calcularOrcamento, formatarBRL, podeMudarStatus } from '@guarusolar/compartilhado';
+import {
+  calcularOrcamento,
+  formatarBRL,
+  formatarData,
+  inicioDoMes,
+  podeMudarStatus,
+  type CondicaoPagamento,
+  type ResultadoCalculo,
+} from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 
 export const rotasOrcamentos = Router();
@@ -29,6 +37,25 @@ const orcamentoSchema = z.object({
   observacoes: z.string().optional(),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
 });
+
+/**
+ * Resultado do cálculo do pagamento que fica gravado no orçamento, para o PDF e o WhatsApp
+ * lerem sem recalcular.
+ */
+function pagamentoGravado(condicao: CondicaoPagamento, totais: ResultadoCalculo) {
+  const parcelado = condicao === 'ENTRADA_PARCELAS';
+  return {
+    valorEntrada: parcelado ? totais.entrada : null,
+    valorParcela: parcelado ? totais.valorParcela : null,
+    resumoPagamento: totais.resumoPagamento,
+  };
+}
+
+/** Link público do PDF, com o token do orçamento (o cliente abre sem login). */
+export function linkDoPdf(orcamento: { id: string; tokenPdf: string }) {
+  const base = (process.env.API_URL_PUBLICA ?? 'http://localhost:3333').replace(/\/+$/, '');
+  return `${base}/api/orcamentos/${orcamento.id}/pdf?token=${orcamento.tokenPdf}`;
+}
 
 /** Dados do item que são cópia gravada no orçamento (regra 2 do CLAUDE.md). */
 type CopiaDoItem = {
@@ -131,15 +158,12 @@ rotasOrcamentos.get(
 // - Em aberto: situação atual do funil (ENVIADO + EM_NEGOCIACAO), sem filtro de data —
 //   um orçamento de meses anteriores ainda em negociação continua em aberto hoje.
 //
-// O mês é calculado no fuso do servidor.
+// O mês é o do fuso da empresa (America/Sao_Paulo), não o do servidor.
 // --------------------------------------------------------------------------
 rotasOrcamentos.get(
   '/resumo',
   rota(async (_req, res) => {
-    const hoje = new Date();
-    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
-    const doMes = { gte: inicio, lt: fim };
+    const doMes = { gte: inicioDoMes(0), lt: inicioDoMes(1) };
 
     const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto] = await Promise.all([
       prisma.orcamento.aggregate({ where: { criadoEm: doMes }, _sum: { valorTotal: true }, _count: true }),
@@ -232,6 +256,7 @@ rotasOrcamentos.post(
           subtotal: totais.subtotal,
           descontoAplicado: totais.descontoAplicado,
           valorTotal: totais.valorTotal,
+          ...pagamentoGravado(dados.condicaoPagamento, totais),
           itens: { create: itens.map(({ _calculo, ...item }) => item) },
         },
         include: { itens: true, cliente: true },
@@ -286,6 +311,7 @@ rotasOrcamentos.put(
           subtotal: totais.subtotal,
           descontoAplicado: totais.descontoAplicado,
           valorTotal: totais.valorTotal,
+          ...pagamentoGravado(dados.condicaoPagamento, totais),
           itens: { create: itens.map(({ _calculo, ...item }) => item) },
         },
         include: { itens: true, cliente: true },
@@ -374,35 +400,22 @@ rotasOrcamentos.post(
   rota(async (req, res) => {
     const orcamento = await prisma.orcamento.findUnique({
       where: { id: req.params.id },
-      include: { cliente: true, itens: true },
+      include: { cliente: true },
     });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
 
     const primeiroNome = orcamento.cliente.nome.split(' ')[0];
-    const totais = calcularOrcamento({
-      itens: orcamento.itens.map((i) => ({
-        quantidade: Number(i.quantidade),
-        precoUnitario: Number(i.precoUnitario),
-      })),
-      descontoTipo: orcamento.descontoTipo,
-      descontoValor: Number(orcamento.descontoValor),
-      condicaoPagamento: orcamento.condicaoPagamento,
-      descontoAVistaPct: Number(orcamento.descontoAVistaPct ?? 0),
-      entradaPct: Number(orcamento.entradaPct ?? 0),
-      parcelas: orcamento.parcelas,
-    });
-
-    const linkPdf = `${process.env.APP_URL ?? 'http://localhost:5173'}/orcamentos/${orcamento.id}/pdf`;
     const mensagem = [
       `Olá, ${primeiroNome}! Tudo bem?`,
       '',
       `Segue o orçamento ${orcamento.codigo} da Guarusolar para o seu sistema de energia solar:`,
       '',
+      // valores gravados ao salvar; nada é recalculado para a mensagem
       `• Valor total: ${formatarBRL(Number(orcamento.valorTotal))}`,
-      `• Pagamento: ${totais.resumoPagamento}`,
-      `• Validade: ${orcamento.validade.toLocaleDateString('pt-BR')}`,
+      `• Pagamento: ${orcamento.resumoPagamento ?? '[CONDIÇÃO DE PAGAMENTO]'}`,
+      `• Validade: ${formatarData(orcamento.validade)}`,
       '',
-      `Orçamento completo em PDF: ${linkPdf}`,
+      `Orçamento completo em PDF: ${linkDoPdf(orcamento)}`,
       '',
       'Qualquer dúvida, estou à disposição!',
       `${req.usuario!.nome} · Guarusolar`,

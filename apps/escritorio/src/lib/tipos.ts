@@ -72,6 +72,9 @@ export type OrcamentoCompleto = {
   subtotal: string;
   descontoAplicado: string;
   valorTotal: string;
+  /** gravado ao salvar; null só em orçamentos anteriores a essa gravação */
+  resumoPagamento: string | null;
+  tokenPdf: string;
   itens: {
     produtoId: string;
     descricao: string;

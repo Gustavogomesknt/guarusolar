@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { calcularOrcamento, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
-import { api, ErroApi, tokenSalvo } from '@/lib/api';
+import { api, ErroApi, tokenSalvo, urlDaApi } from '@/lib/api';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ import { CartaoCliente } from './CartaoCliente';
 import { CartaoItens } from './CartaoItens';
 import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
 import {
+  caminhoDoPdf,
   campoDoFormulario,
   entradaDoCalculo,
   ESTILO_SOMENTE_LEITURA,
@@ -245,6 +246,7 @@ export function GeradorOrcamento({
             alteradoDepoisDeSalvar={salvo !== null && alterado}
             enviandoWhatsApp={enviandoWhatsApp}
             onWhatsApp={aoEnviarWhatsApp}
+            onPdf={() => salvo && window.open(urlDaApi(caminhoDoPdf(salvo)), '_blank', 'noopener')}
           />
         </div>
       </div>

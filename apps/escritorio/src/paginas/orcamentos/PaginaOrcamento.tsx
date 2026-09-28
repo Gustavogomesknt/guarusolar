@@ -82,8 +82,11 @@ export function PaginaOrcamento() {
   const valores = valoresDoOrcamento(orcamento);
   const inicial: OrcamentoInicial = {
     valores,
-    // o resumo do pagamento vem do mesmo cálculo da API, sobre as condições gravadas
-    salvo: salvoDoOrcamento(orcamento, calcularOrcamento(entradaDoCalculo(valores)).resumoPagamento),
+    // resumo do pagamento gravado pela API; orçamentos antigos, sem ele, usam o mesmo cálculo
+    salvo: salvoDoOrcamento(
+      orcamento,
+      orcamento.resumoPagamento ?? calcularOrcamento(entradaDoCalculo(valores)).resumoPagamento,
+    ),
   };
 
   return <GeradorOrcamento key={chave.current} inicial={inicial} />;

@@ -114,9 +114,18 @@ mensagem pronta para mostrar ao técnico.
   `package.json`). A API é CommonJS e carrega o `@guarusolar/compartilhado`, que é ESM, pelo
   `require()` de módulos ESM, que só é estável a partir do Node 22.12. Em versão anterior a API
   nem sobe. Ao escolher o serviço de hospedagem, confira a versão do Node e fixe 22 ou mais nova.
+- **Fuso horário:** períodos e datas seguem sempre `America/Sao_Paulo`, calculados em
+  `packages/compartilhado/src/datas.ts`, e não o fuso do servidor nem o do computador do
+  escritório. Isso vale para os indicadores do mês, o filtro de período da lista, o ano nos
+  códigos (GS-2026-0148), a validade padrão e as datas exibidas, no PDF e no WhatsApp. Pode
+  hospedar a API em servidor configurado em UTC sem ajustes.
 - **Banco:** PostgreSQL gerenciado (plano gratuito do Supabase, Neon ou similar). Use
   `DATABASE_URL` com a conexão pooled e `DIRECT_URL` com a conexão direta, que as migrations
   usam (detalhes em `apps/api/.env.example`).
+- **PDF do orçamento:** gerado pela própria API com pdfmake (só JavaScript, sem navegador
+  embutido; em teste, o processo ficou abaixo de 160 MB gerando 20 PDFs seguidos). Defina
+  `API_URL_PUBLICA` com o endereço público da API: é o link que o cliente recebe pelo WhatsApp
+  (`/api/orcamentos/:id/pdf?token=...`), aberto sem login e protegido pelo token do orçamento.
 - **Publicar a API:** `npm ci`, `npm run build`, `npx prisma migrate deploy` (em `apps/api`) e
   `npm start -w @guarusolar/api`, com `JWT_SECRET` e as variáveis do banco configuradas.
 

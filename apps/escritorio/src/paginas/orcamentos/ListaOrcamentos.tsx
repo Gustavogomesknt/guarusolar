@@ -3,7 +3,16 @@ import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, MessageCircle, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { ROTULO_STATUS_ORCAMENTO, STATUS_ORCAMENTO, type StatusOrcamento } from '@guarusolar/compartilhado';
+import {
+  formatarData,
+  FUSO_EMPRESA,
+  inicioDoDia,
+  inicioDoMes,
+  partesNoFuso,
+  ROTULO_STATUS_ORCAMENTO,
+  STATUS_ORCAMENTO,
+  type StatusOrcamento,
+} from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@/lib/api';
 import type { OrcamentoNaLista, ResumoOrcamentos } from '@/lib/tipos';
 import { formatarBRL } from '@/lib/formatar';
@@ -18,43 +27,44 @@ import { MenuStatus } from './MenuStatus';
 // ---------------------------------------------------------------------------
 type Periodo = 'ESTE_MES' | 'MES_PASSADO' | 'ULTIMOS_90' | 'ESTE_ANO' | 'TUDO';
 
-const nomeDoMes = (data: Date) =>
-  data.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase());
+const nomeDoMes = (instante: Date) =>
+  instante
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: FUSO_EMPRESA })
+    .replace(/^./, (c) => c.toUpperCase());
 
 function opcoesDePeriodo(): { valor: Periodo; rotulo: string }[] {
-  const hoje = new Date();
-  const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
   return [
-    { valor: 'ESTE_MES', rotulo: nomeDoMes(hoje) },
-    { valor: 'MES_PASSADO', rotulo: nomeDoMes(mesPassado) },
+    { valor: 'ESTE_MES', rotulo: nomeDoMes(new Date()) },
+    // meio do mês passado: qualquer instante dele serve para o nome
+    { valor: 'MES_PASSADO', rotulo: nomeDoMes(new Date(inicioDoMes(-1).getTime() + 15 * 864e5)) },
     { valor: 'ULTIMOS_90', rotulo: 'Últimos 90 dias' },
-    { valor: 'ESTE_ANO', rotulo: `Ano de ${hoje.getFullYear()}` },
+    { valor: 'ESTE_ANO', rotulo: `Ano de ${partesNoFuso().ano}` },
     { valor: 'TUDO', rotulo: 'Todo o período' },
   ];
 }
 
-/** Intervalo de criação (de/até) enviado à API. */
+/**
+ * Intervalo de criação (de/até) enviado à API, com os limites no fuso da empresa
+ * (America/Sao_Paulo), qualquer que seja o fuso do computador.
+ */
 function intervalo(periodo: Periodo): { de?: string; ate?: string } {
-  const hoje = new Date();
-  const ano = hoje.getFullYear();
-  const mes = hoje.getMonth();
+  const { ano, mes, dia } = partesNoFuso();
   switch (periodo) {
     case 'ESTE_MES':
-      return { de: new Date(ano, mes, 1).toISOString() };
+      return { de: inicioDoMes(0).toISOString() };
     case 'MES_PASSADO':
-      return { de: new Date(ano, mes - 1, 1).toISOString(), ate: new Date(ano, mes, 1, 0, 0, 0, -1).toISOString() };
+      return {
+        de: inicioDoMes(-1).toISOString(),
+        ate: new Date(inicioDoMes(0).getTime() - 1).toISOString(),
+      };
     case 'ULTIMOS_90':
-      return { de: new Date(ano, mes, hoje.getDate() - 90).toISOString() };
+      return { de: inicioDoDia(ano, mes, dia - 90).toISOString() };
     case 'ESTE_ANO':
-      return { de: new Date(ano, 0, 1).toISOString() };
+      return { de: inicioDoDia(ano, 0, 1).toISOString() };
     case 'TUDO':
       return {};
   }
 }
-
-const dataCurta = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
-/** Validade é gravada ao meio-dia UTC: mostra a data sem conversão de fuso. */
-const dataSemFuso = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
@@ -381,10 +391,10 @@ function Linha({ orcamento: o }: { orcamento: OrcamentoNaLista }) {
         </span>
       </span>
       <span role="cell" className="text-sm">
-        {dataCurta(o.criadoEm)}
+        {formatarData(o.criadoEm)}
       </span>
       <span role="cell" className="text-sm">
-        {dataSemFuso(o.validade)}
+        {formatarData(o.validade)}
       </span>
       <span role="cell" className="text-right font-mono text-sm">
         {formatarBRL(Number(o.valorTotal))}

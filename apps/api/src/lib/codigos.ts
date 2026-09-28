@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { anoNoFuso } from '@guarusolar/compartilhado';
 import { prisma } from './prisma';
 
 type Banco = Prisma.TransactionClient | typeof prisma;
@@ -24,12 +25,12 @@ const formatar = (prefixo: string, ano: number, n: number) => `${prefixo}-${ano}
 
 /** GS-2026-0148 */
 export async function gerarCodigoOrcamento(banco: Banco = prisma) {
-  const ano = new Date().getFullYear();
+  const ano = anoNoFuso(); // ano em São Paulo, não no fuso do servidor
   return formatar('GS', ano, await proximoNumero(banco, 'GS', ano));
 }
 
 /** PRJ-2026-0146 */
 export async function gerarCodigoProjeto(banco: Banco = prisma) {
-  const ano = new Date().getFullYear();
+  const ano = anoNoFuso(); // ano em São Paulo, não no fuso do servidor
   return formatar('PRJ', ano, await proximoNumero(banco, 'PRJ', ano));
 }

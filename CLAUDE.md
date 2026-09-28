@@ -57,6 +57,9 @@ apps/api/                      API (Express + Prisma)
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/lib/zod-pt.ts            mensagens padrão do Zod em português (importado no server.ts)
+  src/lib/pdf-orcamento.ts     PDF A4 do orçamento (pdfmake), só com dados gravados; fontes em
+                               WOFF (WOFF2 e IBM Plex Mono quebram o subset do pdfkit)
+  src/rotas/orcamentoPdf.ts    GET /api/orcamentos/:id/pdf?token= — público, protegido pelo tokenPdf
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
 apps/escritorio/               front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
@@ -167,7 +170,7 @@ Próximos passos, nesta ordem:
    vendedor: autocomplete de itens, ajuste de quantidade e preço, desconto, condições de
    pagamento e total em tempo real).
 2. Demais telas do escritório: lista, pipeline, catálogo, clientes.
-3. Geração do **PDF** do orçamento com o logo.
+3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
 4. **PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline.
 5. Empacotar o front do escritório como **executável Windows**.
 6. Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph.
