@@ -129,6 +129,10 @@ function documento(o: OrcamentoParaPdf): TDocumentDefinitions {
         stack: [
           { text: item.descricao, bold: true },
           { text: ROTULO_CATEGORIA[item.produto.categoria], fontSize: 8, color: COR.secundario },
+          // descrição técnica gravada no item (cópia do catálogo na hora do orçamento)
+          ...(item.descricaoTecnica
+            ? [{ text: item.descricaoTecnica, fontSize: 8, color: COR.secundario, margin: [0, 2, 0, 0] as [number, number, number, number] }]
+            : []),
         ],
       },
       { text: `${formatarQuantidade(numero(item.quantidade))} ${ROTULO_UNIDADE[item.unidade]}`, style: 'celulaNumero' },

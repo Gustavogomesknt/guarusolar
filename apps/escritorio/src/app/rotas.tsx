@@ -4,6 +4,7 @@ import { Login } from '@/paginas/Login';
 import { Sair } from '@/paginas/Sair';
 import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';
 import { PaginaOrcamento } from '@/paginas/orcamentos/PaginaOrcamento';
+import { PaginaCatalogo } from '@/paginas/catalogo/PaginaCatalogo';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
@@ -37,6 +38,7 @@ export const roteador = createBrowserRouter(
             <Route path="orcamentos" element={<ListaOrcamentos />} />
             {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
             <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
+            <Route path="catalogo" element={<PaginaCatalogo />} />
           </Route>
         </Route>
       </Route>

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
+import { calcularMargem } from '@guarusolar/compartilhado';
 
 export const rotasProdutos = Router();
 rotasProdutos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -14,19 +15,21 @@ const produtoSchema = z.object({
   unidade: z.enum(['UN', 'KIT', 'M', 'SERVICO', 'KWP']).default('UN'),
   precoCusto: z.number().nonnegative(),
   precoVenda: z.number().positive(),
-  descricaoTecnica: z.string().optional(),
+  // texto vazio vira null (sem descrição no PDF)
+  descricaoTecnica: z
+    .string()
+    .trim()
+    .max(1500)
+    .nullish()
+    .transform((v) => v || null),
   ativo: z.boolean().default(true),
 });
 
-const comMargem = (p: { precoCusto: Prisma.Decimal; precoVenda: Prisma.Decimal }) => {
-  const custo = Number(p.precoCusto);
-  const venda = Number(p.precoVenda);
-  return {
-    ...p,
-    margemPercentual: venda ? Math.round(((venda - custo) / venda) * 1000) / 10 : 0,
-    lucroBruto: Math.round((venda - custo) * 100) / 100,
-  };
-};
+// mesma conta do painel de edição (@guarusolar/compartilhado)
+const comMargem = <T extends { precoCusto: Prisma.Decimal; precoVenda: Prisma.Decimal }>(p: T) => ({
+  ...p,
+  ...calcularMargem(Number(p.precoCusto), Number(p.precoVenda)),
+});
 
 rotasProdutos.get(
   '/',
@@ -34,13 +37,21 @@ rotasProdutos.get(
     const { q, categoria, incluirInativos } = req.query as Record<string, string>;
     const produtos = await prisma.produto.findMany({
       where: {
+        // sem incluirInativos, só itens ativos: é assim que desativados somem dos novos orçamentos
         ...(incluirInativos === 'true' ? {} : { ativo: true }),
         ...(categoria ? { categoria: categoria as never } : {}),
         ...(q ? { nome: { contains: q, mode: 'insensitive' } } : {}),
       },
       orderBy: [{ categoria: 'asc' }, { nome: 'asc' }],
+      include: { _count: { select: { itensOrcamento: true } } },
     });
-    res.json(produtos.map(comMargem));
+    res.json(
+      produtos.map(({ _count, ...p }) => ({
+        ...comMargem(p),
+        // linhas de orçamento que usam o item (um produto aparece uma vez por orçamento)
+        usadoEmOrcamentos: _count.itensOrcamento,
+      })),
+    );
   }),
 );
 

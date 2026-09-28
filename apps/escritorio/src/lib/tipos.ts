@@ -86,11 +86,19 @@ export type OrcamentoCompleto = {
   }[];
 };
 
+/** Item do catálogo (GET /api/produtos). Preços chegam como texto (Decimal). */
 export type Produto = {
   id: string;
   nome: string;
   categoria: CategoriaProduto;
   unidade: Unidade;
+  precoCusto: string;
   precoVenda: string;
+  descricaoTecnica: string | null;
   ativo: boolean;
+  /** calculados pela API com calcularMargem */
+  margemPercentual: number;
+  lucroBruto: number;
+  /** linhas de orçamento que usam o item */
+  usadoEmOrcamentos: number;
 };

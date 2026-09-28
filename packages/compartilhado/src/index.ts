@@ -4,3 +4,4 @@ export * from './rotulos.js';
 export * from './status.js';
 export * from './datas.js';
 export * from './mascaras.js';
+export * from './margem.js';

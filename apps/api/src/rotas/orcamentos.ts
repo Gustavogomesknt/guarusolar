@@ -61,6 +61,7 @@ export function linkDoPdf(orcamento: { id: string; tokenPdf: string }) {
 type CopiaDoItem = {
   produtoId: string;
   descricao: string;
+  descricaoTecnica: string | null;
   unidade: Unidade;
   precoTabela: Prisma.Decimal;
 };
@@ -87,12 +88,14 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
     const produto = produtos.find((p) => p.id === item.produtoId)!;
     const copia = copias.get(item.produtoId);
     const descricao = copia?.descricao ?? produto.nome;
+    const descricaoTecnica = copia ? copia.descricaoTecnica : produto.descricaoTecnica;
     const unidade = copia?.unidade ?? produto.unidade;
     const precoTabela = copia ? Number(copia.precoTabela) : Number(produto.precoVenda);
     const precoUnitario = item.precoUnitario ?? precoTabela;
     return {
       produtoId: produto.id,
       descricao,
+      descricaoTecnica,
       unidade,
       quantidade: new Prisma.Decimal(item.quantidade),
       precoUnitario: new Prisma.Decimal(precoUnitario),

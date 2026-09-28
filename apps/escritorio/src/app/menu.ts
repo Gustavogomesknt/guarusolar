@@ -27,7 +27,7 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Novo orçamento', caminho: '/orcamentos/novo', icone: FilePlus2, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true },
   { rotulo: 'Pipeline', caminho: '/pipeline', icone: KanbanSquare, papeis: ['COMERCIAL'], disponivel: false },
   { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: ['COMERCIAL'], disponivel: false },
-  { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL'], disponivel: false },
+  { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true },
   { rotulo: 'Agenda', caminho: '/agenda', icone: CalendarDays, papeis: ['GESTOR'], disponivel: false },
   { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: false },
   { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['GESTOR'], disponivel: false },

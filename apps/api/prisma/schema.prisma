@@ -227,6 +227,7 @@ model ItemOrcamento {
   // cópia dos dados do produto no momento do orçamento:
   // se o catálogo mudar depois, o orçamento antigo continua fiel ao que foi enviado
   descricao      String
+  descricaoTecnica String? // aparece no PDF, abaixo do nome
   unidade        Unidade
   quantidade     Decimal @db.Decimal(12, 3)
   precoUnitario  Decimal @db.Decimal(12, 2)

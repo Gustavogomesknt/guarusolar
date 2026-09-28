@@ -73,6 +73,8 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                e gerador (/orcamentos/:id, com "novo" para criar): prévia com
                                calcularOrcamento, salvar via POST/PUT, WhatsApp; APROVADO
                                abre só para leitura
+  src/paginas/catalogo/        catálogo (/catalogo): filtros, ativar/desativar e painel lateral
+                               de criar/editar com margem ao vivo (calcularMargem)
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
   src/app/menu.ts              itens do menu e os papéis de cada um
   src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
@@ -98,7 +100,8 @@ O `.env` da API fica em `apps/api/.env`.
    a API recalcula tudo com `calcularOrcamento` (`packages/compartilhado/src/calculo.ts`) e grava.
    Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
-   gravados no item. Mudança futura no catálogo não altera orçamento antigo. Na edição (PUT),
+   gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
+   não altera orçamento antigo. Na edição (PUT),
    itens que já estavam no orçamento mantêm a cópia gravada; só itens novos copiam o catálogo.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
