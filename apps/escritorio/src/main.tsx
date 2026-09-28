@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 // Fontes empacotadas no app: o executável precisa funcionar sem internet.
@@ -12,18 +12,13 @@ import '@fontsource/ibm-plex-mono/400.css';
 import './estilos/tema.css';
 
 import { clienteConsultas } from '@/lib/consultas';
-import { SessaoProvider } from '@/lib/sessao';
 import { Toaster } from '@/components/ui/sonner';
-import { Rotas } from '@/app/rotas';
+import { roteador } from '@/app/rotas';
 
 createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <QueryClientProvider client={clienteConsultas}>
-      <BrowserRouter>
-        <SessaoProvider>
-          <Rotas />
-        </SessaoProvider>
-      </BrowserRouter>
+      <RouterProvider router={roteador} />
       <Toaster position="top-right" />
     </QueryClientProvider>
   </StrictMode>,

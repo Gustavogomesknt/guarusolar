@@ -1,46 +1,84 @@
-import type { ResultadoCalculo } from '@guarusolar/compartilhado';
+import { FileText, Loader2, MessageCircle } from 'lucide-react';
 import { formatarBRL } from '@/lib/formatar';
-import { Selo } from '@/components/Selo';
+import { Button } from '@/components/ui/button';
+import { CartaoCondicoes } from './CartaoCondicoes';
+
+export type Totais = {
+  subtotal: number;
+  descontoAplicado: number;
+  valorTotal: number;
+  resumoPagamento: string;
+};
 
 /**
- * Coluna da direita: condições e o valor total.
- * Os valores são uma PRÉVIA calculada no navegador; o que vale é o que a API
- * calcula e grava ao salvar o orçamento.
+ * Coluna da direita: condições, valor total e ações.
+ * `confirmado` = os totais são os que a API calculou e gravou; senão é uma prévia do navegador.
  */
-export function ResumoOrcamento({ resultado }: { resultado: ResultadoCalculo }) {
+export function ResumoOrcamento({
+  totais,
+  confirmado,
+  salvo,
+  alteradoDepoisDeSalvar,
+  enviandoWhatsApp,
+  onWhatsApp,
+}: {
+  totais: Totais;
+  confirmado: boolean;
+  salvo: boolean;
+  alteradoDepoisDeSalvar: boolean;
+  enviandoWhatsApp: boolean;
+  onWhatsApp: () => void;
+}) {
+  const podeEnviar = salvo && !alteradoDepoisDeSalvar;
+  const dicaAcoes = !salvo
+    ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
+    : alteradoDepoisDeSalvar
+      ? 'Há alterações não salvas. Salve antes de enviar, para o cliente receber a versão atual.'
+      : 'A geração do PDF entra na próxima etapa.';
+
   return (
     <aside aria-label="Resumo do orçamento" className="flex flex-col gap-4">
-      <section aria-labelledby="titulo-condicoes" className="flex flex-col gap-4 rounded-[14px] border bg-card p-[22px]">
-        <h2 id="titulo-condicoes" className="text-xl font-bold">
-          3. Condições
-        </h2>
-        <dl className="flex flex-col gap-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Subtotal</dt>
-            <dd className="font-mono">{formatarBRL(resultado.subtotal)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Desconto aplicado</dt>
-            <dd className="font-mono">− {formatarBRL(resultado.descontoAplicado)}</dd>
-          </div>
-        </dl>
-        <div className="flex flex-col items-start gap-2 rounded-[10px] bg-background px-3 py-2.5 text-[13px] leading-relaxed text-foreground/80">
-          <Selo variante="destaque">Em construção</Selo>
-          Desconto, condição de pagamento, validade e observações chegam na próxima etapa. Por
-          enquanto, a prévia considera pagamento à vista sem desconto.
-        </div>
-      </section>
+      <CartaoCondicoes subtotal={totais.subtotal} descontoAplicado={totais.descontoAplicado} />
 
       <section aria-labelledby="titulo-total" className="flex flex-col gap-1.5 rounded-[14px] bg-sidebar p-[22px]">
         <h2 id="titulo-total" className="font-sans text-[13px] font-normal tracking-normal text-[#CBDBF0]">
           Valor total do orçamento
         </h2>
         <p className="font-titulo text-[38px] leading-tight font-bold tracking-[-0.02em] text-white" aria-live="polite">
-          {formatarBRL(resultado.valorTotal)}
+          {formatarBRL(totais.valorTotal)}
         </p>
-        <p className="text-[13px] leading-snug text-destaque-claro">{resultado.resumoPagamento}</p>
-        <p className="pt-1 text-xs text-[#9DB6D6]">Prévia. O valor final é confirmado pelo sistema ao salvar.</p>
+        <p className="text-[13px] leading-snug text-destaque-claro">{totais.resumoPagamento}</p>
+        <p className="pt-1 text-xs text-[#9DB6D6]">
+          {confirmado ? 'Valores confirmados pelo sistema.' : 'Prévia. O valor final é confirmado pelo sistema ao salvar.'}
+        </p>
       </section>
+
+      <div className="flex flex-col gap-2.5">
+        <Button
+          type="button"
+          onClick={onWhatsApp}
+          disabled={!podeEnviar || enviandoWhatsApp}
+          aria-describedby="dica-acoes"
+          className="h-[50px] rounded-xl text-[15px] font-semibold"
+        >
+          {enviandoWhatsApp ? <Loader2 className="animate-spin" aria-hidden /> : <MessageCircle aria-hidden />}
+          Enviar via WhatsApp
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          // preparado para o passo 3 do CLAUDE.md (PDF com o logo); ainda sem ação
+          disabled
+          aria-describedby="dica-acoes"
+          className="h-12 rounded-xl bg-card text-[15px]"
+        >
+          <FileText aria-hidden />
+          Gerar PDF
+        </Button>
+        <p id="dica-acoes" className="text-center text-[13px] text-muted-foreground">
+          {dicaAcoes}
+        </p>
+      </div>
     </aside>
   );
 }

@@ -14,8 +14,14 @@ import type { FormularioOrcamento } from './formulario';
 const MINIMO_BUSCA = 2;
 
 export function CartaoCliente() {
-  const { control, setValue } = useFormContext<FormularioOrcamento>();
+  const {
+    control,
+    setValue,
+    clearErrors,
+    formState: { errors },
+  } = useFormContext<FormularioOrcamento>();
   const cliente = useWatch({ control, name: 'cliente' });
+  const erroCliente = errors.root?.cliente?.message;
   const [termo, setTermo] = useState('');
   const [dialogAberto, setDialogAberto] = useState(false);
 
@@ -31,6 +37,7 @@ export function CartaoCliente() {
 
   function selecionar(escolhido: Cliente | null) {
     setValue('cliente', escolhido, { shouldDirty: true });
+    if (escolhido) clearErrors('root.cliente');
     setTermo('');
   }
 
@@ -82,6 +89,12 @@ export function CartaoCliente() {
             </div>
           }
         />
+      )}
+
+      {erroCliente && (
+        <p role="alert" className="text-[13px] text-destructive">
+          {erroCliente}
+        </p>
       )}
 
       <DialogNovoCliente

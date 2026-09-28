@@ -9,21 +9,31 @@ import { numeroOuZero, precoFoiAjustado, type FormularioOrcamento } from './form
 export const COLUNAS_ITENS = 'grid-cols-[minmax(0,1fr)_122px_132px_112px_40px]';
 
 export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: () => void }) {
-  const { control, register, setValue } = useFormContext<FormularioOrcamento>();
+  const {
+    control,
+    register,
+    setValue,
+    clearErrors,
+    formState: { errors },
+  } = useFormContext<FormularioOrcamento>();
   const item = useWatch({ control, name: `itens.${indice}` });
   if (!item) return null;
 
   const quantidade = numeroOuZero(item.quantidade);
   const preco = numeroOuZero(item.precoUnitario);
   const ajustado = precoFoiAjustado(item);
-  const quantidadeInvalida = !(lerNumero(item.quantidade) > 0);
-  const precoInvalido = !(lerNumero(item.precoUnitario) >= 0);
+  const erroLinha = errors.itens?.[indice];
+  const quantidadeInvalida = !(lerNumero(item.quantidade) > 0) || !!erroLinha?.quantidade;
+  const precoInvalido = !(lerNumero(item.precoUnitario) >= 0) || !!erroLinha?.precoUnitario;
+  const mensagemErro = erroLinha?.quantidade?.message ?? erroLinha?.precoUnitario?.message;
   const idBase = `item-${indice}`;
   const campoQuantidade = `itens.${indice}.quantidade` as const;
   const campoPreco = `itens.${indice}.precoUnitario` as const;
 
-  const mudarQuantidade = (delta: number) =>
+  const mudarQuantidade = (delta: number) => {
     setValue(campoQuantidade, formatarQuantidade(Math.max(1, quantidade + delta)), { shouldDirty: true });
+    clearErrors(campoQuantidade);
+  };
 
   return (
     <div role="row" className={`grid ${COLUNAS_ITENS} items-center gap-3 border-t py-3`}>
@@ -37,6 +47,11 @@ export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: ()
         {ajustado && (
           <span id={`${idBase}-ajuste`} className="text-xs text-destaque-texto">
             Preço ajustado · padrão {formatarBRL(item.precoTabela)}
+          </span>
+        )}
+        {mensagemErro && (
+          <span id={`${idBase}-erro`} role="alert" className="text-xs text-destructive">
+            {mensagemErro}
           </span>
         )}
       </div>
@@ -65,7 +80,8 @@ export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: ()
             inputMode="decimal"
             autoComplete="off"
             aria-invalid={quantidadeInvalida || undefined}
-            {...register(campoQuantidade)}
+            aria-describedby={mensagemErro ? `${idBase}-erro` : undefined}
+            {...register(campoQuantidade, { onChange: () => clearErrors(campoQuantidade) })}
             className="h-full w-0 min-w-0 flex-1 bg-card text-center font-mono text-sm outline-none"
           />
           <button
@@ -99,6 +115,7 @@ export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: ()
             aria-invalid={precoInvalido || undefined}
             aria-describedby={ajustado ? `${idBase}-ajuste` : undefined}
             {...register(campoPreco, {
+              onChange: () => clearErrors(campoPreco),
               // ao sair do campo, mostra o valor no formato 1.234,50
               onBlur: (e) => {
                 const valor = lerNumero(e.target.value);

@@ -14,7 +14,14 @@ import { itemDoProduto, numeroOuZero, type FormularioOrcamento } from './formula
 const MINIMO_BUSCA = 2;
 
 export function CartaoItens({ subtotal }: { subtotal: number }) {
-  const { control, getValues, setValue } = useFormContext<FormularioOrcamento>();
+  const {
+    control,
+    getValues,
+    setValue,
+    clearErrors,
+    formState: { errors },
+  } = useFormContext<FormularioOrcamento>();
+  const erroItens = errors.root?.itens?.message;
   const { fields, append, remove } = useFieldArray({ control, name: 'itens' });
   const itens = useWatch({ control, name: 'itens' });
   const [termo, setTermo] = useState('');
@@ -40,6 +47,7 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
       // sem foco na linha nova: o vendedor continua na busca para adicionar o próximo item
       append(itemDoProduto(produto), { shouldFocus: false });
     }
+    clearErrors('root.itens');
     setTermo('');
     campoBusca.current?.focus();
   }
@@ -104,8 +112,15 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
       />
 
       {fields.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-          Nenhum item ainda. Busque no catálogo acima para adicionar.
+        <p
+          role={erroItens ? 'alert' : undefined}
+          className={
+            erroItens
+              ? 'rounded-xl border border-dashed border-destructive px-4 py-8 text-center text-sm text-destructive'
+              : 'rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground'
+          }
+        >
+          {erroItens ?? 'Nenhum item ainda. Busque no catálogo acima para adicionar.'}
         </p>
       ) : (
         <div role="table" aria-label="Itens do orçamento">

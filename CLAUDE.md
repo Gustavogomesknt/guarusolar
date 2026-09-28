@@ -63,10 +63,17 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
   src/lib/api.ts               cliente HTTP: token no cabeçalho, ErroApi, 401 encerra a sessão
   src/lib/sessao.tsx           usuário logado, entrar(), sair() e aviso de sessão expirada
   src/lib/consultas.ts         React Query com aviso global de erro (toast)
-  src/app/rotas.tsx            rotas; cada tela fica dentro de <RotaProtegida papeis={...}>
+  src/app/rotas.tsx            roteador de dados (createBrowserRouter, necessário para o
+                               useBlocker); cada tela fica dentro de <RotaProtegida papeis={...}>
+  src/paginas/orcamentos/      gerador de orçamentos (/orcamentos/novo): prévia com
+                               calcularOrcamento, salvar via POST/PUT, WhatsApp
+  src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
   src/app/menu.ts              itens do menu e os papéis de cada um
   src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
-  src/components/ui/           gerados pelo shadcn (npx shadcn@latest add ... --cwd apps/escritorio)
+  src/components/ui/           gerados pelo shadcn (npx shadcn@latest add ... --cwd apps/escritorio).
+                               ATENÇÃO: o CLI instala um pacote npm "cn" e importa `from "cn"`;
+                               depois de cada add, desinstale o "cn" e troque o import por
+                               `from "@/lib/utils"`
   src/paginas/                 Login, Inicio, SemAcesso
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
@@ -146,6 +153,8 @@ app do técnico (celular), validação do serviço (gestor) e agenda das equipes
 Pronto: schema do Prisma, seed e API completa (auth, clientes, produtos, orçamentos com
 status e WhatsApp, agenda, validação e rotas do técnico). Monorepo com o pacote compartilhado.
 Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegidas por papel.
+Gerador de orçamentos (novo orçamento): cliente, itens, condições, salvar e WhatsApp. Falta
+abrir um orçamento já salvo para editar.
 
 Próximos passos, nesta ordem:
 

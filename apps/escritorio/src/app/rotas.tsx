@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
+import { SessaoProvider } from '@/lib/sessao';
 import { Login } from '@/paginas/Login';
 import { Inicio } from '@/paginas/Inicio';
 import { NovoOrcamento } from '@/paginas/orcamentos/NovoOrcamento';
@@ -6,16 +7,25 @@ import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
 
-/*
- * Toda tela nova entra dentro do <Layout>, envolvida por uma <RotaProtegida> com os papéis
- * dela (os mesmos do item em menu.ts). Exemplo:
- *   <Route element={<RotaProtegida papeis={['COMERCIAL']} />}>
- *     <Route path="orcamentos" element={<Orcamentos />} />
- *   </Route>
- */
-export function Rotas() {
+/** A sessão fica dentro do roteador porque usa useNavigate para voltar ao login. */
+function RaizDoApp() {
   return (
-    <Routes>
+    <SessaoProvider>
+      <Outlet />
+    </SessaoProvider>
+  );
+}
+
+/*
+ * Roteador de dados (createBrowserRouter): necessário para o useBlocker, que confirma a
+ * saída de telas com alterações não salvas.
+ *
+ * Toda tela nova entra dentro do <Layout>, envolvida por uma <RotaProtegida> com os papéis
+ * dela (os mesmos do item em menu.ts).
+ */
+export const roteador = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<RaizDoApp />}>
       <Route path="/login" element={<Login />} />
 
       <Route element={<RotaProtegida papeis={PAPEIS_DO_ESCRITORIO} />}>
@@ -28,6 +38,6 @@ export function Rotas() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
+    </Route>,
+  ),
+);
