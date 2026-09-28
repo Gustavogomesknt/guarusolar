@@ -1,11 +1,15 @@
 import type { NextFunction, Request, Response } from 'express';
 import { MulterError } from 'multer';
 import { ZodError } from 'zod';
+import { TAMANHO_MAXIMO_FOTO } from './upload';
+
+const MB_MAXIMO_FOTO = (TAMANHO_MAXIMO_FOTO / (1024 * 1024)).toLocaleString('pt-BR', {
+  maximumFractionDigits: 1,
+});
 
 /** Mensagens para os erros de upload lançados pelo multer (demais códigos: 400). */
 const mensagensUpload: Record<string, string> = {
-  LIMIT_FILE_SIZE:
-    'A foto passou do tamanho máximo de 15 MB. Tire a foto novamente pelo app, que ela é reduzida automaticamente.',
+  LIMIT_FILE_SIZE: `A foto passou do tamanho máximo de ${MB_MAXIMO_FOTO} MB. Tire a foto novamente pelo app, que ela é reduzida automaticamente.`,
   LIMIT_FILE_COUNT: 'Envie uma foto por vez.',
   LIMIT_UNEXPECTED_FILE: 'Envie a foto no campo "arquivo".',
   LIMIT_PART_COUNT: 'O envio tem partes demais. Tente enviar a foto novamente.',

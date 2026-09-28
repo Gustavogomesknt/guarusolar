@@ -5,10 +5,9 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { salvarArquivo } from '../lib/armazenamento';
+import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 
-// Upload das fotos do técnico. O PWA já reduz a foto antes de enviar (ver README);
-// o limite só barra arquivos que chegaram sem essa redução.
-const TAMANHO_MAXIMO_FOTO = 15 * 1024 * 1024; // 15 MB
+// Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
 const TIPOS_DE_FOTO_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
 
 // ===========================================================================
