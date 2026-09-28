@@ -38,10 +38,12 @@ apps/api/
   prisma/seed.ts            dados iniciais
   src/server.ts             sobe a API e monta as rotas
   src/lib/auth.ts           login por JWT e controle de papéis
-  src/lib/calculo.ts        regra de totais, desconto e parcelamento
   src/lib/codigos.ts        GS-2026-0148 / PRJ-2026-0146
   src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
   src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
+packages/compartilhado/
+  src/enums.ts              enums do banco, usados pelos fronts sem depender do Prisma
+  src/calculo.ts            regra de totais, desconto e parcelamento
 ```
 
 ## Rotas principais
@@ -72,7 +74,8 @@ apps/api/
 ## Decisões importantes
 
 - **Valores calculados no servidor.** O front manda itens e descontos; quem soma é a API.
-  Assim ninguém consegue gravar um total diferente do que as regras permitem.
+  Assim ninguém consegue gravar um total diferente do que as regras permitem. A regra fica em
+  `packages/compartilhado`, e o front usa a mesma função só para mostrar a prévia em tela.
 - **Itens do orçamento são uma cópia.** Nome, unidade e preço ficam gravados no item.
   Mudar o catálogo depois não altera orçamentos antigos.
 - **Nada é apagado.** Clientes e produtos são desativados, preservando o histórico.

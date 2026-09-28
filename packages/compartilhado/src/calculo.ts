@@ -1,4 +1,9 @@
-import { CondicaoPagamento, TipoDesconto } from '@prisma/client';
+/*
+ * ATENÇÃO: o front usa esta função APENAS para a prévia em tela, enquanto o vendedor monta o
+ * orçamento. O valor válido é sempre o que a API calcula e grava: ela recalcula tudo com esta
+ * mesma função ao salvar e nunca aceita total vindo do front (regra 1 do CLAUDE.md).
+ */
+import type { CondicaoPagamento, TipoDesconto } from './enums.js';
 
 export type ItemCalculo = {
   quantidade: number;

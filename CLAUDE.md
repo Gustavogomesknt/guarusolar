@@ -50,21 +50,29 @@ apps/api/                      API (Express + Prisma)
   prisma/seed.ts               catálogo inicial, equipes, checklist e usuários de teste
   src/server.ts                sobe a API e monta as rotas
   src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar
-  src/lib/calculo.ts           totais, desconto e condições de pagamento
+  src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto)
   src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
+packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
+  src/enums.ts                 enums do banco como listas `as const` + tipos
+  src/calculo.ts               totais, desconto e condições de pagamento
 ```
+
+Ao mudar um enum no `schema.prisma`, atualize também `packages/compartilhado/src/enums.ts`;
+o build da API acusa a divergência. A API é CommonJS e carrega o pacote (ESM) com o
+`require()` de ESM do Node, por isso o projeto exige Node 22.12 ou mais recente.
 
 O `.env` da API fica em `apps/api/.env`.
 
 ## Regras de negócio que não podem ser quebradas
 
 1. **Quem calcula é o servidor.** O front envia itens, desconto e condição de pagamento;
-   a API recalcula tudo em `apps/api/src/lib/calculo.ts` e grava. Nunca aceitar total vindo do front.
+   a API recalcula tudo com `calcularOrcamento` (`packages/compartilhado/src/calculo.ts`) e grava.
+   Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
    gravados no item. Mudança futura no catálogo não altera orçamento antigo.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).

@@ -4,7 +4,7 @@ import { Prisma, type StatusOrcamento } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { calcularOrcamento, formatarBRL } from '../lib/calculo';
+import { calcularOrcamento, formatarBRL } from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 
 export const rotasOrcamentos = Router();
