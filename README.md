@@ -77,6 +77,21 @@ src/rotas/                clientes, produtos, orçamentos, agenda, validação, 
   O técnico só consegue concluir com todas as obrigatórias enviadas.
 - **Técnico enxerga apenas a própria agenda**, garantido no servidor, não só na tela.
 
+## App do técnico (PWA)
+
+O técnico usa o próprio celular pelo navegador, muitas vezes com internet móvel fraca.
+Por isso o PWA deve **redimensionar cada foto antes do envio**:
+
+- **Lado maior com 2000 px**, mantendo a proporção. Fotos menores seguem como estão.
+- **JPEG com qualidade 85.** Uma foto assim costuma ficar entre 400 KB e 1 MB.
+- **Manter a data/hora e a localização da captura.** Ao redesenhar a imagem num canvas,
+  os metadados EXIF se perdem. Leia-os antes de reduzir e envie-os nos campos
+  `capturadaEm`, `latitude` e `longitude` da rota `POST /api/tecnico/servicos/:id/fotos`.
+
+A API aceita apenas `image/jpeg`, `image/png` e `image/webp`, até 15 MB, no campo `arquivo`.
+Uma foto maior é recusada com status 413, e um formato diferente com status 400, os dois com
+mensagem pronta para mostrar ao técnico.
+
 ## Próximos passos
 
 1. Front do escritório (React + Tailwind + shadcn/ui) seguindo o design aprovado.

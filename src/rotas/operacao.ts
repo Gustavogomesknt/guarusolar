@@ -6,6 +6,11 @@ import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { salvarArquivo } from '../lib/armazenamento';
 
+// Upload das fotos do técnico. O PWA já reduz a foto antes de enviar (ver README);
+// o limite só barra arquivos que chegaram sem essa redução.
+const TAMANHO_MAXIMO_FOTO = 15 * 1024 * 1024; // 15 MB
+const TIPOS_DE_FOTO_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
+
 // ===========================================================================
 // AGENDA — escritório (gestor)
 // ===========================================================================
@@ -234,7 +239,11 @@ rotasTecnico.use(autenticar, autorizar('TECNICO'));
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 12 * 1024 * 1024 },
+  limits: { fileSize: TAMANHO_MAXIMO_FOTO },
+  fileFilter: (_req, arquivo, cb) => {
+    if (TIPOS_DE_FOTO_ACEITOS.includes(arquivo.mimetype)) return cb(null, true);
+    cb(new ErroHttp(400, 'Formato de arquivo não aceito. Envie a foto em JPG, PNG ou WEBP.'));
+  },
 });
 
 /** Garante que o técnico só acesse os serviços da própria equipe. */

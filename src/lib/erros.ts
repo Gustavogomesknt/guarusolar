@@ -1,5 +1,18 @@
 import type { NextFunction, Request, Response } from 'express';
+import { MulterError } from 'multer';
 import { ZodError } from 'zod';
+
+/** Mensagens para os erros de upload lançados pelo multer (demais códigos: 400). */
+const mensagensUpload: Record<string, string> = {
+  LIMIT_FILE_SIZE:
+    'A foto passou do tamanho máximo de 15 MB. Tire a foto novamente pelo app, que ela é reduzida automaticamente.',
+  LIMIT_FILE_COUNT: 'Envie uma foto por vez.',
+  LIMIT_UNEXPECTED_FILE: 'Envie a foto no campo "arquivo".',
+  LIMIT_PART_COUNT: 'O envio tem partes demais. Tente enviar a foto novamente.',
+  LIMIT_FIELD_KEY: 'Um dos campos enviados tem o nome muito longo.',
+  LIMIT_FIELD_VALUE: 'Um dos campos enviados tem o conteúdo muito longo.',
+  LIMIT_FIELD_COUNT: 'O envio tem campos demais. Tente enviar a foto novamente.',
+};
 
 export class ErroHttp extends Error {
   constructor(public status: number, message: string) {
@@ -24,6 +37,11 @@ export function tratadorDeErros(
     return res.status(400).json({
       erro: 'Dados inválidos',
       detalhes: erro.issues.map((i) => ({ campo: i.path.join('.'), mensagem: i.message })),
+    });
+  }
+  if (erro instanceof MulterError) {
+    return res.status(erro.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+      erro: mensagensUpload[erro.code] ?? 'Não foi possível receber a foto. Tente enviar novamente.',
     });
   }
   if (erro instanceof ErroHttp) {
