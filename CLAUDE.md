@@ -1,0 +1,152 @@
+# Guarusolar — Sistema de Gestão
+
+Contexto permanente deste repositório. Leia antes de qualquer tarefa.
+
+## O que é
+
+Sistema de gestão para a **Guarusolar**, empresa de energia solar de Guarulhos/SP.
+Substitui o **Alvo**, ferramenta de mercado que a empresa usa hoje e pretende abandonar
+(o cliente deixa de pagar a mensalidade do Alvo).
+
+O sistema cobre o fluxo inteiro:
+
+```
+orçamento → aprovação → projeto → agenda das equipes → execução com fotos → validação → concluído
+```
+
+## Quem usa
+
+| Papel | Onde usa | O que enxerga |
+| --- | --- | --- |
+| `COMERCIAL` | executável no PC do escritório | clientes, catálogo, orçamentos, PDF, WhatsApp |
+| `GESTOR` | executável no PC do escritório | agenda das equipes, validação das fotos, projetos |
+| `TECNICO` | navegador do próprio celular (PWA, sem instalar) | **somente** a agenda dele e o envio de fotos |
+| `ADMIN` | ambos | tudo |
+
+Decisão fechada com o cliente: **escritório usa executável** (Electron ou Tauri empacotando o
+front React) e **técnicos usam o site no celular**, porque usam aparelhos próprios e não devem
+instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
+
+## Stack
+
+- **Banco:** PostgreSQL + Prisma
+- **API:** Node.js + TypeScript + Express + Zod (este repositório)
+- **Front:** React + Vite + Tailwind CSS + shadcn/ui
+- **Auth:** JWT com papéis
+- **Arquivos (fotos e PDFs):** hoje em disco local; em produção no **OneDrive/SharePoint do cliente**
+  via Microsoft Graph, aproveitando o plano Microsoft 365 que ele já paga
+- **Hospedagem pretendida:** custo zero enquanto der (plano gratuito de Postgres gerenciado),
+  com backup automático do banco para o OneDrive do cliente
+
+## Estrutura
+
+```
+prisma/schema.prisma      tabelas (clientes, produtos, orçamentos, itens, projetos,
+                          equipes, agendamentos, checklist de fotos, fotos, materiais)
+prisma/seed.ts            catálogo inicial, equipes, checklist e usuários de teste
+src/server.ts             sobe a API e monta as rotas
+src/lib/auth.ts           JWT, hash de senha, middleware autenticar/autorizar
+src/lib/calculo.ts        totais, desconto e condições de pagamento
+src/lib/codigos.ts        GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto)
+src/lib/armazenamento.ts  camada de arquivos — trocar por OneDrive sem mexer no resto
+src/lib/erros.ts          ErroHttp, wrapper de rota async, tratador central
+src/rotas/                auth, clientes, produtos, orcamentos, operacao (agenda,
+                          validação e técnico)
+```
+
+## Regras de negócio que não podem ser quebradas
+
+1. **Quem calcula é o servidor.** O front envia itens, desconto e condição de pagamento;
+   a API recalcula tudo em `src/lib/calculo.ts` e grava. Nunca aceitar total vindo do front.
+2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
+   gravados no item. Mudança futura no catálogo não altera orçamento antigo.
+3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
+4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
+5. **Status seguem transições válidas** (ver mapa `transicoes` em `src/rotas/orcamentos.ts`).
+   Orçamento `APROVADO` não pode ser editado.
+6. **Técnico só acessa os serviços da própria equipe**, validado no servidor, nunca apenas
+   escondendo botões na interface.
+7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
+   teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
+8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`).
+
+## Convenções de código
+
+- Código, nomes de variáveis, rotas, mensagens de erro e comentários **em português**.
+- Enums e valores do banco em MAIÚSCULAS com underscore: `EM_NEGOCIACAO`, `PAINEL_SOLAR`.
+- Validação de entrada sempre com **Zod**, no início da rota.
+- Rotas assíncronas envolvidas no helper `rota()`; erros de regra com `new ErroHttp(status, msg)`.
+- Dinheiro em `Decimal(12,2)` no banco e arredondado para centavos no cálculo.
+- Documento e WhatsApp gravados **somente com dígitos**; a formatação é responsabilidade do front.
+- Mensagens de erro escritas para o usuário final, não para o desenvolvedor.
+  Bom: "Faltam 2 fotos obrigatórias: Aterramento, Medidor".
+
+## Identidade visual (aprovada pelo cliente)
+
+Cores da marca: **azul, laranja e branco**.
+
+| Uso | Cor |
+| --- | --- |
+| Azul escuro (menu, blocos de destaque) | `#0B2F5E` |
+| Azul de ação (botões primários, links) | `#1257A6` |
+| Laranja de destaque (logo, alertas, ênfase) | `#EE7C12` / `#F79433` |
+| Fundo da aplicação | `#F4F6FA` |
+| Cartões | `#FFFFFF`, borda `#D9E0EA` |
+| Texto principal / secundário | `#10243D` / `#5A6675` |
+
+Verde e vermelho ficam reservados para "Aprovado" e "Recusado". Tipografia do protótipo:
+Bricolage Grotesque nos títulos, IBM Plex Sans no texto, IBM Plex Mono em códigos e valores.
+
+**Pendências com o cliente:** códigos hexadecimais oficiais da marca e o arquivo do logo
+(hoje há um ícone de sol provisório).
+
+## Design de referência
+
+O protótipo navegável de todas as telas está em:
+https://claude.ai/artifact/NLBwCgGbifMkGj4AVuHnLW
+
+Telas desenhadas: painel de orçamentos com indicadores, pipeline Kanban, gerador de orçamento,
+cadastro rápido de cliente, catálogo de itens, PDF do orçamento (A4), envio por WhatsApp,
+app do técnico (celular), validação do serviço (gestor) e agenda das equipes.
+
+## Estado atual
+
+Pronto: schema do Prisma, seed e API completa (auth, clientes, produtos, orçamentos com
+status e WhatsApp, agenda, validação e rotas do técnico).
+
+Próximos passos, nesta ordem:
+
+1. Front do escritório: **gerador de orçamentos** primeiro (tela que mais economiza tempo do
+   vendedor: autocomplete de itens, ajuste de quantidade e preço, desconto, condições de
+   pagamento e total em tempo real).
+2. Demais telas do escritório: lista, pipeline, catálogo, clientes.
+3. Geração do **PDF** do orçamento com o logo.
+4. **PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline.
+5. Empacotar o front do escritório como **executável Windows**.
+6. Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph.
+7. Atualização em **tempo real** da fila de validação.
+8. Comparativo **orçado × realizado** por projeto.
+
+## Comandos
+
+```bash
+npm install
+cp .env.example .env     # ajustar DATABASE_URL e JWT_SECRET
+npm run db:migrate       # cria as tabelas
+npm run db:seed          # catálogo, equipes, checklist e usuários de teste
+npm run dev              # API em http://localhost:3333
+npm run db:studio        # inspecionar o banco
+```
+
+Banco local rápido: `docker run --name guarusolar-db -e POSTGRES_PASSWORD=senha -p 5432:5432 -d postgres:16`
+
+Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
+`tecnico.a@guarusolar.com.br`.
+
+## Como trabalhar comigo neste projeto
+
+- Antes de criar arquivo novo, verifique se já existe algo parecido em `src/lib` ou `src/rotas`.
+- Ao mudar o schema, gere a migration (`npm run db:migrate`) e atualize o seed se necessário.
+- Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
+- Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
+- Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.
