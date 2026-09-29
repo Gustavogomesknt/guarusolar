@@ -19,6 +19,7 @@
     "db:migrate": "npm run db:migrate -w @guarusolar/api --",
     "db:seed": "npm run db:seed -w @guarusolar/api --",
     "db:limpar": "npm run db:limpar -w @guarusolar/api --",
-    "db:studio": "npm run db:studio -w @guarusolar/api --"
+    "db:studio": "npm run db:studio -w @guarusolar/api --",
+    "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --"
   }
 }

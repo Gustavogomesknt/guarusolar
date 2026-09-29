@@ -10,6 +10,10 @@ import { rotasOrcamentos } from './rotas/orcamentos';
 import { rotasOrcamentoPdf } from './rotas/orcamentoPdf';
 import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
 import { rotasFotos } from './rotas/fotos';
+import { conferirArmazenamentoAoIniciar } from './lib/armazenamento';
+
+// armazenamento mal configurado para a API ao subir, com a mensagem (não no primeiro upload em campo)
+conferirArmazenamentoAoIniciar();
 
 const app = express();
 

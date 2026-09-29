@@ -167,6 +167,44 @@ em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e 
 precisa ser de um item do checklist daquele tipo de serviço (400). A agenda do técnico mostra,
 além de hoje a 7 dias, os serviços em aberto de dias anteriores, até serem enviados.
 
+### Fotos no SharePoint (produção)
+
+Em produção as fotos vão para uma biblioteca do SharePoint da Guarusolar (`STORAGE_PROVIDER=sharepoint`);
+em desenvolvimento ficam no disco (`STORAGE_PROVIDER=disco`, o padrão). A leitura segue a chave de
+cada foto, então as duas convivem.
+
+**O que pedir ao administrador do Microsoft 365** (Administrador Global, ou de Aplicativos + do SharePoint):
+
+1. Um site do SharePoint **privado**, ex. "Guarusolar Sistema", com a biblioteca **"Fotos de serviços"**
+   (não o OneDrive de uma pessoa: os arquivos seriam do funcionário). Membros: só quem deve ver as
+   fotos direto no SharePoint.
+2. Microsoft Entra ID › Registros de aplicativo › **Novo registro**: "Guarusolar Sistema",
+   **somente este diretório**, sem URL de redirecionamento (a API fala direto com a Microsoft).
+3. Permissões de API › Microsoft Graph › **Permissões de aplicativo** › **`Sites.Selected`** e
+   **Conceder consentimento do administrador**. `Sites.Selected` não dá acesso a nada sozinho: é
+   o oposto de `Files/Sites.ReadWrite.All`, que abririam todos os arquivos da empresa.
+4. **Liberar o site para o aplicativo com papel `write`** (PnP PowerShell:
+   `Grant-PnPAzureADAppSitePermission`; ou Graph: `POST /sites/{id}/permissions`). Sem este passo,
+   tudo dá "acesso negado".
+5. Certificados e segredos › **Novo segredo do cliente** (até 24 meses).
+
+**O que volta e onde vai** (`apps/api/.env` ou, em produção, as variáveis da hospedagem):
+`MS_TENANT_ID` (ID do diretório), `MS_CLIENT_ID` (ID do aplicativo), `MS_CLIENT_SECRET` (o **valor**
+do segredo, mostrado uma vez só), `MS_CLIENT_SECRET_EXPIRA` (validade, AAAA-MM-DD: a API avisa 30
+dias antes), `MS_SITE_URL` (endereço do site), `MS_BIBLIOTECA` ("Fotos de serviços"). Depois:
+`npm run sharepoint:conferir` (testa tudo com um arquivo real) e `STORAGE_PROVIDER=sharepoint`.
+
+**Pastas:** `Cliente – Cidade / PRJ-2026-0015 / 2026-09-29 Instalação / 01 Painéis instalados 14-02-07.jpg`,
+com `Extra hh-mm-ss.jpg` e `Substituídas/` (fotos refeitas; nada é apagado). O banco guarda o id do
+arquivo, não o caminho: renomear ou mover pastas no SharePoint não quebra nada.
+
+**Se a Microsoft não responder:** a API tenta de novo algumas vezes (respeitando o `Retry-After`);
+se não der, responde 503 e a foto continua na fila do celular, que reenvia sozinha. Nada fica
+guardado no disco do servidor (em hospedagem gratuita ele costuma ser apagado a cada reinício).
+Na leitura, 503 e a tela mostra "Não foi possível abrir a foto". As fotos sempre passam pela API
+(com login e regra de equipe); os links de download do próprio Graph, que abrem sem login, nunca
+chegam às telas.
+
 ### Sem sinal em campo
 
 O técnico não perde trabalho sem internet:
@@ -270,5 +308,6 @@ pasta de armazenamento não são removidos.
 3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).
 4. ~~Geração do PDF do orçamento~~ (feito; falta o logo da Guarusolar).
-5. Trocar `armazenamento.ts` para o OneDrive/SharePoint do cliente (Microsoft Graph).
+5. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
+   conferir com `npm run sharepoint:conferir`).
 6. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).

@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:limpar": "tsx prisma/limpar.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "sharepoint:conferir": "tsx scripts/sharepoint-conferir.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

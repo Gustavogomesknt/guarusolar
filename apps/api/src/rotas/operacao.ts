@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { salvarArquivo } from '../lib/armazenamento';
+import path from 'node:path';
+import { ArmazenamentoIndisponivel, guardarComoSubstituida, salvarFoto } from '../lib/armazenamento';
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 import { filtroDoTecnico } from '../lib/acesso';
 import { diaDeHoje } from '@guarusolar/compartilhado';
@@ -480,17 +481,38 @@ rotasTecnico.post(
     conferirServicoAberto(servico.status);
 
     let rotulo = 'Foto extra';
+    let item: { ordem: number; rotulo: string } | null = null;
     if (chave) {
-      const item = await prisma.checklistFoto.findFirst({ where: { tipoServico: servico.tipo, chave } });
-      if (!item) throw new ErroHttp(400, 'Este item não faz parte do checklist deste serviço.');
-      rotulo = item.rotulo;
+      const doChecklist = await prisma.checklistFoto.findFirst({ where: { tipoServico: servico.tipo, chave } });
+      if (!doChecklist) throw new ErroHttp(400, 'Este item não faz parte do checklist deste serviço.');
+      rotulo = doChecklist.rotulo;
+      item = { ordem: doChecklist.ordem, rotulo: doChecklist.rotulo };
+    }
+    const quando = capturadaEm ?? new Date();
+
+    // Grava no armazenamento (disco ou SharePoint). Se o SharePoint não responder, 503: a foto
+    // continua na fila do celular, que reenvia sozinha. Nada fica guardado no servidor.
+    let arquivo;
+    try {
+      arquivo = await salvarFoto(req.file.buffer, {
+        cliente: { nome: servico.projeto.cliente.nome, cidade: servico.projeto.cliente.cidade },
+        projetoCodigo: servico.projeto.codigo,
+        servico: { id: servico.id, dataInicio: servico.dataInicio, tipo: servico.tipo },
+        item,
+        capturadaEm: quando,
+        extensao: path.extname(req.file.originalname) || '.jpg',
+      });
+    } catch (erro) {
+      if (!(erro instanceof ArmazenamentoIndisponivel)) throw erro;
+      console.error(`[armazenamento] foto não gravada (serviço ${servico.id}): ${erro.message}`);
+      throw new ErroHttp(503, 'Não foi possível guardar a foto agora. Ela continua no celular e será enviada de novo sozinha.');
     }
 
-    const arquivo = await salvarArquivo(
-      req.file.buffer,
-      req.file.originalname,
-      `${servico.projeto.codigo}/${servico.id}`,
-    );
+    // refazendo uma foto do checklist: as anteriores deste item saem do banco e o arquivo vai
+    // para "Substituídas" (depois de gravar a nova, fora da transação)
+    const anteriores = chave
+      ? await prisma.fotoServico.findMany({ where: { agendamentoId: servico.id, chave }, select: { arquivoChave: true } })
+      : [];
 
     const gravarFoto = () =>
       prisma.$transaction(async (tx) => {
@@ -512,7 +534,7 @@ rotasTecnico.post(
             tamanhoBytes: arquivo.tamanhoBytes,
             latitude,
             longitude,
-            capturadaEm: capturadaEm ?? new Date(),
+            capturadaEm: quando,
             enviadaPorId: req.usuario!.id,
             idLocal,
           },
@@ -529,6 +551,13 @@ rotasTecnico.post(
       const existente = repetida ? await fotoJaRecebida() : null;
       if (!existente) throw erro;
       return res.status(200).json(existente);
+    }
+
+    // Mesma chave = mesmo arquivo (reenvio simultâneo gravou por cima, no SharePoint): não move.
+    for (const antiga of anteriores.filter((a) => a.arquivoChave !== arquivo.chave)) {
+      guardarComoSubstituida(antiga.arquivoChave).catch((erro) =>
+        console.error(`[armazenamento] não foi possível mover ${antiga.arquivoChave} para Substituídas: ${(erro as Error).message}`),
+      );
     }
 
     res.status(201).json(foto);

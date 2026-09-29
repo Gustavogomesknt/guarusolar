@@ -59,10 +59,18 @@ apps/api/                      API (Express + Prisma)
   src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
-  src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto.
-                               O banco guarda a CHAVE (FotoServico.arquivoChave), nunca uma URL;
-                               lerArquivo/lerMiniatura (480 px, gerada uma vez em .miniaturas/)
-                               recusam chave que saia da pasta base
+  src/lib/armazenamento.ts     camada das fotos: STORAGE_PROVIDER escolhe onde as NOVAS vão
+                               ("disco" padrão, "sharepoint" produção); a leitura segue a chave
+                               ("sp:<id>" = SharePoint; o resto, disco). O banco guarda a CHAVE
+                               (FotoServico.arquivoChave), nunca uma URL. Foto refeita: o arquivo
+                               antigo vai para "Substituídas/". Chave que saia da pasta é recusada
+  src/lib/sharepoint.ts        Microsoft Graph com credencial de aplicativo (Sites.Selected):
+                               token em memória, novas tentativas (Retry-After), falha vira
+                               ArmazenamentoIndisponivel -> 503 (a fila do celular reenvia)
+  src/lib/nomesDeArquivo.ts    pastas e nomes no SharePoint: Cliente – Cidade / PRJ / data e tipo /
+                               "01 Item hh-mm-ss.jpg" (segundos: reenvio substitui, não duplica)
+  scripts/sharepoint-conferir.ts  npm run sharepoint:conferir: testa credencial, site, biblioteca,
+                               envio e leitura antes de ligar em produção
   src/lib/acesso.ts            regra 6 (técnico só vê a própria equipe) num lugar só:
                                tecnicoPodeVer e filtroDoTecnico
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
@@ -279,7 +287,9 @@ Próximos passos, nesta ordem:
 4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
    teste no celular com HTTPS).
 5. Empacotar o front do escritório como **executável Windows**.
-6. Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph.
+6. ~~Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph~~ (feito e testado
+   contra um simulador do Graph; falta o administrador criar o aplicativo e rodar
+   `npm run sharepoint:conferir` com as credenciais reais).
 7. Atualização em **tempo real** da fila de validação.
 8. Comparativo **orçado × realizado** por projeto.
 
@@ -290,11 +300,11 @@ Próximos passos, nesta ordem:
   inteira. Conferir no deploy (o log `login_falhou` mostra a `origem`).
 - **`STORAGE_PUBLIC_URL` não é mais usada** (as fotos saem pela rota autenticada). Se ainda
   estiver no `.env` de alguém, pode ser apagada; não tem efeito.
-- **Arquivos órfãos.** Ao refazer uma foto, o registro antigo sai e o arquivo fica no disco. E quando a mesma foto chega duas vezes ao mesmo tempo
+- **Arquivos órfãos (só no disco).** Foto refeita já vai para "Substituídas/". Resta: quando a mesma foto chega duas vezes ao mesmo tempo
   (a fila reenviou antes da resposta), as duas requisições gravam o arquivo antes de a chave
   única do `idLocal` barrar a segunda: a resposta é certa (200 com a foto existente), mas o
-  segundo arquivo fica sem registro. Raro; resolver junto com o armazenamento (apagar o arquivo
-  quando o `P2002` acontece).
+  segundo arquivo fica sem registro no disco. No SharePoint não acontece: o mesmo nome
+  substitui o arquivo. Raro e só em desenvolvimento; e há 18 arquivos assim em uploads/ dos testes.
 
 ## Comandos
 
@@ -314,6 +324,7 @@ npm run db:limpar        # APAGA clientes, orçamentos, projetos etc. e zera os 
                          # mantém usuários, equipes, checklist e catálogo. Pede LIMPAR;
                          # recusa em produção. Nunca rode por conta própria: quem roda é o usuário.
 npm run build            # compila todos os workspaces
+npm run sharepoint:conferir  # testa a configuração MS_* do SharePoint (envio e leitura reais)
 ```
 
 Banco local rápido: `docker run --name guarusolar-db -e POSTGRES_PASSWORD=senha -p 5432:5432 -d postgres:16`
@@ -332,6 +343,12 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   Revise o SQL antes de aplicar. O diff sempre repete um `ALTER ... "tokenPdf" SET DEFAULT`
   com a mesma expressão (falso positivo do Prisma com `dbgenerated`): é inofensivo.
   Pare a API antes: no Windows ela trava a DLL do Prisma e o `prisma generate` falha.
+- **Parar servidores no Windows:** encerrar só o processo da porta deixa órfãos o `tsx watch` e o
+  `npm run` que o iniciaram (acumularam 21 processos e 1 GB numa sessão). Pare pelo processo
+  inteiro (Ctrl+C no terminal, ou pela linha de comando do processo), não pela porta.
+- **Fotos gravadas no SharePoint (chave "sp:") só abrem com o SharePoint configurado**; numa API
+  em modo disco elas respondem 503. O serviço cancelado PRJ-2026-0016 (TESTE SharePoint) tem
+  fotos assim, gravadas contra o simulador nos testes.
 - Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.

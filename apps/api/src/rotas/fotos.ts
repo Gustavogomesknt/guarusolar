@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { tecnicoPodeVer } from '../lib/acesso';
-import { lerArquivo, lerMiniatura } from '../lib/armazenamento';
+import { ArmazenamentoIndisponivel, ArquivoNaoEncontrado, lerArquivo, lerMiniatura } from '../lib/armazenamento';
 
 /*
  * Única saída das fotos dos serviços (casa e telhado do cliente, com localização): exige login
@@ -38,7 +38,11 @@ rotasFotos.get(
     try {
       arquivo = tamanho === 'miniatura' ? await lerMiniatura(foto.arquivoChave) : await lerArquivo(foto.arquivoChave);
     } catch (erro) {
-      if ((erro as NodeJS.ErrnoException).code === 'ENOENT') throw new ErroHttp(404, 'O arquivo desta foto não foi encontrado');
+      if (erro instanceof ArquivoNaoEncontrado) throw new ErroHttp(404, 'O arquivo desta foto não foi encontrado');
+      if (erro instanceof ArmazenamentoIndisponivel) {
+        console.error(`[armazenamento] foto ${req.params.id} não lida: ${erro.message}`);
+        throw new ErroHttp(503, 'As fotos estão indisponíveis no momento. Tente de novo em instantes.');
+      }
       // arquivo corrompido ou que não é imagem: a miniatura não sai
       throw new ErroHttp(422, 'Não foi possível abrir esta foto');
     }
