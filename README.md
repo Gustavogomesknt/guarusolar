@@ -75,7 +75,8 @@ packages/compartilhado/
 | POST | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me`; rascunho passa a ENVIADO |
 | GET | `/api/agenda?inicio&fim` | gestor | semana por equipe |
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |
-| POST | `/api/agenda` | gestor | agendar serviço |
+| POST | `/api/agenda` | gestor | agendar serviço (409 se a equipe já tem serviço no período) |
+| PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas) ou cancelar (`status: CANCELADO`) |
 | GET | `/api/validacao/fila` | gestor | serviços aguardando validação |
 | POST | `/api/validacao/:id/aprovar` | gestor | conclui o serviço |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo |
@@ -95,6 +96,11 @@ packages/compartilhado/
 - **Checklist de fotos configurável** (tabela `ChecklistFoto`), por tipo de serviço.
   O técnico só consegue concluir com todas as obrigatórias enviadas.
 - **Técnico enxerga apenas a própria agenda**, garantido no servidor, não só na tela.
+- **Agenda é do gestor.** As rotas `/api/agenda` aceitam só GESTOR (e ADMIN); o comercial
+  acompanha pelo status dos orçamentos. Uma equipe não pega dois serviços no mesmo período,
+  nem ao agendar nem ao remarcar. Cancelar devolve o projeto para "A agendar".
+- **Duração do serviço** é informada ao agendar (padrão: 1 dia). Serviços de vários dias
+  pulam o domingo; a grade mostra segunda a sábado.
 
 ## App do técnico (PWA)
 

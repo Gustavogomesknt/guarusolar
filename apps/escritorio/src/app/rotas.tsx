@@ -15,6 +15,7 @@ const Pipeline = lazy(() => import('@/paginas/orcamentos/Pipeline').then((m) => 
 const ListaClientes = lazy(() => import('@/paginas/clientes/ListaClientes').then((m) => ({ default: m.ListaClientes })));
 const FichaCliente = lazy(() => import('@/paginas/clientes/FichaCliente').then((m) => ({ default: m.FichaCliente })));
 const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
+const PaginaAgenda = lazy(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
 
 /** A sessão fica dentro do roteador porque usa useNavigate para voltar ao login. */
 function RaizDoApp() {
@@ -49,6 +50,10 @@ export const roteador = createBrowserRouter(
             <Route path="clientes" element={<ListaClientes />} />
             <Route path="clientes/:id" element={<FichaCliente />} />
             <Route path="catalogo" element={<PaginaCatalogo />} />
+          </Route>
+          {/* Operação: só gestor (e ADMIN) */}
+          <Route element={<RotaProtegida papeis={['GESTOR']} />}>
+            <Route path="agenda" element={<PaginaAgenda />} />
           </Route>
         </Route>
       </Route>

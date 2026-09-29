@@ -91,7 +91,11 @@ export function useMudancaDeStatus(): { pedir: PedirMudanca; dialogo: ReactNode;
       }
     },
     // lista, contagens dos filtros, pipeline e indicadores
-    onSettled: () => clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] }),
+    onSettled: () => {
+      void clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] });
+      // aprovar cria o projeto: ele passa a aparecer em "A agendar"
+      void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
+    },
   });
 
   const pedir: PedirMudanca = (orcamento, destino) => {

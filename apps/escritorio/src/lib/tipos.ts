@@ -1,7 +1,9 @@
 import type {
   CategoriaProduto,
   CondicaoPagamento,
+  StatusAgendamento,
   StatusOrcamento,
+  TipoServico,
   TipoDesconto,
   TipoPessoa,
   Unidade,
@@ -28,6 +30,39 @@ export type Cliente = {
   uf: string | null;
   ativo: boolean;
   observacoes?: string | null;
+};
+
+/** Serviço na agenda (GET /api/agenda). Datas chegam como "2026-09-29T00:00:00.000Z". */
+export type AgendamentoNaAgenda = {
+  id: string;
+  projetoId: string;
+  equipeId: string;
+  tipo: TipoServico;
+  status: StatusAgendamento;
+  dataInicio: string;
+  dataFim: string;
+  projeto: {
+    codigo: string;
+    cliente: { nome: string; cidade: string | null; uf: string | null };
+    orcamento: { id: string; codigo: string };
+  };
+  tecnicoResponsavel: { id: string; nome: string } | null;
+};
+
+/** Uma linha da grade: equipe com membros e serviços da semana. */
+export type EquipeNaAgenda = {
+  id: string;
+  nome: string;
+  membros: { id: string; nome: string; papel: string }[];
+  agendamentos: AgendamentoNaAgenda[];
+};
+
+/** Projeto aprovado sem data (GET /api/agenda/pendentes). */
+export type ProjetoPendente = {
+  id: string;
+  codigo: string;
+  cliente: { nome: string; cidade: string | null; uf: string | null };
+  orcamento: { codigo: string; valorTotal: string };
 };
 
 /** Cliente na tela de clientes (GET /api/clientes com a contagem de orçamentos). */

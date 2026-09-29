@@ -85,8 +85,14 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                gerador e na tela de clientes
   src/paginas/catalogo/        catálogo (/catalogo): filtros, ativar/desativar e painel lateral
                                de criar/editar com margem ao vivo (calcularMargem)
+  src/paginas/agenda/          agenda das equipes (/agenda, só GESTOR): faixa "A agendar",
+                               grade da semana (segunda a sábado) por equipe, agendar,
+                               remarcar e cancelar. Datas como texto AAAA-MM-DD (datas.ts);
+                               serviço de N dias pula o domingo (fimDoServico). A duração não
+                               existe na API: o front pergunta os dias e manda dataFim
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
-  src/app/menu.ts              itens do menu e os papéis de cada um
+  src/app/menu.ts              itens do menu, os papéis de cada um e o grupo (Comercial ou
+                               Operação)
   src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
   src/components/ui/           gerados pelo shadcn (npx shadcn@latest add ... --cwd apps/escritorio).
                                ATENÇÃO: o CLI instala um pacote npm "cn" e importa `from "cn"`;
@@ -122,7 +128,9 @@ O `.env` da API fica em `apps/api/.env`.
    escondendo botões na interface.
 7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
    teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
-8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`).
+8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`
+   e ao remarcar em `PATCH /api/agenda/:id`; serviços cancelados não contam). Cancelar um
+   serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
 
 ## Convenções de código
 
@@ -178,6 +186,8 @@ status e WhatsApp, agenda, validação e rotas do técnico). Monorepo com o paco
 Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegidas por papel.
 Orçamentos no escritório: lista com indicadores e mudança de status, gerador para criar e
 editar (cliente, itens, condições, salvar, WhatsApp) e modo leitura para aprovados.
+Pipeline, clientes e catálogo prontos. Operação: agenda das equipes (semana); as visões
+Dia e Mês aparecem desativadas.
 
 Próximos passos, nesta ordem:
 

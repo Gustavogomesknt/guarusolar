@@ -14,7 +14,41 @@ const TIPOS_DE_FOTO_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
 // AGENDA — escritório (gestor)
 // ===========================================================================
 export const rotasAgenda = Router();
-rotasAgenda.use(autenticar, autorizar('GESTOR', 'COMERCIAL'));
+// agenda é do gestor (ADMIN sempre passa); o comercial acompanha pelo status dos orçamentos
+rotasAgenda.use(autenticar, autorizar('GESTOR'));
+
+// ids de equipe não são UUID (o seed usa o nome, ex.: "Equipe A")
+const idEquipe = z.string().trim().min(1, 'Escolha a equipe');
+
+/** 2026-09-29 -> 29/09 (datas do agendamento são só dia, sem hora). */
+const diaMes = (d: Date) => d.toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/');
+
+/**
+ * A mesma equipe não pode ter dois serviços no mesmo período (regra 8 do CLAUDE.md).
+ * `ignorarId` deixa de fora o próprio agendamento ao remarcar.
+ */
+async function conferirConflito(equipeId: string, inicio: Date, fim: Date, ignorarId?: string) {
+  const conflito = await prisma.agendamento.findFirst({
+    where: {
+      equipeId,
+      status: { notIn: ['CANCELADO'] },
+      dataInicio: { lte: fim },
+      dataFim: { gte: inicio },
+      ...(ignorarId ? { id: { not: ignorarId } } : {}),
+    },
+    include: { equipe: { select: { nome: true } }, projeto: { include: { cliente: { select: { nome: true } } } } },
+  });
+  if (conflito) {
+    const periodo =
+      conflito.dataInicio.getTime() === conflito.dataFim.getTime()
+        ? `em ${diaMes(conflito.dataInicio)}`
+        : `de ${diaMes(conflito.dataInicio)} a ${diaMes(conflito.dataFim)}`;
+    throw new ErroHttp(
+      409,
+      `A ${conflito.equipe.nome} já tem serviço ${periodo} (${conflito.projeto.cliente.nome}). Escolha outro dia ou outra equipe.`,
+    );
+  }
+}
 
 rotasAgenda.get(
   '/',
@@ -32,7 +66,12 @@ rotasAgenda.get(
           where: { dataInicio: { lte: fim }, dataFim: { gte: inicio }, status: { not: 'CANCELADO' } },
           orderBy: { dataInicio: 'asc' },
           include: {
-            projeto: { include: { cliente: { select: { nome: true, cidade: true, uf: true } } } },
+            projeto: {
+              include: {
+                cliente: { select: { nome: true, cidade: true, uf: true } },
+                orcamento: { select: { id: true, codigo: true } },
+              },
+            },
             tecnicoResponsavel: { select: { id: true, nome: true } },
           },
         },
@@ -65,7 +104,7 @@ rotasAgenda.post(
     const dados = z
       .object({
         projetoId: z.string().uuid(),
-        equipeId: z.string().uuid(),
+        equipeId: idEquipe,
         tipo: z.enum(['INSTALACAO', 'VISITA_TECNICA', 'MANUTENCAO', 'VISTORIA_CONCESSIONARIA']),
         dataInicio: z.coerce.date(),
         dataFim: z.coerce.date(),
@@ -78,22 +117,15 @@ rotasAgenda.post(
       })
       .parse(req.body);
 
-    // a mesma equipe não pode ter dois serviços no mesmo dia
-    const conflito = await prisma.agendamento.findFirst({
-      where: {
-        equipeId: dados.equipeId,
-        status: { notIn: ['CANCELADO'] },
-        dataInicio: { lte: dados.dataFim },
-        dataFim: { gte: dados.dataInicio },
-      },
-      include: { projeto: { include: { cliente: { select: { nome: true } } } } },
-    });
-    if (conflito) {
-      throw new ErroHttp(
-        409,
-        `Esta equipe já tem serviço nesse período: ${conflito.projeto.cliente.nome}`,
-      );
+    const projeto = await prisma.projeto.findUnique({ where: { id: dados.projetoId } });
+    if (!projeto) throw new ErroHttp(404, 'Projeto não encontrado');
+    if (projeto.status !== 'AGUARDANDO_AGENDAMENTO') {
+      throw new ErroHttp(409, `O projeto ${projeto.codigo} já está agendado. Para mudar a data, remarque o serviço.`);
     }
+    const equipe = await prisma.equipe.findFirst({ where: { id: dados.equipeId, ativa: true } });
+    if (!equipe) throw new ErroHttp(404, 'Equipe não encontrada');
+
+    await conferirConflito(dados.equipeId, dados.dataInicio, dados.dataFim);
 
     const agendamento = await prisma.$transaction(async (tx) => {
       const criado = await tx.agendamento.create({ data: dados });
@@ -110,14 +142,36 @@ rotasAgenda.patch(
   rota(async (req, res) => {
     const dados = z
       .object({
-        equipeId: z.string().uuid().optional(),
+        equipeId: idEquipe.optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
         tecnicoResponsavelId: z.string().uuid().nullable().optional(),
         status: z.enum(['AGENDADO', 'EM_EXECUCAO', 'CANCELADO']).optional(),
       })
       .parse(req.body);
-    res.json(await prisma.agendamento.update({ where: { id: req.params.id }, data: dados }));
+
+    const atual = await prisma.agendamento.findUnique({ where: { id: req.params.id } });
+    if (!atual) throw new ErroHttp(404, 'Serviço não encontrado');
+    if (atual.status === 'CANCELADO') throw new ErroHttp(409, 'Este serviço já foi cancelado.');
+
+    // remarcar: confere a equipe e o período novos, sem contar o próprio serviço
+    const equipeId = dados.equipeId ?? atual.equipeId;
+    const inicio = dados.dataInicio ?? atual.dataInicio;
+    const fim = dados.dataFim ?? atual.dataFim;
+    if (fim < inicio) throw new ErroHttp(400, 'A data final não pode ser antes da inicial');
+    if (dados.status !== 'CANCELADO' && (dados.equipeId || dados.dataInicio || dados.dataFim)) {
+      await conferirConflito(equipeId, inicio, fim, atual.id);
+    }
+
+    const atualizado = await prisma.$transaction(async (tx) => {
+      const ag = await tx.agendamento.update({ where: { id: atual.id }, data: dados });
+      // cancelado: o projeto volta para "A agendar" para ganhar outra data
+      if (dados.status === 'CANCELADO') {
+        await tx.projeto.update({ where: { id: atual.projetoId }, data: { status: 'AGUARDANDO_AGENDAMENTO' } });
+      }
+      return ag;
+    });
+    res.json(atualizado);
   }),
 );
 
