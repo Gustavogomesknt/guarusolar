@@ -211,6 +211,13 @@ Próximos passos, nesta ordem:
 7. Atualização em **tempo real** da fila de validação.
 8. Comparativo **orçado × realizado** por projeto.
 
+## Dívida técnica (resolver antes da produção)
+
+- **Fotos servidas sem autenticação.** `/arquivos` (`express.static` em `apps/api/src/server.ts`)
+  entrega qualquer foto a quem tiver o link, sem login: são fotos da casa do cliente, com
+  localização. Antes de produção, servir as fotos por rota autenticada (ou link temporário
+  assinado) — naturalmente junto com a troca do `armazenamento.ts` para o OneDrive/SharePoint.
+
 ## Comandos
 
 Todos a partir da raiz do repositório:
@@ -239,6 +246,12 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - Antes de criar arquivo novo, verifique se já existe algo parecido em `apps/api/src/lib` ou
   `apps/api/src/rotas`.
 - Ao mudar o schema, gere a migration (`npm run db:migrate`) e atualize o seed se necessário.
+  Sem terminal interativo, o `migrate dev` não roda: gere com `prisma migrate diff
+  --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma
+  --script` numa pasta `AAAAMMDDHHMMSS_nome` (hora UTC) e aplique com `prisma migrate deploy`.
+  Revise o SQL antes de aplicar. O diff sempre repete um `ALTER ... "tokenPdf" SET DEFAULT`
+  com a mesma expressão (falso positivo do Prisma com `dbgenerated`): é inofensivo.
+  Pare a API antes: no Windows ela trava a DLL do Prisma e o `prisma generate` falha.
 - Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.

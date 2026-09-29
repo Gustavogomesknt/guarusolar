@@ -6,6 +6,7 @@ import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { salvarArquivo } from '../lib/armazenamento';
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
+import { diaDeHoje } from '@guarusolar/compartilhado';
 
 // Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
 const TIPOS_DE_FOTO_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
@@ -318,8 +319,12 @@ async function servicoDoTecnico(id: string, usuarioId: string, equipeId: string 
 rotasTecnico.get(
   '/agenda',
   rota(async (req, res) => {
-    const de = req.query.de ? new Date(String(req.query.de)) : new Date();
-    const ate = req.query.ate ? new Date(String(req.query.ate)) : new Date(Date.now() + 7 * 864e5);
+    // As datas do agendamento são só dia (DATE, meia-noite UTC). Comparar com o instante
+    // atual escondia o serviço de hoje; por isso o período é contado em dias, no fuso da empresa.
+    const dia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a data no formato AAAA-MM-DD');
+    const consulta = z.object({ de: dia.optional(), ate: dia.optional() }).parse(req.query);
+    const de = new Date(`${consulta.de ?? diaDeHoje()}T00:00:00Z`);
+    const ate = consulta.ate ? new Date(`${consulta.ate}T00:00:00Z`) : new Date(de.getTime() + 7 * 864e5);
 
     const servicos = await prisma.agendamento.findMany({
       where: {
@@ -378,14 +383,24 @@ rotasTecnico.post(
     const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
     if (!req.file) throw new ErroHttp(400, 'Envie o arquivo da foto');
 
-    const { chave, latitude, longitude, capturadaEm } = z
+    const { chave, latitude, longitude, capturadaEm, idLocal } = z
       .object({
         chave: z.string().optional(),
+        // id gerado no celular: o reenvio da fila (resposta perdida no caminho) não duplica
+        idLocal: z.string().uuid().optional(),
         latitude: z.coerce.number().optional(),
         longitude: z.coerce.number().optional(),
         capturadaEm: z.coerce.date().optional(),
       })
       .parse(req.body);
+
+    if (idLocal) {
+      const jaRecebida = await prisma.fotoServico.findUnique({ where: { idLocal } });
+      if (jaRecebida) {
+        if (jaRecebida.agendamentoId !== servico.id) throw new ErroHttp(409, 'Esta foto já foi enviada para outro serviço');
+        return res.status(200).json(jaRecebida);
+      }
+    }
 
     const rotulo = chave
       ? (await prisma.checklistFoto.findFirst({ where: { tipoServico: servico.tipo, chave } }))?.rotulo
@@ -418,6 +433,7 @@ rotasTecnico.post(
           longitude,
           capturadaEm: capturadaEm ?? new Date(),
           enviadaPorId: req.usuario!.id,
+          idLocal,
         },
       });
     });

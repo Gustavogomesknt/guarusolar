@@ -12,6 +12,9 @@ const SEGREDO: string = (() => {
   return segredo;
 })();
 const VALIDADE = (process.env.JWT_EXPIRES_IN ?? '12h') as jwt.SignOptions['expiresIn'];
+// O técnico trabalha em campo com sinal ruim e fotos na fila: pedir login todo dia faria a
+// fila parar no meio do serviço. Por isso o token dele dura mais (os demais seguem com 12h).
+const VALIDADE_TECNICO = (process.env.JWT_EXPIRES_IN_TECNICO ?? '7d') as jwt.SignOptions['expiresIn'];
 
 export type UsuarioToken = {
   id: string;
@@ -33,7 +36,9 @@ export const gerarHash = (senha: string) => bcrypt.hash(senha, 10);
 export const conferirSenha = (senha: string, hash: string) => bcrypt.compare(senha, hash);
 
 export const gerarToken = (usuario: UsuarioToken) =>
-  jwt.sign(usuario, SEGREDO, { expiresIn: VALIDADE });
+  jwt.sign(usuario, SEGREDO, {
+    expiresIn: usuario.papel === 'TECNICO' ? VALIDADE_TECNICO : VALIDADE,
+  });
 
 /** Exige um token válido no cabeçalho Authorization: Bearer <token>. */
 export function autenticar(req: Request, _res: Response, next: NextFunction) {

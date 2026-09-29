@@ -377,6 +377,8 @@ model FotoServico {
   enviadaPor    Usuario  @relation(fields: [enviadaPorId], references: [id])
   revisao       RevisaoFoto @default(PENDENTE)
   comentario    String?
+  /// gerado no celular do técnico; evita foto duplicada quando a fila reenvia
+  idLocal       String?  @unique
   criadoEm      DateTime @default(now())
 
   @@index([agendamentoId])

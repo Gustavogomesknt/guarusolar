@@ -82,8 +82,9 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/validacao/fila` | gestor | serviços aguardando validação |
 | POST | `/api/validacao/:id/aprovar` | gestor | conclui o serviço |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo |
-| GET | `/api/tecnico/agenda` | técnico | só os serviços dele |
-| POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist |
+| GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |
+| GET | `/api/tecnico/servicos/:id` | técnico | serviço com o checklist e as fotos já enviadas |
+| POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist; `idLocal` evita duplicata no reenvio |
 | POST | `/api/tecnico/servicos/:id/concluir` | técnico | envia para validação |
 
 ## Decisões importantes
@@ -118,6 +119,13 @@ Por isso o PWA deve **redimensionar cada foto antes do envio**:
 A API aceita apenas `image/jpeg`, `image/png` e `image/webp`, até 15 MB, no campo `arquivo`.
 Uma foto maior é recusada com status 413, e um formato diferente com status 400, os dois com
 mensagem pronta para mostrar ao técnico.
+
+**Reenvio sem duplicar.** O app manda em cada foto um `idLocal` (UUID gerado no celular).
+Se a foto já chegou e só a resposta se perdeu, o reenvio devolve a foto existente (200) em
+vez de criar outra.
+
+**Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
+no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).
 
 ## Limpar os dados de teste
 

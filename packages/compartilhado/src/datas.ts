@@ -34,6 +34,15 @@ function deslocamentoMinutos(instante: Date) {
  * Instante em que começa o dia `dia/mes/ano` no fuso da empresa.
  * Aceita mês e dia fora do intervalo (mes 12 = janeiro do ano seguinte; dia 0 = último do mês anterior).
  */
+/**
+ * Hoje no fuso da empresa, como "AAAA-MM-DD". É o formato das colunas só de data (DATE),
+ * como as do agendamento: compare com elas por este texto, nunca pelo instante atual.
+ */
+export function diaDeHoje(agora: Date = new Date()): string {
+  const { ano, mes, dia } = partesNoFuso(agora);
+  return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
 export function inicioDoDia(ano: number, mes: number, dia: number): Date {
   const meiaNoiteUtc = Date.UTC(ano, mes, dia);
   const aproximado = new Date(meiaNoiteUtc - deslocamentoMinutos(new Date(meiaNoiteUtc)) * 60_000);
