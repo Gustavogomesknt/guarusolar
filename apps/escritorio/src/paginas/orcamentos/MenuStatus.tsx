@@ -8,7 +8,7 @@ import {
   TRANSICOES_STATUS,
   type StatusOrcamento,
 } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { OrcamentoNaLista } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

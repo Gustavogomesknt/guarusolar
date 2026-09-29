@@ -1,0 +1,21 @@
+{
+  "name": "@guarusolar/web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "description": "Codigo de navegador usado pelos fronts da Guarusolar: cliente HTTP, sessao e tema",
+  "type": "module",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./sessao": "./src/sessao.tsx",
+    "./tema.css": "./src/tema.css"
+  },
+  "peerDependencies": {
+    "@guarusolar/compartilhado": "^0.1.0",
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^19.0.0",
+    "react-router": "^8.0.0"
+  }
+}

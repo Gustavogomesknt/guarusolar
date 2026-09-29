@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Plus, Search, Users } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '@guarusolar/web/api';
 import type { ClienteNaLista } from '@/lib/tipos';
 import { mascararDocumento, mascararTelefone } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';

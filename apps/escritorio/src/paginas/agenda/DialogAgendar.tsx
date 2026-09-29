@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TIPOS_SERVICO, type TipoServico } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TipoPessoa } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { Cliente } from '@/lib/tipos';
 import { mascararCep, mascararDocumento, mascararTelefone, somenteDigitos } from '@/lib/formatar';
 import { buscarCep } from '@/lib/viacep';

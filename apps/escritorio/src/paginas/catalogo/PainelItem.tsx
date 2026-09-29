@@ -15,7 +15,7 @@ import {
   type CategoriaProduto,
   type Unidade,
 } from '@guarusolar/compartilhado';
-import { api, ErroApi, tokenSalvo } from '@/lib/api';
+import { api, ErroApi, tokenSalvo } from '@guarusolar/web/api';
 import type { Produto } from '@/lib/tipos';
 import { formatarDecimal, lerNumero } from '@/lib/formatar';
 import { cn } from '@/lib/utils';

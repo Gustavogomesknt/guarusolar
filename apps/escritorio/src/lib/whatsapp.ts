@@ -1,5 +1,5 @@
 import type { StatusOrcamento } from '@guarusolar/compartilhado';
-import { api } from './api';
+import { api } from '@guarusolar/web/api';
 
 /**
  * Pede à API a mensagem pronta e abre o WhatsApp numa aba nova.

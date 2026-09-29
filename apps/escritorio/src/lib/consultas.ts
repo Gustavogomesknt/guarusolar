@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ErroApi, SEM_CONEXAO } from './api';
+import { ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 
 declare module '@tanstack/react-query' {
   interface Register {

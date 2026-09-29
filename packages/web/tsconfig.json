@@ -1,0 +1,17 @@
+{
+  // Pacote só com código-fonte: quem compila é o Vite de cada app, e o `tsc -b` de cada app
+  // confere os tipos daqui. Este arquivo serve ao editor.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["src"]
+}

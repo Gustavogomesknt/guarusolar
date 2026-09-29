@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
-import { SessaoProvider } from '@/lib/sessao';
+import { SessaoProvider } from '@guarusolar/web/sessao';
 import { Login } from '@/paginas/Login';
 import { Sair } from '@/paginas/Sair';
 import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '@guarusolar/web/api';
 import type { Cliente } from '@/lib/tipos';
 import { documentoParaExibir, mascararCep, mascararTelefone } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';

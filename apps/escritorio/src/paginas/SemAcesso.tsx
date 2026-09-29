@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { ShieldAlert, Smartphone } from 'lucide-react';
-import { useSessao } from '@/lib/sessao';
+import { useSessao } from '@guarusolar/web/sessao';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TelaCheia } from '@/components/TelaCheia';

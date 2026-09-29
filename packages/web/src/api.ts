@@ -1,5 +1,5 @@
 /*
- * Cliente HTTP do escritório. Toda chamada à API passa por aqui:
+ * Cliente HTTP dos fronts (escritório e técnico). Toda chamada à API passa por aqui:
  * - envia o token no cabeçalho Authorization;
  * - transforma qualquer falha em ErroApi, com mensagem pronta para mostrar ao usuário
  *   (a API já responde { erro, detalhes? } com textos para o usuário final);
@@ -26,7 +26,14 @@ const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 /** Endereço completo de um caminho da API, para links abertos fora do fetch (ex.: PDF). */
 export const urlDaApi = (caminho: string) => `${BASE_URL}${caminho}`;
-const CHAVE_TOKEN = 'guarusolar.escritorio.token';
+
+// Cada app guarda o token com a própria chave: no mesmo navegador, a sessão do escritório
+// e a do técnico não se misturam. Definida por configurarApi() antes de renderizar o app.
+let CHAVE_TOKEN = 'guarusolar.token';
+
+export function configurarApi(opcoes: { chaveToken: string }) {
+  CHAVE_TOKEN = opcoes.chaveToken;
+}
 
 // O armazenamento do navegador pode estar bloqueado; nesse caso a sessão dura só a aba aberta.
 let tokenEmMemoria: string | null = null;
@@ -86,6 +93,7 @@ async function lerCorpo(resposta: Response): Promise<unknown> {
 }
 
 type Opcoes = {
+  /** Objeto vira JSON; FormData (envio de arquivo) segue como está. */
   corpo?: unknown;
   signal?: AbortSignal;
   /** No login, 401 é "senha errada", não sessão expirada: não redireciona. */
@@ -95,7 +103,9 @@ type Opcoes = {
 async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {}): Promise<T> {
   const { corpo, signal, semRedirecionarEm401 } = opcoes;
   const cabecalhos: Record<string, string> = { Accept: 'application/json' };
-  if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json';
+  const formulario = corpo instanceof FormData;
+  // no FormData o navegador monta o Content-Type com o separador das partes
+  if (corpo !== undefined && !formulario) cabecalhos['Content-Type'] = 'application/json';
   const token = tokenSalvo.ler();
   if (token) cabecalhos.Authorization = `Bearer ${token}`;
 
@@ -104,7 +114,7 @@ async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {
     resposta = await fetch(`${BASE_URL}${caminho}`, {
       method: metodo,
       headers: cabecalhos,
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      body: corpo === undefined ? undefined : formulario ? corpo : JSON.stringify(corpo),
       signal,
     });
   } catch (erro) {

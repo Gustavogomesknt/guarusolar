@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { calcularOrcamento, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
-import { api, ErroApi, tokenSalvo, urlDaApi } from '@/lib/api';
+import { api, ErroApi, tokenSalvo, urlDaApi } from '@guarusolar/web/api';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import type { Cliente } from '@/lib/tipos';
 import { Button } from '@/components/ui/button';

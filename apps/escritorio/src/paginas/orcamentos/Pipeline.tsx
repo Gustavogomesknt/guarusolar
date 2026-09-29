@@ -11,7 +11,7 @@ import {
   STATUS_ORCAMENTO,
   type StatusOrcamento,
 } from '@guarusolar/compartilhado';
-import { api } from '@/lib/api';
+import { api } from '@guarusolar/web/api';
 import type { OrcamentoNaLista } from '@/lib/tipos';
 import { formatarBRL } from '@/lib/formatar';
 import { cn } from '@/lib/utils';

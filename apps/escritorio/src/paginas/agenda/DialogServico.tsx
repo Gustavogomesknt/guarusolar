@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { AgendamentoNaAgenda, EquipeNaAgenda } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

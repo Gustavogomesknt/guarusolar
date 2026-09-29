@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { ROTULO_CATEGORIA, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
-import { api } from '@/lib/api';
+import { api } from '@guarusolar/web/api';
 import type { Produto } from '@/lib/tipos';
 import { formatarBRL, formatarQuantidade } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';

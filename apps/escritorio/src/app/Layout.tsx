@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { Loader2, LogOut } from "lucide-react";
-import { useSessao } from "@/lib/sessao";
+import { useSessao } from "@guarusolar/web/sessao";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
 import { Selo } from "@/components/Selo";

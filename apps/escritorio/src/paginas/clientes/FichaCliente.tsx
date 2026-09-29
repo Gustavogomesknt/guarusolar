@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { FilePlus2, Loader2, Pencil } from 'lucide-react';
 import { formatarData } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { FichaDoCliente } from '@/lib/tipos';
 import { formatarBRL, mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';

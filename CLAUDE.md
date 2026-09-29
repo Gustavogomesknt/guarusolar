@@ -64,9 +64,8 @@ apps/api/                      API (Express + Prisma)
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
 apps/escritorio/               front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
-  src/estilos/tema.css         cores e fontes da marca como variáveis do shadcn
-  src/lib/api.ts               cliente HTTP: token no cabeçalho, ErroApi, 401 encerra a sessão
-  src/lib/sessao.tsx           usuário logado, entrar(), sair() e aviso de sessão expirada
+  src/estilos/tema.css         importa o Tailwind e o tema de packages/web
+  src/main.tsx                 configurarApi({ chaveToken }) antes de renderizar
   src/lib/consultas.ts         React Query com aviso global de erro (toast)
   src/app/rotas.tsx            roteador de dados (createBrowserRouter, necessário para o
                                useBlocker); cada tela fica dentro de <RotaProtegida papeis={...}>
@@ -102,7 +101,17 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
   src/calculo.ts               totais, desconto e condições de pagamento
+packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
+                               o Vite de cada app compila e o `tsc -b` de cada app confere)
+  src/api.ts                   cliente HTTP: token no cabeçalho (chave própria de cada app),
+                               JSON ou FormData, ErroApi, 401 encerra a sessão
+  src/sessao.tsx               usuário logado, entrar(), sair(), aviso de sessão expirada e
+                               papeisAceitos (o app do técnico só aceita TECNICO)
+  src/tema.css                 cores e fontes da marca como variáveis do shadcn
 ```
+
+O que depende de navegador ou React (fetch, localStorage, componentes, CSS) vai em
+`packages/web`, nunca em `packages/compartilhado`: a API também carrega o `compartilhado`.
 
 Ao mudar um enum no `schema.prisma`, atualize também `packages/compartilhado/src/enums.ts`;
 o build da API acusa a divergência. A API é CommonJS e carrega o pacote (ESM) com o

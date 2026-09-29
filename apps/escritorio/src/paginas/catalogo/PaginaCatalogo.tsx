@@ -8,7 +8,7 @@ import {
   ROTULO_UNIDADE,
   type CategoriaProduto,
 } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { Produto } from '@/lib/tipos';
 import { formatarBRL } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';

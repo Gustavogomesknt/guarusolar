@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { WifiOff } from 'lucide-react';
 import type { Papel } from '@guarusolar/compartilhado';
-import { useSessao, type EstadoLogin } from '@/lib/sessao';
+import { useSessao, type EstadoLogin } from '@guarusolar/web/sessao';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TelaCarregando, TelaCheia } from '@/components/TelaCheia';

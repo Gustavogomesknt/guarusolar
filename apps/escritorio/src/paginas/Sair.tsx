@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useSessao } from '@/lib/sessao';
+import { useSessao } from '@guarusolar/web/sessao';
 import { TelaCarregando } from '@/components/TelaCheia';
 
 /**

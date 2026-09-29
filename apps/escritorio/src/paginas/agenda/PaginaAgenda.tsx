@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, X } from 'lucide-react';
 import { TIPOS_SERVICO } from '@guarusolar/compartilhado';
-import { api } from '@/lib/api';
+import { api } from '@guarusolar/web/api';
 import type { AgendamentoNaAgenda, EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

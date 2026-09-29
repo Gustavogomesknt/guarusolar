@@ -9,7 +9,7 @@ import {
   STATUS_ORCAMENTO,
   type StatusOrcamento,
 } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@/lib/api';
+import { api, ErroApi } from '@guarusolar/web/api';
 import type { OrcamentoNaLista, ResumoOrcamentos } from '@/lib/tipos';
 import { formatarBRL } from '@/lib/formatar';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';

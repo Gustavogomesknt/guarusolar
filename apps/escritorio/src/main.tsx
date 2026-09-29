@@ -11,9 +11,12 @@ import '@fontsource/ibm-plex-sans/600.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import './estilos/tema.css';
 
+import { configurarApi } from '@guarusolar/web/api';
 import { clienteConsultas } from '@/lib/consultas';
 import { Toaster } from '@/components/ui/sonner';
 import { roteador } from '@/app/rotas';
+
+configurarApi({ chaveToken: 'guarusolar.escritorio.token' });
 
 createRoot(document.getElementById('raiz')!).render(
   <StrictMode>

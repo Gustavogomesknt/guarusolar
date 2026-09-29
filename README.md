@@ -47,13 +47,15 @@ apps/api/
   src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
   src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
 apps/escritorio/            front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
-  src/lib/api.ts            cliente HTTP com token e tratamento central de erro
-  src/lib/sessao.tsx        login, saída e sessão expirada
   src/app/                  rotas protegidas por papel, menu e layout
   src/paginas/              telas (por enquanto: login e início)
 packages/compartilhado/
   src/enums.ts              enums do banco, usados pelos fronts sem depender do Prisma
   src/calculo.ts            regra de totais, desconto e parcelamento
+packages/web/               o que os dois fronts usam no navegador
+  src/api.ts                cliente HTTP com token e tratamento central de erro
+  src/sessao.tsx            login, saída e sessão expirada
+  src/tema.css              cores e fontes da marca
 ```
 
 ## Rotas principais

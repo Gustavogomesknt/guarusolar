@@ -33,7 +33,20 @@ type Sessao = {
 
 const ContextoSessao = createContext<Sessao | null>(null);
 
-export function SessaoProvider({ children }: { children: ReactNode }) {
+/**
+ * `papeisAceitos`: quando informado, só esses papéis entram neste app. Os demais recebem
+ * `avisoPapelRecusado` e o token nem chega a ser guardado. É conveniência de interface: quem
+ * protege os dados é o servidor (autorizar() em cada rota).
+ */
+export function SessaoProvider({
+  children,
+  papeisAceitos,
+  avisoPapelRecusado = 'Seu usuário não tem acesso a este aplicativo.',
+}: {
+  children: ReactNode;
+  papeisAceitos?: readonly Papel[];
+  avisoPapelRecusado?: string;
+}) {
   const navegar = useNavigate();
   const clienteConsultas = useQueryClient();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -58,15 +71,18 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   // Ao abrir o app, confirma na API se o token salvo ainda vale.
   useEffect(() => {
-    if (!tokenSalvo.ler()) return;
+    // O token pode sumir antes deste efeito (ex.: abrir /sair direto: o efeito da tela filha
+    // roda primeiro). Sem esta linha, "carregando" ficaria verdadeiro para sempre.
+    if (!tokenSalvo.ler()) return setCarregando(false);
     const controle = new AbortController();
     setCarregando(true);
     setFalhaAoConectar(null);
     api
       .get<Usuario>('/api/auth/eu', { signal: controle.signal })
-      .then((dados) =>
-        setUsuario({ id: dados.id, nome: dados.nome, papel: dados.papel, equipeId: dados.equipeId }),
-      )
+      .then((dados) => {
+        if (papeisAceitos && !papeisAceitos.includes(dados.papel)) return sair(avisoPapelRecusado);
+        setUsuario({ id: dados.id, nome: dados.nome, papel: dados.papel, equipeId: dados.equipeId });
+      })
       .catch((erro) => {
         if (controle.signal.aborted) return;
         // 401 já foi tratado por quandoSessaoExpirar; aqui só a falta de conexão ou erro do servidor.
@@ -76,6 +92,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         if (!controle.signal.aborted) setCarregando(false);
       });
     return () => controle.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- confere o token só ao abrir e ao tentar de novo
   }, [tentativa]);
 
   const entrar = useCallback(async (email: string, senha: string) => {
@@ -84,12 +101,15 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       { email, senha },
       { semRedirecionarEm401: true },
     );
+    if (papeisAceitos && !papeisAceitos.includes(resposta.usuario.papel)) {
+      throw new ErroApi(403, avisoPapelRecusado);
+    }
     tokenSalvo.gravar(resposta.token);
     setAviso(null);
     setFalhaAoConectar(null);
     setUsuario(resposta.usuario);
     return resposta.usuario;
-  }, []);
+  }, [papeisAceitos, avisoPapelRecusado]);
 
   const valor = useMemo<Sessao>(
     () => ({
