@@ -235,15 +235,21 @@ Orçamentos no escritório: lista com indicadores e mudança de status, gerador 
 editar (cliente, itens, condições, salvar, WhatsApp) e modo leitura para aprovados.
 Pipeline, clientes e catálogo prontos. Operação: agenda das equipes (semana); as visões
 Dia e Mês aparecem desativadas.
+App do técnico (`apps/tecnico`, PWA): login só para TECNICO, agenda, serviço com checklist de
+fotos (câmera, redução no aparelho, data e local), observações, teste e envio para validação;
+fila offline das fotos, abre sem sinal, versão nova com "Atualizar", instalação na tela
+inicial. Testado no Chrome do computador; **falta o teste num celular de verdade**, que
+precisa de HTTPS (câmera, localização e service worker não funcionam por IP da rede local) —
+o usuário combina com o Gustavo como expor o ambiente.
 
 Próximos passos, nesta ordem:
 
-1. Front do escritório: **gerador de orçamentos** primeiro (tela que mais economiza tempo do
-   vendedor: autocomplete de itens, ajuste de quantidade e preço, desconto, condições de
-   pagamento e total em tempo real).
-2. Demais telas do escritório: lista, pipeline, catálogo, clientes.
+1. ~~Front do escritório: **gerador de orçamentos**~~ (feito).
+2. ~~Demais telas do escritório: lista, pipeline, catálogo, clientes~~ (feito; faltam as telas
+   de **validação** e de **projetos** do gestor).
 3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
-4. **PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline.
+4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
+   teste no celular com HTTPS).
 5. Empacotar o front do escritório como **executável Windows**.
 6. Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph.
 7. Atualização em **tempo real** da fila de validação.

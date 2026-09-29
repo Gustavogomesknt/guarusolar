@@ -226,9 +226,11 @@ pasta de armazenamento não são removidos.
 
 ## Próximos passos
 
-1. Front do escritório (React + Tailwind + shadcn/ui) seguindo o design aprovado.
+1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo e agenda);
+   faltam as telas de validação e de projetos do gestor.
 2. Empacotar o front em executável Windows (Electron ou Tauri).
-3. PWA dos técnicos com câmera e fila de envio offline.
-4. Geração do PDF do orçamento com o logo da Guarusolar.
+3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
+   que precisa do ambiente exposto com HTTPS).
+4. ~~Geração do PDF do orçamento~~ (feito; falta o logo da Guarusolar).
 5. Trocar `armazenamento.ts` para o OneDrive/SharePoint do cliente (Microsoft Graph).
 6. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).
