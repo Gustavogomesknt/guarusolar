@@ -86,6 +86,7 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/validacao/:id` | gestor | serviço com fotos na ordem do checklist, materiais, técnico e equipe |
 | POST | `/api/validacao/:id/aprovar` | gestor | conclui serviço e projeto; foto marcada para refazer exige `confirmarFotosMarcadas` |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
+| GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico | a foto (ou miniatura de 480 px); técnico só da própria equipe |
 | GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |
 | GET | `/api/tecnico/servicos/:id` | técnico | serviço com o checklist e as fotos já enviadas |
 | POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist; `idLocal` evita duplicata no reenvio |
@@ -103,6 +104,13 @@ packages/web/               o que os dois fronts usam no navegador
 - **Checklist de fotos configurável** (tabela `ChecklistFoto`), por tipo de serviço.
   O técnico só consegue concluir com todas as obrigatórias enviadas.
 - **Técnico enxerga apenas a própria agenda**, garantido no servidor, não só na tela.
+- **Fotos sem link público.** São fotos da casa e do telhado do cliente, com localização: só
+  saem por `GET /api/fotos/:id`, com login e conferência de papel e equipe a cada foto. As
+  telas buscam a foto com o token no cabeçalho (componente `ImagemProtegida`), porque o
+  navegador não manda o token em `<img src>`. Não há token na URL nem link assinado: um link
+  copiado não abre fora da sessão. O banco guarda só a chave do arquivo, então a troca para o
+  OneDrive muda apenas `armazenamento.ts`. A única exceção sem login é o PDF do orçamento,
+  aberto pelo cliente com o token do link.
 - **Agenda é do gestor.** As rotas `/api/agenda` aceitam só GESTOR (e ADMIN); o comercial
   acompanha pelo status dos orçamentos. Uma equipe não pega dois serviços no mesmo período,
   nem ao agendar nem ao remarcar. Cancelar devolve o projeto para "A agendar".
@@ -205,7 +213,7 @@ npm run preview:tecnico                           # terminal 2: build do técnic
 cloudflared tunnel --url http://127.0.0.1:5175    # terminal 3: mostra https://<aleatório>.trycloudflare.com
 ```
 
-Só a 5175 é exposta: ela repassa `/api` e `/arquivos` para a API, então para o celular é tudo
+Só a 5175 é exposta: ela repassa `/api` (inclusive as fotos) para a API, então para o celular é tudo
 o mesmo endereço (sem CORS). O Vite já aceita qualquer `*.trycloudflare.com` e o preview escuta
 em `127.0.0.1` (com `localhost` ficaria só no IPv6 e o túnel não conectaria). O endereço muda a
 cada execução do `cloudflared`: um app instalado na tela inicial e as fotos na fila ficam presos

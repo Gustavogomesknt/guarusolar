@@ -121,11 +121,13 @@ type Opcoes = {
   signal?: AbortSignal;
   /** No login, 401 é "senha errada", não sessão expirada: não redireciona. */
   semRedirecionarEm401?: boolean;
+  /** A resposta é um arquivo (foto): devolve o Blob em vez de ler JSON. */
+  comoArquivo?: boolean;
 };
 
 async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {}): Promise<T> {
-  const { corpo, signal, semRedirecionarEm401 } = opcoes;
-  const cabecalhos: Record<string, string> = { Accept: 'application/json' };
+  const { corpo, signal, semRedirecionarEm401, comoArquivo } = opcoes;
+  const cabecalhos: Record<string, string> = { Accept: comoArquivo ? '*/*' : 'application/json' };
   const formulario = corpo instanceof FormData;
   // no FormData o navegador monta o Content-Type com o separador das partes
   if (corpo !== undefined && !formulario) cabecalhos['Content-Type'] = 'application/json';
@@ -145,6 +147,7 @@ async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {
     throw new ErroApi(SEM_CONEXAO, 'Sem conexão com o servidor. Verifique a internet e tente novamente.');
   }
 
+  if (resposta.ok && comoArquivo) return (await resposta.blob()) as T;
   const dados = await lerCorpo(resposta);
   if (resposta.ok) return dados as T;
 
@@ -156,6 +159,13 @@ async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {
   throw new ErroApi(resposta.status, mensagem, detalhes);
 }
 
+/**
+ * Endereço (na API) de uma foto de serviço. Não serve em <img src>: a rota exige o token no
+ * cabeçalho. Use o componente ImagemProtegida, que busca com o token e exibe.
+ */
+export const urlDaFoto = (id: string, tamanho: 'original' | 'miniatura' = 'original') =>
+  `/api/fotos/${id}${tamanho === 'miniatura' ? '?tamanho=miniatura' : ''}`;
+
 export const api = {
   get: <T>(caminho: string, opcoes?: Omit<Opcoes, 'corpo'>) => requisitar<T>('GET', caminho, opcoes),
   post: <T>(caminho: string, corpo?: unknown, opcoes?: Opcoes) =>
@@ -164,4 +174,7 @@ export const api = {
     requisitar<T>('PUT', caminho, { ...opcoes, corpo }),
   patch: <T>(caminho: string, corpo?: unknown, opcoes?: Opcoes) =>
     requisitar<T>('PATCH', caminho, { ...opcoes, corpo }),
+  /** Baixa um arquivo protegido (ex.: foto) com o token no cabeçalho. */
+  baixar: (caminho: string, opcoes?: Pick<Opcoes, 'signal'>) =>
+    requisitar<Blob>('GET', caminho, { ...opcoes, comoArquivo: true }),
 };

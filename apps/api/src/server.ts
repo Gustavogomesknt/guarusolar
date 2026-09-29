@@ -2,7 +2,6 @@ import 'dotenv/config';
 import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
 import express from 'express';
 import cors from 'cors';
-import path from 'node:path';
 import { tratadorDeErros } from './lib/erros';
 import { rotasAuth } from './rotas/auth';
 import { rotasClientes } from './rotas/clientes';
@@ -10,6 +9,7 @@ import { rotasProdutos } from './rotas/produtos';
 import { rotasOrcamentos } from './rotas/orcamentos';
 import { rotasOrcamentoPdf } from './rotas/orcamentoPdf';
 import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
+import { rotasFotos } from './rotas/fotos';
 
 const app = express();
 
@@ -20,8 +20,7 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 
-// arquivos locais durante o desenvolvimento (em produção: OneDrive/SharePoint)
-app.use('/arquivos', express.static(process.env.STORAGE_DIR ?? path.resolve('uploads')));
+// Nada de pasta pública de arquivos: as fotos só saem por /api/fotos/:id, com login (rotas/fotos.ts).
 
 app.get('/saude', (_req, res) => res.json({ ok: true, hora: new Date().toISOString() }));
 
@@ -34,6 +33,7 @@ app.use('/api/orcamentos', rotasOrcamentos);
 app.use('/api/agenda', rotasAgenda);
 app.use('/api/validacao', rotasValidacao);
 app.use('/api/tecnico', rotasTecnico);
+app.use('/api/fotos', rotasFotos);
 
 app.use((_req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));
 app.use(tratadorDeErros);

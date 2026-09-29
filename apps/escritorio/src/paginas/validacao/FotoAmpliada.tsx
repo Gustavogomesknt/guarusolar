@@ -1,4 +1,6 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageOff, Loader2 } from 'lucide-react';
+import { urlDaFoto } from '@guarusolar/web/api';
+import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { formatarHora } from '@guarusolar/compartilhado';
 import type { FotoEmValidacao } from '@/lib/tipos';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -50,11 +52,18 @@ export function FotoAmpliada({
           </div>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center rounded-lg bg-[#0B2F5E]">
-            <img
+            <ImagemProtegida
               key={foto.id}
-              src={foto.arquivoUrl}
+              src={urlDaFoto(foto.id)}
               alt={rotuloDaFoto(foto)}
               className="max-h-[72vh] max-w-full object-contain"
+              carregando={<Loader2 className="my-24 size-8 animate-spin text-white/70" aria-hidden />}
+              emErro={
+                <span className="my-24 flex flex-col items-center gap-2 text-sm text-white/80">
+                  <ImageOff className="size-8" aria-hidden />
+                  Não foi possível abrir a foto
+                </span>
+              }
             />
             <button
               type="button"

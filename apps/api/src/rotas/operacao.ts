@@ -7,6 +7,7 @@ import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { salvarArquivo } from '../lib/armazenamento';
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
+import { filtroDoTecnico } from '../lib/acesso';
 import { diaDeHoje } from '@guarusolar/compartilhado';
 
 // Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
@@ -356,13 +357,10 @@ const upload = multer({
   },
 });
 
-/** Garante que o técnico só acesse os serviços da própria equipe. */
+/** Garante que o técnico só acesse os serviços da própria equipe (regra em lib/acesso.ts). */
 async function servicoDoTecnico(id: string, usuarioId: string, equipeId: string | null) {
   const servico = await prisma.agendamento.findFirst({
-    where: {
-      id,
-      OR: [{ tecnicoResponsavelId: usuarioId }, ...(equipeId ? [{ equipeId }] : [])],
-    },
+    where: { id, ...filtroDoTecnico({ id: usuarioId, equipeId }) },
     include: {
       projeto: { include: { cliente: true } },
       fotos: { orderBy: { criadoEm: 'asc' } },
@@ -397,12 +395,7 @@ rotasTecnico.get(
     const servicos = await prisma.agendamento.findMany({
       where: {
         AND: [
-          {
-            OR: [
-              { tecnicoResponsavelId: req.usuario!.id },
-              ...(req.usuario!.equipeId ? [{ equipeId: req.usuario!.equipeId }] : []),
-            ],
-          },
+          filtroDoTecnico(req.usuario!),
           {
             OR: [
               { dataInicio: { lte: ate }, dataFim: { gte: de }, status: { notIn: ['CANCELADO', 'APROVADO'] } },
@@ -514,7 +507,7 @@ rotasTecnico.post(
             agendamentoId: servico.id,
             chave,
             rotulo,
-            arquivoUrl: arquivo.url,
+            arquivoChave: arquivo.chave,
             arquivoNome: arquivo.nome,
             tamanhoBytes: arquivo.tamanhoBytes,
             latitude,

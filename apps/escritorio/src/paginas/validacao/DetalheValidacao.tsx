@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ImageOff, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatarDataHora, formatarHora, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@guarusolar/web/api';
+import { api, ErroApi, urlDaFoto } from '@guarusolar/web/api';
+import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import type { FotoEmValidacao, ServicoEmValidacao, ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
@@ -334,7 +335,6 @@ function CartaoFoto({
   onAmpliar: () => void;
   onMarcar: (m: Marcacao) => void;
 }) {
-  const [falhou, setFalhou] = useState(false);
   const rotulo = rotuloDaFoto(foto);
   const mapa = linkDoMapa(foto);
   return (
@@ -349,14 +349,18 @@ function CartaoFoto({
         onClick={onAmpliar}
         className="relative flex h-[150px] items-center justify-center overflow-hidden rounded-[10px] bg-[#C6D5E8] text-[#2C5484] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
-        {falhou ? (
-          <span className="flex flex-col items-center gap-1 text-xs">
-            <ImageOff className="size-7" aria-hidden />
-            Não foi possível abrir a foto
-          </span>
-        ) : (
-          <img src={foto.arquivoUrl} alt="" loading="lazy" onError={() => setFalhou(true)} className="size-full object-cover" />
-        )}
+        <ImagemProtegida
+          src={urlDaFoto(foto.id, 'miniatura')}
+          alt=""
+          className="size-full object-cover"
+          carregando={<Loader2 className="size-6 animate-spin opacity-60" aria-hidden />}
+          emErro={
+            <span className="flex flex-col items-center gap-1 text-xs">
+              <ImageOff className="size-7" aria-hidden />
+              Não foi possível abrir a foto
+            </span>
+          }
+        />
         <span className="sr-only">Ampliar: {rotulo}</span>
         {foto.capturadaEm && (
           <span className="absolute bottom-2 left-2 rounded-md bg-[#0B2F5E]/75 px-1.5 py-0.5 font-mono text-[11px] text-white">

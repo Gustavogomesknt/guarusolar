@@ -51,6 +51,14 @@ export function tratadorDeErros(
   if (erro instanceof ErroHttp) {
     return res.status(erro.status).json({ erro: erro.message });
   }
+  // corpo que não é JSON válido ou grande demais (express.json): erro de quem enviou, não 500
+  const tipo = (erro as { type?: string }).type;
+  if (tipo === 'entity.parse.failed') {
+    return res.status(400).json({ erro: 'Os dados enviados não estão em um formato válido.' });
+  }
+  if (tipo === 'entity.too.large') {
+    return res.status(413).json({ erro: 'Os dados enviados são grandes demais.' });
+  }
   console.error(erro);
   return res.status(500).json({ erro: 'Erro interno do servidor' });
 }

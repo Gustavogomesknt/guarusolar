@@ -168,7 +168,7 @@ export type FotoEmValidacao = {
   id: string;
   chave: string | null;
   rotulo: string | null;
-  arquivoUrl: string;
+  /** a imagem sai por GET /api/fotos/:id (com login): use urlDaFoto(id) + ImagemProtegida */
   capturadaEm: string | null;
   latitude: string | null;
   longitude: string | null;

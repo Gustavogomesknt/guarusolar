@@ -4,9 +4,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// Como no escritório: no desenvolvimento o Vite repassa /api e /arquivos para a API local.
+// Como no escritório: no desenvolvimento o Vite repassa /api para a API local (inclusive as
+// fotos, que só saem por /api/fotos com login).
 const API_LOCAL = 'http://localhost:3333';
-const REPASSE = { '/api': API_LOCAL, '/arquivos': API_LOCAL };
+const REPASSE = { '/api': API_LOCAL };
 
 // Teste no celular pelo Cloudflare Tunnel (túnel rápido, sem conta): o endereço muda a cada
 // execução (https://<aleatório>.trycloudflare.com). O ponto no início libera qualquer um deles;
@@ -50,7 +51,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         globIgnores: ['**/*cyrillic*', '**/*greek*', '**/*vietnamese*', '**/*latin-ext*'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/arquivos\//],
+        navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
       },
     }),

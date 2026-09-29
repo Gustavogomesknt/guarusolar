@@ -367,7 +367,9 @@ model FotoServico {
   agendamento   Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
   chave         String? // referência ao ChecklistFoto; nulo = foto extra
   rotulo        String?
-  arquivoUrl    String // link no OneDrive/SharePoint do cliente
+  /// onde o arquivo está no armazenamento (disco hoje, OneDrive depois), nunca uma URL:
+  /// a foto só sai pela rota autenticada GET /api/fotos/:id
+  arquivoChave  String
   arquivoNome   String
   tamanhoBytes  Int?
   latitude      Decimal? @db.Decimal(10, 7)

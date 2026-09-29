@@ -1,5 +1,7 @@
 import { AlertTriangle, Camera, Check, Clock, ImageIcon, Images, Loader2, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { FUSO_EMPRESA } from '@guarusolar/compartilhado';
+import { urlDaFoto } from '@guarusolar/web/api';
+import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import type { FotoLocal } from '@/fotos/useFotos';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +21,23 @@ const DESCRICAO: Record<EstadoBloco, string> = {
   erro: 'não foi enviada',
   enviada: 'foto enviada',
 };
+
+/**
+ * Miniatura de uma foto que já está no servidor (sai com login, por isso ImagemProtegida).
+ * Sem sinal ou enquanto carrega, fica o ícone de foto.
+ */
+function MiniaturaDoServidor({ fotoId, className, icone }: { fotoId: string; className: string; icone: string }) {
+  const marcador = <ImageIcon className={icone} strokeWidth={1.6} aria-hidden />;
+  return (
+    <ImagemProtegida
+      src={urlDaFoto(fotoId, 'miniatura')}
+      alt=""
+      className={className}
+      carregando={marcador}
+      emErro={marcador}
+    />
+  );
+}
 
 /** Link secundário "Da galeria": alvo de 44 px, discreto, abaixo do bloco. */
 function BotaoGaleria({ onClick, rotulo }: { onClick: () => void; rotulo: string }) {
@@ -44,6 +63,7 @@ export function BlocoFoto({
   opcional,
   estado,
   url,
+  fotoId,
   capturadaEm,
   comentario,
   erro,
@@ -56,6 +76,8 @@ export function BlocoFoto({
   opcional: boolean;
   estado: EstadoBloco;
   url?: string | null;
+  /** foto já no servidor: sem `url` local, a miniatura vem de lá */
+  fotoId?: string;
   capturadaEm: string | null;
   comentario: string | null;
   erro?: string;
@@ -91,6 +113,8 @@ export function BlocoFoto({
           >
             {url ? (
               <img src={url} alt="" className="absolute inset-0 size-full object-cover" />
+            ) : fotoId ? (
+              <MiniaturaDoServidor fotoId={fotoId} className="absolute inset-0 size-full object-cover" icone="size-8" />
             ) : (
               <ImageIcon className="size-8" strokeWidth={1.6} aria-hidden />
             )}
@@ -198,7 +222,11 @@ export function FotosExtras({
                 f.refazer && 'border-2 border-destaque',
               )}
             >
-              {f.url ? <img src={f.url} alt="" className="size-full object-cover" /> : <ImageIcon className="size-6" aria-hidden />}
+              {f.url ? (
+                <img src={f.url} alt="" className="size-full object-cover" />
+              ) : (
+                <MiniaturaDoServidor fotoId={f.id} className="size-full object-cover" icone="size-6" />
+              )}
               {f.refazer ? (
                 <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full border border-destaque bg-destaque-suave text-destaque-texto">
                   <AlertTriangle className="size-3" aria-hidden />

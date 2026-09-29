@@ -193,6 +193,8 @@ export function Servico() {
       // a foto nova falhou, mas a anterior continua valendo no servidor
       anteriorValendo: item.enviada && local?.estado === 'erro',
       url: local?.url ?? (item.foto ? fotos.miniaturas[item.foto.id] : undefined),
+      // sem cópia local, a miniatura vem do servidor (a enviada ou a que o gestor mandou refazer)
+      fotoId: item.foto?.id ?? paraRefazer?.id,
       capturadaEm: item.foto?.capturadaEm ?? null,
       comentario: paraRefazer?.comentario ?? null,
     };
@@ -293,6 +295,7 @@ export function Servico() {
                 opcional={!b.item.obrigatoria}
                 estado={b.estado}
                 url={b.url}
+                fotoId={b.fotoId}
                 capturadaEm={b.capturadaEm}
                 comentario={b.comentario}
                 erro={b.local?.erro}

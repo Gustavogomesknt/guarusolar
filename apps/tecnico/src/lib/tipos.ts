@@ -34,7 +34,7 @@ export type FotoEnviada = {
   id: string;
   chave: string | null;
   rotulo: string | null;
-  arquivoUrl: string;
+  // a imagem sai por GET /api/fotos/:id (com login): urlDaFoto(id) + ImagemProtegida
   capturadaEm: string | null;
   revisao: RevisaoFoto;
   comentario: string | null;

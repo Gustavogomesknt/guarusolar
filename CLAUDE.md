@@ -54,7 +54,15 @@ apps/api/                      API (Express + Prisma)
   src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
-  src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto
+  src/lib/armazenamento.ts     camada de arquivos — trocar por OneDrive sem mexer no resto.
+                               O banco guarda a CHAVE (FotoServico.arquivoChave), nunca uma URL;
+                               lerArquivo/lerMiniatura (480 px, gerada uma vez em .miniaturas/)
+                               recusam chave que saia da pasta base
+  src/lib/acesso.ts            regra 6 (técnico só vê a própria equipe) num lugar só:
+                               tecnicoPodeVer e filtroDoTecnico
+  src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
+                               login sempre; gestor vê todas, técnico só da equipe (outra: 404),
+                               comercial não (403). Não existe pasta pública de arquivos
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/lib/zod-pt.ts            mensagens padrão do Zod em português (importado no server.ts)
@@ -150,6 +158,8 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
                                faz o Tailwind de cada app gerar as classes escritas no pacote
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
+  src/ImagemProtegida.tsx      <img> de foto de serviço: busca com o token no cabeçalho (o navegador
+                               não manda token em <img src>) e exibe; use com urlDaFoto(id)
 ```
 
 O que depende de navegador ou React (fetch, localStorage, componentes, CSS) vai em
@@ -176,7 +186,10 @@ O `.env` da API fica em `apps/api/.env`.
    `packages/compartilhado/src/status.ts`, usado pela API e pelo menu de status da lista).
    Orçamento `APROVADO` não pode ser editado.
 6. **Técnico só acessa os serviços da própria equipe**, validado no servidor, nunca apenas
-   escondendo botões na interface.
+   escondendo botões na interface. Vale também para as fotos (`lib/acesso.ts`).
+   **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
+   e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
+   cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
 7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
    teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
    Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
@@ -267,11 +280,12 @@ Próximos passos, nesta ordem:
 
 ## Dívida técnica (resolver antes da produção)
 
-- **Fotos servidas sem autenticação.** `/arquivos` (`express.static` em `apps/api/src/server.ts`)
-  entrega qualquer foto a quem tiver o link, sem login: são fotos da casa do cliente, com
-  localização. Antes de produção, servir as fotos por rota autenticada (ou link temporário
-  assinado) — naturalmente junto com a troca do `armazenamento.ts` para o OneDrive/SharePoint.
-- **Arquivo órfão no envio duplicado.** Quando a mesma foto chega duas vezes ao mesmo tempo
+- **Login sem limite de tentativas.** `POST /api/auth/login` aceita tentativas sem limite: dá
+  para testar senhas à vontade. Antes de produção, limitar por e-mail e por IP (ex.: 5
+  tentativas em 15 min) e registrar os bloqueios.
+- **`STORAGE_PUBLIC_URL` não é mais usada** (as fotos saem pela rota autenticada). Se ainda
+  estiver no `.env` de alguém, pode ser apagada; não tem efeito.
+- **Arquivos órfãos.** Ao refazer uma foto, o registro antigo sai e o arquivo fica no disco. E quando a mesma foto chega duas vezes ao mesmo tempo
   (a fila reenviou antes da resposta), as duas requisições gravam o arquivo antes de a chave
   única do `idLocal` barrar a segunda: a resposta é certa (200 com a foto existente), mas o
   segundo arquivo fica sem registro. Raro; resolver junto com o armazenamento (apagar o arquivo

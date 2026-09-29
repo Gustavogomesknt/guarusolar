@@ -11,7 +11,8 @@
     "./api": "./src/api.ts",
     "./sessao": "./src/sessao.tsx",
     "./tema.css": "./src/tema.css",
-    "./tiposServico": "./src/tiposServico.ts"
+    "./tiposServico": "./src/tiposServico.ts",
+    "./ImagemProtegida": "./src/ImagemProtegida.tsx"
   },
   "peerDependencies": {
     "@guarusolar/compartilhado": "^0.1.0",
