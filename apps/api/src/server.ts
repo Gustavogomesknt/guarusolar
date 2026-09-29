@@ -13,6 +13,12 @@ import { rotasFotos } from './rotas/fotos';
 
 const app = express();
 
+// IP de quem chama (limite de tentativas de login). Atrás de proxy (hospedagem, Cloudflare),
+// TRUST_PROXY diz quantos saltos confiar no X-Forwarded-For; sem isso, todos chegam com o IP
+// do proxy. Nunca "true": qualquer um poderia inventar o próprio IP no cabeçalho.
+const saltosDeProxy = Number(process.env.TRUST_PROXY ?? 0);
+if (Number.isInteger(saltosDeProxy) && saltosDeProxy > 0) app.set('trust proxy', saltosDeProxy);
+
 app.use(
   cors({
     origin: (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(','),

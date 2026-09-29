@@ -32,8 +32,20 @@ declare global {
   }
 }
 
-export const gerarHash = (senha: string) => bcrypt.hash(senha, 10);
-export const conferirSenha = (senha: string, hash: string) => bcrypt.compare(senha, hash);
+const CUSTO_DO_HASH = 10;
+export const gerarHash = (senha: string) => bcrypt.hash(senha, CUSTO_DO_HASH);
+
+// Hash de uma senha que ninguém tem, com o mesmo custo dos hashes reais.
+const HASH_FICTICIO = bcrypt.hashSync(`nenhuma-conta-${Date.now()}`, CUSTO_DO_HASH);
+
+/**
+ * Confere a senha SEMPRE com bcrypt, mesmo sem conta (hash null): assim o tempo de resposta
+ * é o mesmo para e-mail que existe e que não existe, e não revela quem tem conta.
+ */
+export async function conferirSenha(senha: string, hash: string | null) {
+  const confere = await bcrypt.compare(senha, hash ?? HASH_FICTICIO);
+  return hash !== null && confere;
+}
 
 export const gerarToken = (usuario: UsuarioToken) =>
   jwt.sign(usuario, SEGREDO, {

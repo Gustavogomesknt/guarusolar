@@ -104,6 +104,13 @@ packages/web/               o que os dois fronts usam no navegador
 - **Checklist de fotos configurável** (tabela `ChecklistFoto`), por tipo de serviço.
   O técnico só consegue concluir com todas as obrigatórias enviadas.
 - **Técnico enxerga apenas a própria agenda**, garantido no servidor, não só na tela.
+- **Limite de tentativas no login.** A cada 5 senhas erradas seguidas num e-mail, ele fica
+  bloqueado por 1 min, depois 5, 15 e 60 min; o login certo zera. Um IP com 30 falhas em 15
+  min (muitas contas testadas) fica bloqueado por 5, 15 e 60 min — folga grande porque vários
+  técnicos saem da mesma rede. A mensagem é a mesma para e-mail que existe e que não existe
+  (inclusive no tempo de resposta: a senha é sempre conferida). Cada falha e bloqueio vai para
+  o log numa linha JSON (`login_falhou`, `login_bloqueio_iniciado`, `login_bloqueado`), nunca
+  a senha. Em produção atrás de proxy, configure `TRUST_PROXY` (quantos proxies há na frente).
 - **Fotos sem link público.** São fotos da casa e do telhado do cliente, com localização: só
   saem por `GET /api/fotos/:id`, com login e conferência de papel e equipe a cada foto. As
   telas buscam a foto com o token no cabeçalho (componente `ImagemProtegida`), porque o

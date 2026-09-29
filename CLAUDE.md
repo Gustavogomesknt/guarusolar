@@ -50,7 +50,12 @@ apps/api/                      API (Express + Prisma)
   prisma/seed.ts               catálogo inicial, equipes, checklist e usuários de teste
   prisma/limpar.ts             apaga os dados de operação (npm run db:limpar)
   src/server.ts                sobe a API e monta as rotas
-  src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar
+  src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar; conferirSenha
+                               roda o bcrypt mesmo sem conta (tempo igual: não revela e-mails)
+  src/lib/limiteLogin.ts       limite de tentativas de login, em memória: por e-mail (5 falhas ->
+                               1, 5, 15, 60 min) e por IP (30 falhas em 15 min -> 5, 15, 60 min,
+                               folga para técnicos na mesma rede). Com mais de uma instância da
+                               API, mover para o banco ou Redis. Depende de TRUST_PROXY certo
   src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
@@ -280,9 +285,9 @@ Próximos passos, nesta ordem:
 
 ## Dívida técnica (resolver antes da produção)
 
-- **Login sem limite de tentativas.** `POST /api/auth/login` aceita tentativas sem limite: dá
-  para testar senhas à vontade. Antes de produção, limitar por e-mail e por IP (ex.: 5
-  tentativas em 15 min) e registrar os bloqueios.
+- **`TRUST_PROXY` na hospedagem.** Atrás de proxy, sem `TRUST_PROXY` = número de proxies,
+  todos os usuários chegam com o IP do proxy e o limite por IP do login valeria para a empresa
+  inteira. Conferir no deploy (o log `login_falhou` mostra a `origem`).
 - **`STORAGE_PUBLIC_URL` não é mais usada** (as fotos saem pela rota autenticada). Se ainda
   estiver no `.env` de alguém, pode ser apagada; não tem efeito.
 - **Arquivos órfãos.** Ao refazer uma foto, o registro antigo sai e o arquivo fica no disco. E quando a mesma foto chega duas vezes ao mesmo tempo
