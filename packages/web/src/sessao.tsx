@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Papel } from '@guarusolar/compartilhado';
-import { api, ErroApi, quandoSessaoExpirar, tokenSalvo } from './api';
+import { api, ErroApi, quandoSessaoExpirar, SEM_CONEXAO, tokenSalvo, usuarioSalvo } from './api';
 
 export type Usuario = {
   id: string;
@@ -37,15 +37,21 @@ const ContextoSessao = createContext<Sessao | null>(null);
  * `papeisAceitos`: quando informado, só esses papéis entram neste app. Os demais recebem
  * `avisoPapelRecusado` e o token nem chega a ser guardado. É conveniência de interface: quem
  * protege os dados é o servidor (autorizar() em cada rota).
+ *
+ * `abrirSemConexao`: o app abre com o último usuário confirmado quando a API não responde ao
+ * abrir (técnico em campo sem sinal). O token continua indo em cada requisição; se tiver
+ * vencido, o primeiro 401 encerra a sessão como sempre.
  */
 export function SessaoProvider({
   children,
   papeisAceitos,
   avisoPapelRecusado = 'Seu usuário não tem acesso a este aplicativo.',
+  abrirSemConexao = false,
 }: {
   children: ReactNode;
   papeisAceitos?: readonly Papel[];
   avisoPapelRecusado?: string;
+  abrirSemConexao?: boolean;
 }) {
   const navegar = useNavigate();
   const clienteConsultas = useQueryClient();
@@ -81,12 +87,18 @@ export function SessaoProvider({
       .get<Usuario>('/api/auth/eu', { signal: controle.signal })
       .then((dados) => {
         if (papeisAceitos && !papeisAceitos.includes(dados.papel)) return sair(avisoPapelRecusado);
-        setUsuario({ id: dados.id, nome: dados.nome, papel: dados.papel, equipeId: dados.equipeId });
+        const confirmado = { id: dados.id, nome: dados.nome, papel: dados.papel, equipeId: dados.equipeId };
+        if (abrirSemConexao) usuarioSalvo.gravar(confirmado);
+        setUsuario(confirmado);
       })
       .catch((erro) => {
         if (controle.signal.aborted) return;
         // 401 já foi tratado por quandoSessaoExpirar; aqui só a falta de conexão ou erro do servidor.
-        if (erro instanceof ErroApi && erro.status !== 401) setFalhaAoConectar(erro.message);
+        if (!(erro instanceof ErroApi) || erro.status === 401) return;
+        const semServidor = erro.status === SEM_CONEXAO || erro.status >= 500;
+        const salvo = abrirSemConexao && semServidor ? usuarioSalvo.ler<Usuario>() : null;
+        if (salvo) setUsuario(salvo);
+        else setFalhaAoConectar(erro.message);
       })
       .finally(() => {
         if (!controle.signal.aborted) setCarregando(false);
@@ -105,11 +117,12 @@ export function SessaoProvider({
       throw new ErroApi(403, avisoPapelRecusado);
     }
     tokenSalvo.gravar(resposta.token);
+    if (abrirSemConexao) usuarioSalvo.gravar(resposta.usuario);
     setAviso(null);
     setFalhaAoConectar(null);
     setUsuario(resposta.usuario);
     return resposta.usuario;
-  }, [papeisAceitos, avisoPapelRecusado]);
+  }, [papeisAceitos, avisoPapelRecusado, abrirSemConexao]);
 
   const valor = useMemo<Sessao>(
     () => ({

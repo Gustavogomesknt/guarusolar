@@ -22,6 +22,7 @@ npm run dev:api                            # http://localhost:3333
 npm run db:limpar                          # apaga os dados de teste (pede para digitar LIMPAR)
 npm run dev:escritorio                     # front do escritório em http://localhost:5173
 npm run dev:tecnico                        # app do técnico em http://localhost:5174
+npm run preview:tecnico                    # build do técnico com service worker (5175)
 ```
 
 Com a API e o front rodando, abra http://localhost:5173 e entre com um usuário do seed.
@@ -144,6 +145,35 @@ vez de criar outra.
 em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e a foto de um item
 precisa ser de um item do checklist daquele tipo de serviço (400). A agenda do técnico mostra,
 além de hoje a 7 dias, os serviços em aberto de dias anteriores, até serem enviados.
+
+### Sem sinal em campo
+
+O técnico não perde trabalho sem internet:
+
+- **Fotos na fila do aparelho** (`apps/tecnico/src/fotos/fila.ts`, IndexedDB). A foto original
+  é gravada no instante em que é escolhida; se o app fechar no meio do preparo, ao reabrir ele
+  retoma. Cada foto aparece na hora com o estado: preparando, na fila, enviando ou erro.
+- **Envio automático.** Falha de rede tenta de novo sozinha (5 s, 15 s, 1 min e depois a cada
+  5 min). A fila também tenta na hora quando a conexão volta, quando o app volta para a tela e
+  quando qualquer consulta à API dá certo — com sinal fraco o navegador nem percebe que ficou
+  sem internet, então não dá para depender só do evento `online`.
+- **Recusa da API não se repete** (ex.: serviço cancelado pelo escritório): a foto fica com o
+  motivo na tela e o técnico decide.
+- **O app abre sem sinal**: o service worker guarda o app; a agenda e os serviços já abertos
+  ficam guardados (React Query persistido, até 7 dias); a sessão lembra o usuário.
+- **Enviar para validação exige conexão** nesta versão: sem sinal, o botão avisa na hora que
+  fotos e observações estão guardadas.
+- **Sair com fotos na fila** pede confirmação; elas ficam guardadas e sobem quando a mesma
+  pessoa entrar de novo naquele celular.
+
+Limites conhecidos:
+
+- **No iPhone não há envio em segundo plano** (o Safari não tem Background Sync): as fotos só
+  sobem com o app aberto. No Android dá para acrescentar depois.
+- **O primeiro acesso precisa de internet**: é nele que o app fica guardado no aparelho.
+- **O Safari apaga dados de sites não usados por 7 dias**; app adicionado à tela inicial fica de
+  fora disso. O app pede armazenamento persistente (`navigator.storage.persist()`), e a
+  instalação na tela inicial é o que realmente protege a fila no iPhone.
 
 **Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
 no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).

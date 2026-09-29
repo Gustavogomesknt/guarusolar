@@ -1,9 +1,9 @@
-import { AlertTriangle, Camera, Check, ImageIcon, Images, Loader2, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Clock, ImageIcon, Images, Loader2, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { FUSO_EMPRESA } from '@guarusolar/compartilhado';
 import type { FotoLocal } from '@/fotos/useFotos';
 import { cn } from '@/lib/utils';
 
-export type EstadoBloco = 'falta' | 'refazer' | 'preparando' | 'enviando' | 'erro' | 'enviada';
+export type EstadoBloco = 'falta' | 'refazer' | 'preparando' | 'na_fila' | 'enviando' | 'erro' | 'enviada';
 
 const hora = (iso: string | null) =>
   iso
@@ -14,6 +14,7 @@ const DESCRICAO: Record<EstadoBloco, string> = {
   falta: 'falta a foto',
   refazer: 'o gestor pediu para refazer',
   preparando: 'preparando a foto',
+  na_fila: 'guardada no celular, aguardando envio',
   enviando: 'enviando',
   erro: 'não foi enviada',
   enviada: 'foto enviada',
@@ -97,6 +98,12 @@ export function BlocoFoto({
               <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#0B2F5E]/55 text-xs font-semibold text-white">
                 <Loader2 className="size-6 animate-spin" aria-hidden />
                 {estado === 'preparando' ? 'Preparando…' : 'Enviando…'}
+              </span>
+            )}
+            {estado === 'na_fila' && (
+              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-[#0B2F5E]/75 py-1 text-[11px] font-semibold text-white">
+                <Clock className="size-3.5" aria-hidden />
+                Na fila
               </span>
             )}
             {estado === 'enviada' && (
@@ -200,11 +207,18 @@ export function FotosExtras({
                 )}
               >
                 {f.url && <img src={f.url} alt="" className="size-full object-cover" />}
-                {f.estado !== 'erro' && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-[#0B2F5E]/55 text-white">
-                    <Loader2 className="size-5 animate-spin" aria-hidden />
-                    <span className="sr-only">Enviando foto extra</span>
+                {f.estado === 'na_fila' ? (
+                  <span className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-[#0B2F5E]/75 py-0.5 text-white">
+                    <Clock className="size-3.5" aria-hidden />
+                    <span className="sr-only">Foto extra na fila, aguardando envio</span>
                   </span>
+                ) : (
+                  f.estado !== 'erro' && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-[#0B2F5E]/55 text-white">
+                      <Loader2 className="size-5 animate-spin" aria-hidden />
+                      <span className="sr-only">{f.estado === 'preparando' ? 'Preparando' : 'Enviando'} foto extra</span>
+                    </span>
+                  )
                 )}
               </span>
               {f.estado === 'erro' && (

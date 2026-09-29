@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarX2, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CalendarX2, Clock, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
@@ -10,6 +11,7 @@ import { enderecoEscrito, linkDoMapa, linkDoWhatsApp } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
 import { SeloStatus } from '@/components/SeloStatus';
+import { useFila } from '@/fotos/useFotos';
 
 const DIAS_A_FRENTE = 7;
 
@@ -28,9 +30,12 @@ function nomeDoDia(dia: Dia, hoje: Dia) {
  */
 export function Agenda() {
   const { usuario, sair } = useSessao();
+  const fila = useFila();
+  const [confirmarSaida, setConfirmarSaida] = useState(false);
   const hoje = diaDeHoje();
   const agenda = useQuery({
-    queryKey: ['agenda', hoje],
+    // sem a data na chave: aberto sem sinal num dia novo, mostra o que ficou guardado
+    queryKey: ['agenda'],
     queryFn: ({ signal }) =>
       api.get<ServicoNaAgenda[]>(`/api/tecnico/agenda?de=${hoje}&ate=${somarDias(hoje, DIAS_A_FRENTE)}`, { signal }),
   });
@@ -57,7 +62,8 @@ export function Agenda() {
         acoes={
           <button
             type="button"
-            onClick={() => sair()}
+            // com fotos ainda no aparelho, confirma antes (elas ficam guardadas para quando voltar)
+            onClick={() => (fila.fotos.length > 0 ? setConfirmarSaida(true) : sair())}
             className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm text-white/85 focus-visible:outline-2 focus-visible:outline-sidebar-ring"
           >
             <LogOut className="size-5" aria-hidden />
@@ -67,6 +73,28 @@ export function Agenda() {
       />
 
       <main className="flex flex-col gap-6 px-4 pt-4">
+        {confirmarSaida && (
+          <section role="alertdialog" aria-labelledby="titulo-sair" className="flex flex-col gap-3 rounded-2xl border border-destaque bg-card p-4">
+            <h2 id="titulo-sair" className="font-sans text-base font-semibold tracking-normal">
+              {fila.fotos.length === 1 ? 'Há 1 foto' : `Há ${fila.fotos.length} fotos`} ainda no celular
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Se sair, {fila.fotos.length === 1 ? 'ela fica guardada e é enviada' : 'elas ficam guardadas e são enviadas'}{' '}
+              quando você entrar de novo neste celular.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setConfirmarSaida(false)} className="h-12 rounded-xl border font-semibold" autoFocus>
+                Continuar aqui
+              </button>
+              <button type="button" onClick={() => sair()} className="h-12 rounded-xl font-semibold text-destaque-texto">
+                Sair mesmo assim
+              </button>
+            </div>
+          </section>
+        )}
+
+        <AvisoDaFila />
+
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">Hoje e os próximos {DIAS_A_FRENTE} dias</p>
           <button
@@ -219,5 +247,32 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
         )}
       </div>
     </article>
+  );
+}
+
+/** Resumo da fila de fotos: tranquiliza quando está sem sinal e aponta o que precisa de ação. */
+function AvisoDaFila() {
+  const fila = useFila();
+  const naFila = fila.fotos.filter((f) => f.estado !== 'erro').length;
+  const comErro = fila.fotos.filter((f) => f.estado === 'erro').length;
+  if (naFila === 0 && comErro === 0) return null;
+  const quantas = (n: number) => (n === 1 ? '1 foto' : `${n} fotos`);
+  return (
+    <section role="status" className="flex flex-col gap-2 rounded-2xl border bg-card p-4 text-sm">
+      {naFila > 0 && (
+        <p className="flex items-start gap-2">
+          <Clock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          {fila.semConexao
+            ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando sinal para enviar.`
+            : `Enviando ${quantas(naFila)}…`}
+        </p>
+      )}
+      {comErro > 0 && (
+        <p className="flex items-start gap-2 text-destaque-texto">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {quantas(comErro)} não {comErro === 1 ? 'foi aceita' : 'foram aceitas'}: abra o serviço para ver o motivo.
+        </p>
+      )}
+    </section>
   );
 }

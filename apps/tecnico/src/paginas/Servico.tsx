@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Loader2, LocateFixed, MapPin } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diaMes, nomeLongo, somarDias } from '@guarusolar/compartilhado';
-import { api, ErroApi } from '@guarusolar/web/api';
+import { toast } from 'sonner';
+import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import type { ServicoDetalhe } from '@/lib/tipos';
 import { enderecoEscrito } from '@/lib/contato';
@@ -88,7 +89,10 @@ export function Servico() {
   const aoEscolher = (e: ChangeEvent<HTMLInputElement>) => {
     const arquivo = e.target.files?.[0];
     e.target.value = ''; // permite escolher o mesmo arquivo de novo
-    if (arquivo) void fotos.adicionar(arquivo, alvo.current.chave, alvo.current.posicao);
+    if (!arquivo) return;
+    fotos.adicionar(arquivo, alvo.current.chave, alvo.current.posicao).catch((erro: unknown) =>
+      toast.error(erro instanceof Error ? erro.message : 'Não foi possível guardar a foto.'),
+    );
   };
 
   const concluir = useMutation({
@@ -98,6 +102,9 @@ export function Servico() {
         sistemaTestado: rascunho?.testado ?? false,
       }),
     meta: { erroTratadoNaTela: true },
+    // sem sinal, falha na hora com a mensagem (não fica pausado esperando): nesta versão o
+    // envio para validação exige conexão; fotos e rascunho continuam guardados no aparelho
+    networkMode: 'always',
     onSuccess: () => {
       gravarRascunho(id, null);
       setEnviadoAgora(true);
@@ -105,7 +112,13 @@ export function Servico() {
       void clienteConsultas.invalidateQueries({ queryKey: ['servico', id] });
     },
     onError: (erro) =>
-      setErroEnvio(erro instanceof ErroApi ? erro.message : 'Não foi possível enviar. Tente de novo.'),
+      setErroEnvio(
+        erro instanceof ErroApi && erro.status === SEM_CONEXAO
+          ? 'Sem sinal para enviar agora. As fotos e as observações estão guardadas no celular: tente de novo quando o sinal voltar.'
+          : erro instanceof ErroApi
+            ? erro.message
+            : 'Não foi possível enviar. Tente de novo.',
+      ),
   });
 
   const primeiroQueFalta = useRef<HTMLDivElement>(null);
@@ -193,7 +206,8 @@ export function Servico() {
   const bloqueado = faltam > 0 || !testado || emAndamento > 0 || concluir.isPending;
 
   let rotuloBotao = 'Enviar para validação';
-  if (emAndamento > 0) rotuloBotao = `Enviando ${emAndamento} ${emAndamento === 1 ? 'foto' : 'fotos'}…`;
+  const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
+  if (emAndamento > 0) rotuloBotao = fotos.semConexao ? `Sem sinal: ${fotosEscritas} na fila` : `Enviando ${fotosEscritas}…`;
   else if (faltam > 0) rotuloBotao = faltam === 1 ? 'Falta 1 foto obrigatória' : `Faltam ${faltam} fotos obrigatórias`;
   else if (!testado) rotuloBotao = 'Confirme o teste do sistema';
 
@@ -350,11 +364,15 @@ export function Servico() {
             bloqueado ? 'bg-[#D9E0EA] text-[#414F60]' : 'bg-primary text-primary-foreground active:bg-primary/90',
           )}
         >
-          {(concluir.isPending || emAndamento > 0) && <Loader2 className="size-5 animate-spin" aria-hidden />}
+          {(concluir.isPending || (emAndamento > 0 && !fotos.semConexao)) && (
+            <Loader2 className="size-5 animate-spin" aria-hidden />
+          )}
           {concluir.isPending ? 'Enviando…' : rotuloBotao}
         </button>
         <p className="text-center text-xs text-muted-foreground">
-          O gestor recebe as fotos para validar antes de concluir o serviço.
+          {emAndamento > 0 && fotos.semConexao
+            ? 'As fotos estão guardadas no celular e sobem sozinhas quando o sinal voltar.'
+            : 'O gestor recebe as fotos para validar antes de concluir o serviço.'}
         </p>
       </footer>
     </div>

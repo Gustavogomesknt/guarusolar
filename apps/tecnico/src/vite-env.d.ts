@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/react" />
 
 interface ImportMetaEnv {
   /** URL da API. Vazio no desenvolvimento (o Vite repassa /api para a API local). */

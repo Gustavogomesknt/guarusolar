@@ -58,8 +58,31 @@ export const tokenSalvo = {
     tokenEmMemoria = null;
     try {
       localStorage.removeItem(CHAVE_TOKEN);
+      localStorage.removeItem(`${CHAVE_TOKEN}.usuario`);
     } catch {
       /* nada a apagar */
+    }
+  },
+};
+
+/**
+ * Último usuário confirmado pela API, para o app abrir sem internet (app do técnico).
+ * Sai junto com o token. Não é prova de acesso: quem decide é a API, a cada requisição.
+ */
+export const usuarioSalvo = {
+  ler<T>(): T | null {
+    try {
+      const texto = localStorage.getItem(`${CHAVE_TOKEN}.usuario`);
+      return texto ? (JSON.parse(texto) as T) : null;
+    } catch {
+      return null;
+    }
+  },
+  gravar(usuario: unknown) {
+    try {
+      localStorage.setItem(`${CHAVE_TOKEN}.usuario`, JSON.stringify(usuario));
+    } catch {
+      /* sem armazenamento: o app só não abrirá sem internet */
     }
   },
 };

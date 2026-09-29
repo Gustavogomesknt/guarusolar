@@ -107,10 +107,21 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
   src/paginas/Servico.tsx      serviço aberto (protótipo "Técnico — concluir serviço"): checklist,
                                extras, observações e teste (rascunho no localStorage), botão do
                                rodapé que diz o que falta e leva até lá
+  src/fotos/fila.ts            FILA OFFLINE das fotos (IndexedDB): a original é gravada no ato,
+                               antes do preparo; um trabalhador prepara e outro envia, uma foto
+                               por vez; rede/5xx tenta de novo (5 s, 15 s, 1 min, 5 min), 4xx vira
+                               erro na tela, 401 pausa; acorda com `online`, com a volta à tela e
+                               com qualquer consulta que dá certo. Leia o comentário do topo
+                               antes de mexer
   src/fotos/                   reduzir.ts (2000 px, JPEG 85), metadados.ts (EXIF + posição do
                                navegador), useLocalizacao.ts (permissão pedida num toque próprio,
-                               nunca junto com a câmera), envio.ts e useFotos.ts (preparo uma
-                               foto por vez; idLocal em cada envio)
+                               nunca junto com a câmera), envio.ts, useFotos.ts (a tela lê a fila)
+  src/lib/consultas.ts         React Query persistido no localStorage (só agenda e serviços):
+                               o app abre sem sinal com o que já foi carregado
+  src/components/AvisoAtualizacao  versão nova do app só entra quando o técnico toca em
+                               "Atualizar" (faixa no topo; embaixo cobriria o botão principal)
+  vite.config.ts               service worker (vite-plugin-pwa): guarda o app, não a API. Só
+                               funciona no build: teste com `npm run preview:tecnico` (5175)
   src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
@@ -255,7 +266,8 @@ npm run db:migrate       # cria as tabelas
 npm run db:seed          # catálogo, equipes, checklist e usuários de teste
 npm run dev:api          # API em http://localhost:3333
 npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
-npm run dev:tecnico      # app do técnico em http://localhost:5174 (idem)
+npm run dev:tecnico      # app do técnico em http://localhost:5174 (idem; sem service worker)
+npm run preview:tecnico  # build do técnico com service worker em http://localhost:5175
 npm run db:studio        # inspecionar o banco
 npm run db:limpar        # APAGA clientes, orçamentos, projetos etc. e zera os códigos;
                          # mantém usuários, equipes, checklist e catálogo. Pede LIMPAR;
