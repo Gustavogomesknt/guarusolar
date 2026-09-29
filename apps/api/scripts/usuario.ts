@@ -5,6 +5,7 @@
  *   npm run usuario -- criar --nome "João" --email joao@guarusolar.com.br --papel TECNICO --equipe "Equipe A"
  *   npm run usuario -- nova-senha --email maria@guarusolar.com.br   (esqueceu a senha)
  *   npm run usuario -- desativar --email maria@guarusolar.com.br     (saiu da empresa)
+ *   npm run usuario -- trocar-email --email errado@x.com --novo certo@guarusolar.com.br
  *   npm run usuario -- listar
  *
  * A senha gerada aparece UMA vez, aqui no terminal: passe à pessoa por um canal seguro. Ela é
@@ -64,6 +65,14 @@ async function main() {
       const senha = senhaTemporaria();
       await prisma.usuario.update({ where: { email }, data: { senhaHash: await bcrypt.hash(senha, 10), senhaTemporaria: true } });
       console.log(`Nova senha temporária de ${email}: ${senha}\n(trocada pela pessoa no próximo acesso)`);
+    } else if (comando === 'trocar-email') {
+      const email = o.email?.trim().toLowerCase();
+      const novo = o.novo?.trim().toLowerCase();
+      if (!email || !novo) throw new Error('Use: trocar-email --email atual --novo novo');
+      if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(novo)) throw new Error(`"${novo}" não parece um e-mail.`);
+      if (await prisma.usuario.findUnique({ where: { email: novo } })) throw new Error(`Já existe usuário com ${novo}.`);
+      await prisma.usuario.update({ where: { email }, data: { email: novo } });
+      console.log(`E-mail trocado: ${email} -> ${novo}. A senha continua a mesma.`);
     } else if (comando === 'desativar') {
       const email = o.email?.trim().toLowerCase();
       if (!email) throw new Error('Use: desativar --email email');
@@ -75,7 +84,7 @@ async function main() {
         console.log(`${u.ativo ? ' ' : 'x'} ${u.papel.padEnd(9)} ${u.nome} <${u.email}>${u.equipeId ? ` · ${u.equipeId}` : ''}${u.senhaTemporaria ? ' · senha temporária' : ''}`);
       }
     } else {
-      console.log('Comandos: criar, nova-senha, desativar, listar (detalhes no topo de apps/api/scripts/usuario.ts)');
+      console.log('Comandos: criar, nova-senha, trocar-email, desativar, listar (detalhes no topo de apps/api/scripts/usuario.ts)');
     }
   } catch (erro) {
     const mensagem = (erro as { code?: string }).code === 'P2025' ? 'Usuário não encontrado.' : (erro as Error).message;

@@ -53,7 +53,7 @@ apps/api/                      API (Express + Prisma)
                                sem o catálogo de exemplo; sem usuários)
   prisma/seed-teste.ts         usuários de teste (senha pública guarusolar123): NUNCA em produção
                                (recusa com NODE_ENV=production e em banco marcado como produção)
-  scripts/usuario.ts           npm run usuario -- criar|nova-senha|desativar|listar: usuários reais,
+  scripts/usuario.ts           npm run usuario -- criar|nova-senha|trocar-email|desativar|listar: reais,
                                com senha temporária (troca obrigatória no primeiro acesso)
   scripts/marcar-producao.ts   npm run db:marcar-producao: grava a marca de produção NO banco
                                (tabela AmbienteDoBanco; lib/ambienteDoBanco.ts confere)
