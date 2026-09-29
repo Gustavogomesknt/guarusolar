@@ -188,6 +188,23 @@ sem loja e sem instalar nada de verdade: continua sendo o site.
 Nome "Guarusolar", ícone do sol provisório sobre o azul-escuro da marca (troca quando chegar o
 logo: `apps/tecnico/icones/`), abre direto na agenda.
 
+### Testar no celular (Cloudflare Tunnel)
+
+Câmera, localização e service worker só funcionam em HTTPS, e o IP da rede local não conta.
+Um túnel rápido da Cloudflare (sem conta) dá um endereço HTTPS temporário:
+
+```bash
+npm run dev:api                                   # terminal 1: API na 3333
+npm run preview:tecnico                           # terminal 2: build do técnico na 5175
+cloudflared tunnel --url http://127.0.0.1:5175    # terminal 3: mostra https://<aleatório>.trycloudflare.com
+```
+
+Só a 5175 é exposta: ela repassa `/api` e `/arquivos` para a API, então para o celular é tudo
+o mesmo endereço (sem CORS). O Vite já aceita qualquer `*.trycloudflare.com` e o preview escuta
+em `127.0.0.1` (com `localhost` ficaria só no IPv6 e o túnel não conectaria). O endereço muda a
+cada execução do `cloudflared`: um app instalado na tela inicial e as fotos na fila ficam presos
+ao endereço antigo, então mantenha o túnel aberto durante todo o teste.
+
 **Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
 no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).
 

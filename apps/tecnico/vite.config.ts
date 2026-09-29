@@ -8,6 +8,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 const API_LOCAL = 'http://localhost:3333';
 const REPASSE = { '/api': API_LOCAL, '/arquivos': API_LOCAL };
 
+// Teste no celular pelo Cloudflare Tunnel (túnel rápido, sem conta): o endereço muda a cada
+// execução (https://<aleatório>.trycloudflare.com). O ponto no início libera qualquer um deles;
+// sem isso o Vite responde 403 ("Blocked request") para o nome desconhecido.
+const HOSTS_DO_TUNEL = ['.trycloudflare.com'];
+
 export default defineConfig({
   plugins: [
     react(),
@@ -53,7 +58,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
-  server: { port: 5174, strictPort: true, proxy: REPASSE },
-  // `vite preview` serve o build com o service worker ativo (no `vite dev` ele fica desligado)
-  preview: { port: 5175, strictPort: true, proxy: REPASSE },
+  server: { port: 5174, strictPort: true, proxy: REPASSE, allowedHosts: HOSTS_DO_TUNEL },
+  // `vite preview` serve o build com o service worker ativo (no `vite dev` ele fica desligado).
+  // Em 127.0.0.1 (IPv4) fixo: com "localhost" o Node escuta só no IPv6 (::1) e o cloudflared,
+  // que tenta o IPv4, receberia "conexão recusada". O navegador do PC segue em localhost:5175.
+  preview: { host: '127.0.0.1', port: 5175, strictPort: true, proxy: REPASSE, allowedHosts: HOSTS_DO_TUNEL },
 });
