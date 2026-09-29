@@ -175,6 +175,19 @@ Limites conhecidos:
   fora disso. O app pede armazenamento persistente (`navigator.storage.persist()`), e a
   instalação na tela inicial é o que realmente protege a fila no iPhone.
 
+### Na tela inicial do celular
+
+O app pode ficar na tela inicial como um aplicativo (abre em tela cheia, com nome e ícone),
+sem loja e sem instalar nada de verdade: continua sendo o site.
+
+- **Android:** a agenda mostra "Coloque o app na tela inicial" com o botão **Instalar**.
+- **iPhone:** o Safari não oferece botão; o convite explica o caminho: **Compartilhar ›
+  Adicionar à Tela de Início**. No iPhone isso importa: é o que protege as fotos guardadas
+  (o Safari apaga dados de sites não usados por 7 dias).
+
+Nome "Guarusolar", ícone do sol provisório sobre o azul-escuro da marca (troca quando chegar o
+logo: `apps/tecnico/icones/`), abre direto na agenda.
+
 **Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
 no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).
 

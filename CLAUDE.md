@@ -121,7 +121,14 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
   src/components/AvisoAtualizacao  versão nova do app só entra quando o técnico toca em
                                "Atualizar" (faixa no topo; embaixo cobriria o botão principal)
   vite.config.ts               service worker (vite-plugin-pwa): guarda o app, não a API. Só
-                               funciona no build: teste com `npm run preview:tecnico` (5175)
+                               funciona no build: teste com `npm run preview:tecnico` (5175).
+                               Também o manifest (nome, cores, ícones, abre em /agenda)
+  icones/                      app.svg (ícone PROVISÓRIO: sol) e gerar.mjs, que cria os PNGs em
+                               public/ (`npm run icones -w @guarusolar/tecnico`). Chegando o logo,
+                               troque o app.svg e rode de novo
+  src/components/ConviteInstalacao  "Coloque o app na tela inicial": botão Instalar no Android
+                               (beforeinstallprompt), passo a passo do Compartilhar no iPhone;
+                               some se já instalado; "Agora não" vale por 7 dias
   src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
@@ -207,7 +214,8 @@ Verde e vermelho ficam reservados para "Aprovado" e "Recusado". Tipografia do pr
 Bricolage Grotesque nos títulos, IBM Plex Sans no texto, IBM Plex Mono em códigos e valores.
 
 **Pendências com o cliente:** códigos hexadecimais oficiais da marca e o arquivo do logo
-(hoje há um ícone de sol provisório).
+(hoje há um ícone de sol provisório; no app do técnico, troque `apps/tecnico/icones/app.svg` e
+rode `npm run icones -w @guarusolar/tecnico`).
 
 ## Design de referência
 

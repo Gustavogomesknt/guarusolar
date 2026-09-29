@@ -18,7 +18,27 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt', // versão nova só entra quando o técnico toca em "Atualizar"
       injectRegister: false, // o registro é feito pelo AvisoAtualizacao (useRegisterSW)
-      manifest: false, // manifest e ícones: próxima etapa (instalação na tela inicial)
+      // os ícones já entram pelo globPatterns; incluí-los de novo duplica a entrada no cache
+      includeManifestIcons: false,
+      // Instalação na tela inicial. Ícones gerados de icones/app.svg (npm run icones).
+      manifest: {
+        name: 'Guarusolar Técnico',
+        short_name: 'Guarusolar',
+        description: 'Agenda e fotos dos serviços, para o técnico em campo.',
+        lang: 'pt-BR',
+        id: '/',
+        start_url: '/agenda',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        theme_color: '#0b2f5e',
+        background_color: '#f4f6fa',
+        icons: [
+          { src: '/icone-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icone-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icone-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
       workbox: {
         // Só woff2 (todo navegador que roda o app entende) e só os alfabetos usados:
         // o português cabe no subconjunto "latin".

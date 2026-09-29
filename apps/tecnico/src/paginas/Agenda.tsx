@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
 import { SeloStatus } from '@/components/SeloStatus';
 import { useFila } from '@/fotos/useFotos';
+import { ConviteInstalacao } from '@/components/ConviteInstalacao';
 
 const DIAS_A_FRENTE = 7;
 
@@ -167,6 +168,8 @@ export function Agenda() {
             ))}
           </>
         )}
+        {/* por último: o trabalho do dia vem primeiro */}
+        <ConviteInstalacao />
       </main>
     </div>
   );

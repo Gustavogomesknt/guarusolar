@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícone PROVISÓRIO (sol) até o cliente enviar o logo. Fundo azul-escuro da marca, sol no
+       laranja claro. O sol ocupa 280 px no centro: dentro da zona segura (círculo de 410 px)
+       do ícone adaptável do Android, que recorta as bordas. -->
+  <rect width="512" height="512" fill="#0B2F5E"/>
+  <g transform="translate(256 256) scale(14) translate(-12 -12)" fill="none" stroke="#F79433" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+  </g>
+</svg>
