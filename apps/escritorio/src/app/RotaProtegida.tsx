@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TelaCarregando, TelaCheia } from '@/components/TelaCheia';
 import { SemAcesso } from '@/paginas/SemAcesso';
+import { CAMINHO_TROCAR_SENHA } from '@/paginas/TrocarSenha';
 import { podeAcessar } from './permissoes';
 
 /** Exige login e um dos papéis informados (ADMIN sempre passa, como na API). */
@@ -38,6 +39,11 @@ export function RotaProtegida({ papeis }: { papeis: readonly Papel[] }) {
 
   if (!usuario) {
     return <Navigate to="/login" replace state={{ de: local.pathname } satisfies EstadoLogin} />;
+  }
+
+  // senha temporária (criada por um administrador): nenhuma tela antes de criar a própria
+  if (usuario.senhaTemporaria && local.pathname !== CAMINHO_TROCAR_SENHA) {
+    return <Navigate to={CAMINHO_TROCAR_SENHA} replace />;
   }
 
   if (!podeAcessar(usuario.papel, papeis)) return <SemAcesso />;

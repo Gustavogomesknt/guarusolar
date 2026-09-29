@@ -50,6 +50,9 @@ export function conferirArmazenamentoAoIniciar() {
   if (valor && valor !== 'disco' && valor !== 'sharepoint') {
     throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco" ou "sharepoint".`);
   }
+  if (!appTecnicoLiberado()) {
+    console.warn('[armazenamento] Produção sem armazenamento persistente de fotos: app dos técnicos BLOQUEADO até configurar o SharePoint (ou FOTOS_EM_DISCO_PERSISTENTE=sim com volume).');
+  }
   if (destinoAtual() !== 'sharepoint') return;
   const faltando = variaveisFaltando();
   if (faltando.length) throw new Error(`STORAGE_PROVIDER=sharepoint, mas faltam: ${faltando.join(', ')}`);
@@ -60,6 +63,20 @@ export function conferirArmazenamentoAoIniciar() {
   avisar();
   setInterval(avisar, 24 * 60 * 60 * 1000).unref(); // e todo dia, com a API no ar
 }
+
+/**
+ * As fotos sobrevivem a uma publicação? No SharePoint, sim. No disco, só se ele for persistente
+ * (volume do Fly: FOTOS_EM_DISCO_PERSISTENTE=sim); o disco comum do servidor é apagado a cada
+ * publicação. Em produção sem isso, o app dos técnicos fica bloqueado (login e rotas): melhor
+ * não receber fotos do que perdê-las. Fora de produção, sempre liberado.
+ */
+export const appTecnicoLiberado = () =>
+  process.env.NODE_ENV !== 'production' ||
+  destinoAtual() === 'sharepoint' ||
+  process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim';
+
+export const AVISO_APP_TECNICO_BLOQUEADO =
+  'O app dos técnicos ainda não foi liberado. Fale com o gestor para combinar os serviços.';
 
 // ------------------------------------------------------------------------------------------
 // Disco

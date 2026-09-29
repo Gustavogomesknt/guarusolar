@@ -3,6 +3,7 @@ import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route 
 import { SessaoProvider } from '@guarusolar/web/sessao';
 import { Login } from '@/paginas/Login';
 import { Sair } from '@/paginas/Sair';
+import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
 import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
@@ -43,6 +44,7 @@ export const roteador = createBrowserRouter(
       <Route path="/sair" element={<Sair />} />
 
       <Route element={<RotaProtegida papeis={PAPEIS_DO_ESCRITORIO} />}>
+        <Route path={CAMINHO_TROCAR_SENHA} element={<TrocarSenha />} />
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/orcamentos" replace />} />
           <Route element={<RotaProtegida papeis={['COMERCIAL', 'GESTOR']} />}>

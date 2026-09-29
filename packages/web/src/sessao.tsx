@@ -9,6 +9,8 @@ export type Usuario = {
   nome: string;
   papel: Papel;
   equipeId: string | null;
+  /** senha gerada por um administrador: a pessoa precisa criar a própria antes de usar */
+  senhaTemporaria?: boolean;
 };
 
 /** Estado de navegação da tela de login: para onde voltar depois de entrar. */
@@ -28,6 +30,8 @@ type Sessao = {
   falhaAoConectar: string | null;
   entrar: (email: string, senha: string) => Promise<Usuario>;
   sair: (aviso?: string) => void;
+  /** Troca a própria senha (POST /api/auth/senha); erros chegam como ErroApi com a mensagem. */
+  trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>;
   tentarNovamente: () => void;
 };
 
@@ -87,7 +91,13 @@ export function SessaoProvider({
       .get<Usuario>('/api/auth/eu', { signal: controle.signal })
       .then((dados) => {
         if (papeisAceitos && !papeisAceitos.includes(dados.papel)) return sair(avisoPapelRecusado);
-        const confirmado = { id: dados.id, nome: dados.nome, papel: dados.papel, equipeId: dados.equipeId };
+        const confirmado = {
+          id: dados.id,
+          nome: dados.nome,
+          papel: dados.papel,
+          equipeId: dados.equipeId,
+          senhaTemporaria: dados.senhaTemporaria,
+        };
         if (abrirSemConexao) usuarioSalvo.gravar(confirmado);
         setUsuario(confirmado);
       })
@@ -124,6 +134,16 @@ export function SessaoProvider({
     return resposta.usuario;
   }, [papeisAceitos, avisoPapelRecusado, abrirSemConexao]);
 
+  const trocarSenha = useCallback(
+    async (senhaAtual: string, novaSenha: string) => {
+      const resposta = await api.post<{ token: string; usuario: Usuario }>('/api/auth/senha', { senhaAtual, novaSenha });
+      tokenSalvo.gravar(resposta.token);
+      if (abrirSemConexao) usuarioSalvo.gravar(resposta.usuario);
+      setUsuario(resposta.usuario);
+    },
+    [abrirSemConexao],
+  );
+
   const valor = useMemo<Sessao>(
     () => ({
       usuario,
@@ -132,9 +152,10 @@ export function SessaoProvider({
       falhaAoConectar,
       entrar,
       sair,
+      trocarSenha,
       tentarNovamente: () => setTentativa((n) => n + 1),
     }),
-    [usuario, aviso, carregando, falhaAoConectar, entrar, sair],
+    [usuario, aviso, carregando, falhaAoConectar, entrar, sair, trocarSenha],
   );
 
   return <ContextoSessao.Provider value={valor}>{children}</ContextoSessao.Provider>;

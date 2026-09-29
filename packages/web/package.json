@@ -12,7 +12,8 @@
     "./sessao": "./src/sessao.tsx",
     "./tema.css": "./src/tema.css",
     "./tiposServico": "./src/tiposServico.ts",
-    "./ImagemProtegida": "./src/ImagemProtegida.tsx"
+    "./ImagemProtegida": "./src/ImagemProtegida.tsx",
+    "./FormularioTrocaSenha": "./src/FormularioTrocaSenha.tsx"
   },
   "peerDependencies": {
     "@guarusolar/compartilhado": "^0.1.0",

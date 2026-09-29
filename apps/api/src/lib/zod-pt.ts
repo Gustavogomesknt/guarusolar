@@ -10,7 +10,8 @@ import { z, ZodIssueCode, ZodParsedType } from 'zod';
 const plural = (n: number | bigint, singular: string, pluralTexto: string) =>
   `${n} ${Number(n) === 1 ? singular : pluralTexto}`;
 
-const dataBR = (valor: number | bigint) => new Date(Number(valor)).toLocaleDateString('pt-BR');
+// no fuso da empresa (não no do servidor)
+const dataBR = (valor: number | bigint) => new Date(Number(valor)).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
 const TIPOS: Partial<Record<string, string>> = {
   [ZodParsedType.string]: 'Deve ser um texto',

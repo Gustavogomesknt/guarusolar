@@ -14,7 +14,15 @@ const REPASSE = { '/api': API_LOCAL };
 // sem isso o Vite responde 403 ("Blocked request") para o nome desconhecido.
 const HOSTS_DO_TUNEL = ['.trycloudflare.com'];
 
-export default defineConfig({
+/*
+ * Base: em produção o app mora em /campo/ (a mesma API entrega o escritório na raiz e este app
+ * em /campo/). No `vite dev` fica na raiz (localhost:5174). BASE_TECNICO troca, se um dia o app
+ * ganhar endereço próprio (ex.: BASE_TECNICO=/ para campo.guarusolar.com.br).
+ */
+export default defineConfig(({ command }) => {
+  const base = command === 'build' ? (process.env.BASE_TECNICO ?? '/campo/') : '/';
+  return {
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -32,17 +40,18 @@ export default defineConfig({
         short_name: 'Guarusolar',
         description: 'Agenda e fotos dos serviços, para o técnico em campo.',
         lang: 'pt-BR',
-        id: '/',
-        start_url: '/agenda',
-        scope: '/',
+        // relativos ao manifest: valem com qualquer base (/campo/ hoje, / com domínio próprio)
+        id: './',
+        start_url: './agenda',
+        scope: './',
         display: 'standalone',
         orientation: 'portrait',
         theme_color: '#0b2f5e',
         background_color: '#f4f6fa',
         icons: [
-          { src: '/icone-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icone-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icone-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icone-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icone-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icone-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -50,7 +59,7 @@ export default defineConfig({
         // o português cabe no subconjunto "latin".
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         globIgnores: ['**/*cyrillic*', '**/*greek*', '**/*vietnamese*', '**/*latin-ext*'],
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
       },
@@ -64,4 +73,5 @@ export default defineConfig({
   // Em 127.0.0.1 (IPv4) fixo: com "localhost" o Node escuta só no IPv6 (::1) e o cloudflared,
   // que tenta o IPv4, receberia "conexão recusada". O navegador do PC segue em localhost:5175.
   preview: { host: '127.0.0.1', port: 5175, strictPort: true, proxy: REPASSE, allowedHosts: HOSTS_DO_TUNEL },
+  };
 });

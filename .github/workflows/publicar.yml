@@ -1,0 +1,20 @@
+# Publicação em produção: só manual (aba Actions › Publicar › Run workflow).
+# Precisa do segredo FLY_API_TOKEN no repositório (README, "Publicar em produção").
+name: Publicar
+
+on:
+  workflow_dispatch:
+
+# nunca duas publicações ao mesmo tempo
+concurrency: publicar
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # a versão (commit) aparece em /saude: dá para conferir o que está no ar
+      - run: flyctl deploy --remote-only --build-arg VERSAO=${{ github.sha }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarX2, Clock, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
@@ -61,6 +61,14 @@ export function Agenda() {
         titulo="Minha agenda"
         subtitulo={primeiroNome ? `Olá, ${primeiroNome}` : undefined}
         acoes={
+          <>
+          <Link
+            to="/senha"
+            className="flex size-11 items-center justify-center rounded-xl text-white/85 focus-visible:outline-2 focus-visible:outline-sidebar-ring"
+          >
+            <KeyRound className="size-5" aria-hidden />
+            <span className="sr-only">Trocar senha</span>
+          </Link>
           <button
             type="button"
             // com fotos ainda no aparelho, confirma antes (elas ficam guardadas para quando voltar)
@@ -70,6 +78,7 @@ export function Agenda() {
             <LogOut className="size-5" aria-hidden />
             Sair
           </button>
+          </>
         }
       />
 

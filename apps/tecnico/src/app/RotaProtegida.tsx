@@ -3,6 +3,7 @@ import { WifiOff } from 'lucide-react';
 import { useSessao, type EstadoLogin } from '@guarusolar/web/sessao';
 import { Button } from '@/components/ui/button';
 import { TelaCarregando, TelaCheia } from '@/components/TelaCheia';
+import { CAMINHO_TROCAR_SENHA } from '@/paginas/TrocarSenha';
 
 /** Exige login. O papel já foi conferido pela sessão (papeisAceitos) e é garantido pela API. */
 export function RotaProtegida() {
@@ -29,6 +30,9 @@ export function RotaProtegida() {
   }
 
   if (!usuario) return <Navigate to="/login" replace state={{ de: local.pathname } satisfies EstadoLogin} />;
+
+  // senha temporária (criada pelo escritório): antes de tudo, a pessoa cria a própria
+  if (usuario.senhaTemporaria && local.pathname !== CAMINHO_TROCAR_SENHA) return <Navigate to={CAMINHO_TROCAR_SENHA} replace />;
 
   return <Outlet />;
 }

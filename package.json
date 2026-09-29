@@ -17,7 +17,11 @@
     "dev:tecnico": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/tecnico",
     "preview:tecnico": "npm run build -w @guarusolar/compartilhado && npm run build -w @guarusolar/tecnico && npm run preview -w @guarusolar/tecnico",
     "db:migrate": "npm run db:migrate -w @guarusolar/api --",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w @guarusolar/api --",
     "db:seed": "npm run db:seed -w @guarusolar/api --",
+    "db:seed:base": "npm run db:seed:base -w @guarusolar/api --",
+    "db:marcar-producao": "npm run db:marcar-producao -w @guarusolar/api --",
+    "usuario": "npm run usuario -w @guarusolar/api --",
     "db:limpar": "npm run db:limpar -w @guarusolar/api --",
     "db:studio": "npm run db:studio -w @guarusolar/api --",
     "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --"

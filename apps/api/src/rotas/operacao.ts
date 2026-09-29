@@ -6,7 +6,13 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import path from 'node:path';
-import { ArmazenamentoIndisponivel, guardarComoSubstituida, salvarFoto } from '../lib/armazenamento';
+import {
+  ArmazenamentoIndisponivel,
+  appTecnicoLiberado,
+  AVISO_APP_TECNICO_BLOQUEADO,
+  guardarComoSubstituida,
+  salvarFoto,
+} from '../lib/armazenamento';
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 import { filtroDoTecnico } from '../lib/acesso';
 import { diaDeHoje } from '@guarusolar/compartilhado';
@@ -347,7 +353,11 @@ rotasValidacao.post(
 // TÉCNICO — PWA no celular (único acesso do técnico)
 // ===========================================================================
 export const rotasTecnico = Router();
-rotasTecnico.use(autenticar, autorizar('TECNICO'));
+rotasTecnico.use(autenticar, autorizar('TECNICO'), (_req, _res, next) => {
+  // sem lugar seguro para as fotos em produção, o app dos técnicos fica fechado (armazenamento.ts)
+  if (!appTecnicoLiberado()) throw new ErroHttp(403, AVISO_APP_TECNICO_BLOQUEADO);
+  next();
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),

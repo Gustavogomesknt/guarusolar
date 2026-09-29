@@ -17,6 +17,17 @@ datasource db {
 // ... RETURNING (src/lib/codigos.ts): dois cadastros ao mesmo tempo nunca recebem
 // o mesmo número.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Marca, dentro do próprio banco, se ele é o de produção (npm run db:marcar-producao).
+// Scripts destrutivos ou de teste (db:limpar, usuários de teste) conferem esta marca e se
+// recusam, mesmo rodando de um computador de desenvolvimento com a URL de produção.
+// ---------------------------------------------------------------------------
+model AmbienteDoBanco {
+  id        Int      @id @default(1)
+  nome      String // "producao"
+  marcadoEm DateTime @default(now())
+}
+
 model SequenciaCodigo {
   prefixo String // GS | PRJ
   ano     Int
@@ -41,6 +52,8 @@ model Usuario {
   nome      String
   email     String   @unique
   senhaHash String
+  /// senha gerada por um administrador (npm run usuario): a pessoa troca no primeiro acesso
+  senhaTemporaria Boolean @default(false)
   papel     Papel
   telefone  String?
   ativo     Boolean  @default(true)

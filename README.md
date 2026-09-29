@@ -17,7 +17,8 @@ Requer Node.js 22.12 ou mais recente. Todos os comandos rodam a partir da raiz:
 npm install                                # instala todos os workspaces
 cp apps/api/.env.example apps/api/.env     # ajuste DATABASE_URL, DIRECT_URL e JWT_SECRET
 npm run db:migrate                         # cria as tabelas
-npm run db:seed                            # catálogo, equipes, checklist e usuários de teste
+npm run db:seed                            # base (catálogo, equipes, checklist) + usuários de teste
+npm run usuario -- listar                  # usuários reais: criar, nova-senha, desativar, listar
 npm run dev:api                            # http://localhost:3333
 npm run db:limpar                          # apaga os dados de teste (pede para digitar LIMPAR)
 npm run dev:escritorio                     # front do escritório em http://localhost:5173
@@ -258,7 +259,8 @@ npm run preview:tecnico                           # terminal 2: build do técnic
 cloudflared tunnel --url http://127.0.0.1:5175    # terminal 3: mostra https://<aleatório>.trycloudflare.com
 ```
 
-Só a 5175 é exposta: ela repassa `/api` (inclusive as fotos) para a API, então para o celular é tudo
+No celular, abra `https://<aleatório>.trycloudflare.com/campo/` (o build do técnico mora em
+`/campo/`, como em produção). Só a 5175 é exposta: ela repassa `/api` (inclusive as fotos) para a API, então para o celular é tudo
 o mesmo endereço (sem CORS). O Vite já aceita qualquer `*.trycloudflare.com` e o preview escuta
 em `127.0.0.1` (com `localhost` ficaria só no IPv6 e o túnel não conectaria). O endereço muda a
 cada execução do `cloudflared`: um app instalado na tela inicial e as fotos na fila ficam presos
@@ -275,7 +277,8 @@ próximo orçamento volta a ser `GS-<ano>-0001` e o próximo projeto `PRJ-<ano>-
 Usuários, equipes, checklist de fotos e o catálogo de produtos ficam como estão.
 
 Antes de apagar, o script mostra em qual banco vai rodar e quanto existe em cada tabela, e só
-continua se alguém digitar `LIMPAR`. Com `NODE_ENV=production`, ele se recusa a rodar. Tudo é
+continua se alguém digitar `LIMPAR`. Com `NODE_ENV=production` ou num banco marcado como
+produção (`npm run db:marcar-producao`), ele se recusa a rodar, de qualquer computador. Tudo é
 apagado numa transação só: se algo falhar, nada é apagado. Arquivos de fotos já enviados à
 pasta de armazenamento não são removidos.
 
@@ -297,8 +300,109 @@ pasta de armazenamento não são removidos.
   embutido; em teste, o processo ficou abaixo de 160 MB gerando 20 PDFs seguidos). Defina
   `API_URL_PUBLICA` com o endereço público da API: é o link que o cliente recebe pelo WhatsApp
   (`/api/orcamentos/:id/pdf?token=...`), aberto sem login e protegido pelo token do orçamento.
-- **Publicar a API:** `npm ci`, `npm run build`, `npx prisma migrate deploy` (em `apps/api`) e
-  `npm start -w @guarusolar/api`, com `JWT_SECRET` e as variáveis do banco configuradas.
+- **Publicar:** ver "Publicar em produção (Fly.io)" abaixo.
+
+## Publicar em produção (Fly.io)
+
+Um serviço só, no Fly.io em São Paulo (`gru`), junto do banco no Supabase em São Paulo:
+
+```
+https://<app>.fly.dev/          escritório (comercial e gestor)
+https://<app>.fly.dev/campo/    app dos técnicos (PWA)
+https://<app>.fly.dev/api/...   API
+```
+
+Mesmo endereço para os apps e a API: sem CORS no navegador. A imagem (`Dockerfile`) é compilada
+pelo próprio Fly: não precisa de Docker na máquina. Custo estimado: US$ 3–5/mês (1 máquina de
+512 MB, sempre ligada). Quando houver domínio próprio, cada app pode ganhar o seu endereço.
+
+**App dos técnicos sem SharePoint:** em produção, sem lugar persistente para as fotos, o login do
+técnico e as rotas `/api/tecnico` ficam bloqueados ("O app dos técnicos ainda não foi liberado")
+— melhor não receber fotos do que perdê-las na próxima publicação. Liberam sozinhos com
+`STORAGE_PROVIDER=sharepoint` (segredos `MS_*`). Alternativa, se precisar antes: volume do Fly
+(`fly volumes create fotos --region gru --size 1`, `[mounts]` em `/data`, `STORAGE_DIR=/data/fotos`,
+`FOTOS_EM_DISCO_PERSISTENTE=sim` e `strategy = "immediate"`: com volume, cada publicação derruba o
+serviço por uns 10–20 s).
+
+### Primeira vez (uma vez só)
+
+**1. GitHub.** Em github.com › New repository: nome `guarusolar`, **Private**, sem README. Depois:
+
+```powershell
+git remote add origin https://github.com/<seu-usuario>/guarusolar.git
+git push -u origin main
+```
+
+**2. Supabase de produção.** Em supabase.com › New project: `guarusolar-producao`, região
+**South America (São Paulo)**, senha do banco forte (guarde num gerenciador de senhas). Em
+Connect, copie a **Transaction pooler** (porta 6543) e a **Session pooler** (porta 5432). No
+PowerShell, na raiz do projeto (as variáveis da sessão valem mais que o `.env`, que não muda):
+
+```powershell
+$env:DATABASE_URL = "<transaction pooler, porta 6543>?pgbouncer=true&connection_limit=5"
+$env:DIRECT_URL   = "<session pooler, porta 5432>"
+npm run db:migrate:deploy          # cria as tabelas
+npm run db:marcar-producao         # digite PRODUCAO: db:limpar e usuários de teste passam a recusar
+npm run db:seed:base               # equipes, catálogo inicial, checklist (sem usuários)
+npm run usuario -- criar --nome "Seu Nome" --email voce@guarusolar.com.br --papel ADMIN
+# repita para cada pessoa (COMERCIAL, GESTOR; TECNICO com --equipe "Equipe A")
+Remove-Item Env:DATABASE_URL, Env:DIRECT_URL   # volta para o banco de desenvolvimento
+```
+
+A senha que o comando mostra é temporária: no primeiro acesso a pessoa cria a própria.
+Os dados reais que estão hoje no banco de desenvolvimento são copiados num passo à parte.
+
+**3. Fly.io.** Crie a conta em fly.io (pede cartão; a cobrança é pelo uso). No PowerShell:
+
+```powershell
+iwr https://fly.io/install.ps1 -useb | iex        # instala o flyctl (abra outro terminal depois)
+fly auth login
+fly apps create guarusolar-sistema                 # se o nome existir, escolha outro e troque em fly.toml
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"   # gera o JWT_SECRET
+fly secrets set DATABASE_URL="<a mesma do passo 2>" DIRECT_URL="<a mesma do passo 2>" JWT_SECRET="<gerado acima>"
+fly deploy
+```
+
+Confira `https://guarusolar-sistema.fly.dev/saude` (`"banco":"ok"` e a versão) e entre em
+`https://guarusolar-sistema.fly.dev` com o usuário criado.
+
+**4. Publicação pelo GitHub.** `fly tokens create deploy` gera um token; no repositório,
+Settings › Secrets and variables › Actions › `FLY_API_TOKEN`. Para o backup noturno, também
+`BACKUP_DATABASE_URL` (a Session pooler de produção) e `BACKUP_SENHA` (guarde fora do GitHub:
+sem ela o backup não abre).
+
+### Publicar uma versão nova
+
+Aba **Actions › Publicar › Run workflow** (ou `fly deploy` no PowerShell). O Fly:
+
+1. roda as migrations (`release_command`) — se falharem, nada é publicado;
+2. sobe a versão nova **ao lado** da atual e espera o `/saude` responder (a API precisa
+   alcançar o banco);
+3. só então troca o tráfego e desliga a antiga (`strategy = "bluegreen"`): ninguém cai.
+
+Técnicos com o app aberto veem "Nova versão disponível — Atualizar" e seguem trabalhando até
+tocar. Toda alteração enviada ao GitHub passa pela verificação (`npm run build`).
+
+**Migrations precisam funcionar também com a versão anterior do código** (durante a troca, as
+duas rodam; e voltar atrás não desfaz o banco): só adições numa publicação; renomear ou apagar
+coluna em duas (primeiro adiciona e passa a usar, depois remove). Antes de publicar uma
+migration, rode o backup (Actions › Backup do banco › Run workflow).
+
+### Voltar atrás
+
+```powershell
+fly releases --image                    # lista as versões publicadas e a imagem de cada uma
+fly deploy --image <imagem da versão boa>   # volta em ~1 min, sem recompilar
+fly logs                                # o que a API está registrando agora
+```
+
+### Backup e restauração do banco
+
+O plano gratuito do Supabase não dá backup restaurável. O workflow **Backup do banco** faz um
+`pg_dump` toda madrugada (03h), criptografado com `BACKUP_SENHA`, guardado 14 dias como artefato
+do GitHub. Para restaurar: baixe o artefato, `gpg --decrypt arquivo.dump.gpg > arquivo.dump` e
+`pg_restore --no-owner --dbname "<url do banco de destino>" arquivo.dump` (de preferência num
+projeto novo, para conferir antes de trocar).
 
 ## Próximos passos
 

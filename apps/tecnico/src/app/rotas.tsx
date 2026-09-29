@@ -4,6 +4,7 @@ import { SessaoProvider, useSessao } from '@guarusolar/web/sessao';
 import { Login } from '@/paginas/Login';
 import { Agenda } from '@/paginas/Agenda';
 import { Servico } from '@/paginas/Servico';
+import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
 import { definirUsuarioDaFila } from '@/fotos/fila';
 import { AvisoAtualizacao } from '@/components/AvisoAtualizacao';
 import { RotaProtegida } from './RotaProtegida';
@@ -38,8 +39,11 @@ export const roteador = createBrowserRouter(
         <Route index element={<Navigate to="/agenda" replace />} />
         <Route path="agenda" element={<Agenda />} />
         <Route path="servico/:id" element={<Servico />} />
+        <Route path={CAMINHO_TROCAR_SENHA} element={<TrocarSenha />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>,
   ),
+  // o app mora em /campo/ em produção (mesmo endereço do escritório); em desenvolvimento, na raiz
+  { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' },
 );

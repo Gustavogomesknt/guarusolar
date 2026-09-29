@@ -1,0 +1,12 @@
+# Nada disso entra na imagem. O .env NUNCA: os segredos de produção ficam no Fly (fly secrets).
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/dist
+.git
+.github
+.vscode
+apps/api/uploads
+**/*.log
+**/.DS_Store

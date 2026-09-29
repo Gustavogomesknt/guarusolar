@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { Loader2, LogOut } from "lucide-react";
+import { KeyRound, Loader2, LogOut } from "lucide-react";
 import { useSessao } from "@guarusolar/web/sessao";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
@@ -80,10 +80,17 @@ export function Layout() {
           <p className="text-xs text-sidebar-foreground/70">
             {NOME_DO_PAPEL[usuario.papel]}
           </p>
+          <Link
+            to="/conta/senha"
+            className="mt-3 flex min-h-10 items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
+          >
+            <KeyRound className="size-4" aria-hidden />
+            Trocar senha
+          </Link>
           {/* Link para /sair (e não sair() direto): passa pela confirmação de alterações não salvas */}
           <Link
             to="/sair"
-            className="mt-3 flex min-h-10 items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
+            className="flex min-h-10 items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
           >
             <LogOut className="size-4" aria-hidden />
             Sair

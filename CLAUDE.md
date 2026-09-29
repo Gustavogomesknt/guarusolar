@@ -47,9 +47,19 @@ package.json                   workspaces e atalhos (build, dev:api, db:*)
 apps/api/                      API (Express + Prisma)
   prisma/schema.prisma         tabelas (clientes, produtos, orçamentos, itens, projetos,
                                equipes, agendamentos, checklist de fotos, fotos, materiais)
-  prisma/seed.ts               catálogo inicial, equipes, checklist e usuários de teste
+  prisma/seed-base.ts          equipes, catálogo inicial e checklist (produção também; sem usuários)
+  prisma/seed-teste.ts         usuários de teste (senha pública guarusolar123): NUNCA em produção
+                               (recusa com NODE_ENV=production e em banco marcado como produção)
+  scripts/usuario.ts           npm run usuario -- criar|nova-senha|desativar|listar: usuários reais,
+                               com senha temporária (troca obrigatória no primeiro acesso)
+  scripts/marcar-producao.ts   npm run db:marcar-producao: grava a marca de produção NO banco
+                               (tabela AmbienteDoBanco; lib/ambienteDoBanco.ts confere)
   prisma/limpar.ts             apaga os dados de operação (npm run db:limpar)
   src/server.ts                sobe a API e monta as rotas
+  src/lib/appsWeb.ts           em produção a API entrega o escritório (/) e o técnico (/campo/):
+                               assets/ com cache de 1 ano; index.html, sw.js e manifest sem cache;
+                               página de reserva só para navegação (arquivo inexistente = 404)
+  src/lib/senha.ts             regras da senha nova (8+, sem óbvias, sem e-mail/nome)
   src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar; conferirSenha
                                roda o bcrypt mesmo sem conta (tempo igual: não revela e-mails)
   src/lib/limiteLogin.ts       limite de tentativas de login, em memória: por e-mail (5 falhas ->
@@ -125,7 +135,8 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                depois de cada add, desinstale o "cn" e troque o import por
                                `from "@/lib/utils"`
   src/paginas/                 Login, Inicio, SemAcesso
-apps/tecnico/                  app do técnico (PWA no navegador do celular; mesmo stack do escritório)
+apps/tecnico/                  app do técnico (PWA no navegador do celular; mesmo stack do escritório).
+                               Build com base /campo/ (BASE_TECNICO troca); dev na raiz (5174)
   src/app/rotas.tsx            SessaoProvider com papeisAceitos=['TECNICO']: outros papéis recebem
                                o aviso para usar o escritório
   src/paginas/Agenda.tsx       hoje e os próximos 7 dias; serviço de vários dias aparece em cada
@@ -171,6 +182,10 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
                                faz o Tailwind de cada app gerar as classes escritas no pacote
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
+  src/FormularioTrocaSenha.tsx troca da própria senha (escritório /conta/senha, técnico /senha);
+                               a RotaProtegida leva quem tem senha temporária direto para ela
+Dockerfile, fly.toml           produção no Fly.io (README, "Publicar em produção"); o Fly compila
+.github/workflows/             verificação (build a cada push), publicar (manual), backup do banco
   src/ImagemProtegida.tsx      <img> de foto de serviço: busca com o token no cabeçalho (o navegador
                                não manda token em <img src>) e exibe; use com urlDaFoto(id)
 ```
@@ -314,7 +329,10 @@ Todos a partir da raiz do repositório:
 npm install                                  # instala todos os workspaces
 cp apps/api/.env.example apps/api/.env       # ajustar DATABASE_URL, DIRECT_URL e JWT_SECRET
 npm run db:migrate       # cria as tabelas
-npm run db:seed          # catálogo, equipes, checklist e usuários de teste
+npm run db:seed          # base (catálogo, equipes, checklist) + usuários de teste
+npm run db:seed:base     # só a base (produção)
+npm run usuario -- listar  # usuários reais: criar | nova-senha | desativar | listar
+npm run db:marcar-producao # uma vez, no banco de produção
 npm run dev:api          # API em http://localhost:3333
 npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
 npm run dev:tecnico      # app do técnico em http://localhost:5174 (idem; sem service worker)
@@ -350,5 +368,10 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   em modo disco elas respondem 503. O serviço cancelado PRJ-2026-0016 (TESTE SharePoint) tem
   fotos assim, gravadas contra o simulador nos testes.
 - Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
+- **Migrations em produção funcionam com a versão anterior do código** (publicação sem queda
+  roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
+  publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).
+- **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
+  armazenamento.ts): o disco do Fly é apagado a cada publicação. Não contorne isso.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createInterface } from 'node:readline/promises';
 import { PrismaClient } from '@prisma/client';
+import { recusarEmProducao } from '../src/lib/ambienteDoBanco';
 
 /*
  * Limpa os dados de operação para começar os cadastros reais: `npm run db:limpar`.
@@ -11,7 +12,8 @@ import { PrismaClient } from '@prisma/client';
  *
  * MANTÉM: usuários, equipes, checklist de fotos e produtos do catálogo.
  *
- * Proteções: recusa com NODE_ENV=production e só roda se alguém digitar LIMPAR.
+ * Proteções: recusa com NODE_ENV=production e em banco marcado como produção
+ * (npm run db:marcar-producao), de qualquer computador; e só roda se alguém digitar LIMPAR.
  * Arquivos de fotos já enviados (pasta de armazenamento) não são apagados por este script.
  */
 
@@ -24,6 +26,7 @@ async function main() {
   }
 
   const prisma = new PrismaClient();
+  await recusarEmProducao(prisma, 'A limpeza dos dados');
   try {
     // mostra onde vai apagar, sem expor usuário e senha da conexão
     const url = process.env.DATABASE_URL ?? '';
