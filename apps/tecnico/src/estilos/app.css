@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+/* cores, fontes e variáveis do shadcn: iguais nos dois fronts (packages/web) */
+@import '@guarusolar/web/tema.css';
+
+/*
+ * Celular: sem o "flash" azul ao tocar e sem o zoom de toque duplo atrasando os botões.
+ * Campos de texto com 16px ou mais: abaixo disso o iPhone dá zoom ao focar.
+ */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

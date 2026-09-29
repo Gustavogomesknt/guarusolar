@@ -10,7 +10,8 @@
   "exports": {
     "./api": "./src/api.ts",
     "./sessao": "./src/sessao.tsx",
-    "./tema.css": "./src/tema.css"
+    "./tema.css": "./src/tema.css",
+    "./tiposServico": "./src/tiposServico.ts"
   },
   "peerDependencies": {
     "@guarusolar/compartilhado": "^0.1.0",

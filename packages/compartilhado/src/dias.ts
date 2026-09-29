@@ -1,19 +1,13 @@
-import { partesNoFuso } from '@guarusolar/compartilhado';
 
 /*
- * Datas da agenda como texto AAAA-MM-DD. O agendamento é só dia (coluna DATE no banco),
- * então não há hora nem fuso: as contas são feitas em UTC puro sobre o dia.
+ * Dias como texto AAAA-MM-DD (agenda do escritório e app do técnico). O agendamento é só dia
+ * (coluna DATE no banco), então não há hora nem fuso: as contas são feitas em UTC puro sobre
+ * o dia. Para "hoje", use diaDeHoje() (datas.ts), que já considera o fuso da empresa.
  */
 export type Dia = string;
 
 const paraData = (dia: Dia) => new Date(`${dia}T00:00:00Z`);
 const paraDia = (d: Date): Dia => d.toISOString().slice(0, 10);
-
-/** Hoje, no fuso da empresa. */
-export function hoje(): Dia {
-  const { ano, mes, dia } = partesNoFuso();
-  return paraDia(new Date(Date.UTC(ano, mes, dia)));
-}
 
 export const somarDias = (dia: Dia, n: number): Dia => {
   const d = paraData(dia);

@@ -2,7 +2,7 @@
   "name": "guarusolar",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistema de gestao da Guarusolar: API, front do escritorio e codigo compartilhado",
+  "description": "Sistema de gestao da Guarusolar: API, fronts do escritorio e do tecnico e codigo compartilhado",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -14,6 +14,7 @@
     "build": "npm run build --workspaces --if-present",
     "dev:api": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/api",
     "dev:escritorio": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/escritorio",
+    "dev:tecnico": "npm run build -w @guarusolar/compartilhado && npm run dev -w @guarusolar/tecnico",
     "db:migrate": "npm run db:migrate -w @guarusolar/api --",
     "db:seed": "npm run db:seed -w @guarusolar/api --",
     "db:limpar": "npm run db:limpar -w @guarusolar/api --",

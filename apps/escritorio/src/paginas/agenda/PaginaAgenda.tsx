@@ -13,7 +13,7 @@ import {
   diaDaApi,
   diaMes,
   diasDaSemana,
-  hoje,
+  diaDeHoje,
   intervaloEscrito,
   nomeCurto,
   nomeLongo,
@@ -21,8 +21,8 @@ import {
   segundaDaSemana,
   somarDias,
   type Dia,
-} from './datas';
-import { TIPOS_SERVICO_AGENDA } from './tiposServico';
+} from '@guarusolar/compartilhado';
+import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 
 const COLUNAS = 'grid-cols-[170px_repeat(6,minmax(98px,1fr))]';
 const DIA_VALIDO = /^\d{4}-\d{2}-\d{2}$/;
@@ -48,10 +48,10 @@ function blocosDaSemana(equipe: EquipeNaAgenda, dias: Dia[]) {
 export function PaginaAgenda() {
   const [parametros, setParametros] = useSearchParams();
   const semanaNaUrl = parametros.get('semana');
-  const segunda = segundaDaSemana(semanaNaUrl && DIA_VALIDO.test(semanaNaUrl) ? semanaNaUrl : hoje());
+  const segunda = segundaDaSemana(semanaNaUrl && DIA_VALIDO.test(semanaNaUrl) ? semanaNaUrl : diaDeHoje());
   const dias = useMemo(() => diasDaSemana(segunda), [segunda]);
   const sabado = dias[5];
-  const diaDeHoje = hoje();
+  const hoje = diaDeHoje();
 
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [agendando, setAgendando] = useState<PreAgendamento | null>(null);
@@ -84,9 +84,9 @@ export function PaginaAgenda() {
   }, [selecionado, agendando, servicoAberto]);
 
   const irParaSemana = (dia: Dia) =>
-    setParametros(dia === segundaDaSemana(diaDeHoje) ? {} : { semana: dia }, { replace: true });
+    setParametros(dia === segundaDaSemana(hoje) ? {} : { semana: dia }, { replace: true });
 
-  const semanaAtual = segunda === segundaDaSemana(diaDeHoje);
+  const semanaAtual = segunda === segundaDaSemana(hoje);
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -109,7 +109,7 @@ export function PaginaAgenda() {
               <span className="sr-only">Próxima semana</span>
             </Button>
             {!semanaAtual && (
-              <Button variant="ghost" className="h-10 rounded-[10px]" onClick={() => irParaSemana(segundaDaSemana(diaDeHoje))}>
+              <Button variant="ghost" className="h-10 rounded-[10px]" onClick={() => irParaSemana(segundaDaSemana(hoje))}>
                 Hoje
               </Button>
             )}
@@ -215,7 +215,7 @@ export function PaginaAgenda() {
           <div className={`grid ${COLUNAS} border-b`}>
             <span className="px-4 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase">Equipe</span>
             {dias.map((d) => {
-              const eHoje = d === diaDeHoje;
+              const eHoje = d === hoje;
               return (
                 <span key={d} className={cn('flex flex-col items-center gap-0.5 border-l px-2 py-2.5', eHoje && 'bg-primary/5')}>
                   <span className={cn('text-xs font-semibold tracking-[0.06em] uppercase', eHoje ? 'text-primary' : 'text-muted-foreground')}>
@@ -243,7 +243,7 @@ export function PaginaAgenda() {
                   key={equipe.id}
                   equipe={equipe}
                   dias={dias}
-                  diaDeHoje={diaDeHoje}
+                  hoje={hoje}
                   selecionado={selecionado}
                   onAgendar={(dia) => setAgendando({ projetoId: selecionado?.id, equipeId: equipe.id, dia })}
                   onAbrirServico={setServicoAberto}
@@ -285,14 +285,14 @@ export function PaginaAgenda() {
 function LinhaEquipe({
   equipe,
   dias,
-  diaDeHoje,
+  hoje,
   selecionado,
   onAgendar,
   onAbrirServico,
 }: {
   equipe: EquipeNaAgenda;
   dias: Dia[];
-  diaDeHoje: Dia;
+  hoje: Dia;
   selecionado: ProjetoPendente | null;
   onAgendar: (dia: Dia) => void;
   onAbrirServico: (servico: AgendamentoNaAgenda) => void;
@@ -312,7 +312,7 @@ function LinhaEquipe({
 
       {/* fundo das colunas: dia de hoje destacado e dias livres clicáveis */}
       {dias.map((d, i) => {
-        const eHoje = d === diaDeHoje;
+        const eHoje = d === hoje;
         const livre = !ocupados.has(i);
         return (
           <div

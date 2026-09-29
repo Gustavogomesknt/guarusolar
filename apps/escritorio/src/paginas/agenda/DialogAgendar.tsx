@@ -16,8 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { fimDoServico, hoje, nomeLongo, type Dia } from './datas';
-import { TIPOS_SERVICO_AGENDA } from './tiposServico';
+import { fimDoServico, diaDeHoje, nomeLongo, type Dia } from '@guarusolar/compartilhado';
+import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 
 export const CLASSE_SELECT =
   'h-11 w-full rounded-[10px] border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
@@ -56,7 +56,7 @@ export function DialogAgendar({
     if (!aberto) return;
     setProjetoId(inicial.projetoId ?? projetos[0]?.id ?? '');
     setEquipeId(inicial.equipeId ?? equipes[0]?.id ?? '');
-    setDia(inicial.dia ?? hoje());
+    setDia(inicial.dia ?? diaDeHoje());
     setTipo('INSTALACAO');
     setDias('1');
     setErro(null);

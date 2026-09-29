@@ -4,6 +4,12 @@
  */
 
 /*
+ * Classes do Tailwind escritas aqui no pacote (ex.: cores dos tipos de serviço): o caminho é
+ * relativo a este arquivo, então cada app que importa o tema também gera essas classes.
+ */
+@source './';
+
+/*
  * Os fronts só têm tema claro. Sem esta linha, as classes dark: dos componentes do
  * shadcn seguiriam o modo escuro do sistema e escureceriam campos e botões.
  */

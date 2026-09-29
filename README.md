@@ -21,6 +21,7 @@ npm run db:seed                            # catálogo, equipes, checklist e usu
 npm run dev:api                            # http://localhost:3333
 npm run db:limpar                          # apaga os dados de teste (pede para digitar LIMPAR)
 npm run dev:escritorio                     # front do escritório em http://localhost:5173
+npm run dev:tecnico                        # app do técnico em http://localhost:5174
 ```
 
 Com a API e o front rodando, abra http://localhost:5173 e entre com um usuário do seed.
@@ -47,6 +48,7 @@ apps/api/
   src/lib/armazenamento.ts  fotos e PDFs (hoje disco, depois OneDrive)
   src/rotas/                clientes, produtos, orçamentos, agenda, validação, técnico
 apps/escritorio/            front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
+apps/tecnico/               app do técnico: PWA aberto no navegador do celular
   src/app/                  rotas protegidas por papel, menu e layout
   src/paginas/              telas (por enquanto: login e início)
 packages/compartilhado/

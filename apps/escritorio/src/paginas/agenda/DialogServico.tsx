@@ -17,8 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { diaDaApi, diasUteis, fimDoServico, nomeLongo, type Dia } from './datas';
-import { TIPOS_SERVICO_AGENDA } from './tiposServico';
+import { diaDaApi, diasUteis, fimDoServico, nomeLongo, type Dia } from '@guarusolar/compartilhado';
+import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { CLASSE_SELECT } from './DialogAgendar';
 
 type Modo = 'ver' | 'remarcar' | 'cancelar';

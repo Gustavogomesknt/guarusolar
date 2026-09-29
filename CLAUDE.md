@@ -98,16 +98,25 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                depois de cada add, desinstale o "cn" e troque o import por
                                `from "@/lib/utils"`
   src/paginas/                 Login, Inicio, SemAcesso
+apps/tecnico/                  app do técnico (PWA no navegador do celular; mesmo stack do escritório)
+  src/app/rotas.tsx            SessaoProvider com papeisAceitos=['TECNICO']: outros papéis recebem
+                               o aviso para usar o escritório
+  src/paginas/Agenda.tsx       hoje e os próximos 7 dias; serviço de vários dias aparece em cada
+                               dia; devolvidos pelo gestor no topo; WhatsApp e "Como chegar"
+  src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
   src/calculo.ts               totais, desconto e condições de pagamento
+  src/dias.ts                  dias como texto AAAA-MM-DD (somar, nome do dia, semana...)
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
                                o Vite de cada app compila e o `tsc -b` de cada app confere)
   src/api.ts                   cliente HTTP: token no cabeçalho (chave própria de cada app),
                                JSON ou FormData, ErroApi, 401 encerra a sessão
   src/sessao.tsx               usuário logado, entrar(), sair(), aviso de sessão expirada e
                                papeisAceitos (o app do técnico só aceita TECNICO)
-  src/tema.css                 cores e fontes da marca como variáveis do shadcn
+  src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
+                               faz o Tailwind de cada app gerar as classes escritas no pacote
+  src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
 ```
 
 O que depende de navegador ou React (fetch, localStorage, componentes, CSS) vai em
@@ -229,6 +238,7 @@ npm run db:migrate       # cria as tabelas
 npm run db:seed          # catálogo, equipes, checklist e usuários de teste
 npm run dev:api          # API em http://localhost:3333
 npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
+npm run dev:tecnico      # app do técnico em http://localhost:5174 (idem)
 npm run db:studio        # inspecionar o banco
 npm run db:limpar        # APAGA clientes, orçamentos, projetos etc. e zera os códigos;
                          # mantém usuários, equipes, checklist e catálogo. Pede LIMPAR;
