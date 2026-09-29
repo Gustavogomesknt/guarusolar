@@ -36,7 +36,9 @@ instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
 - **Arquivos (fotos e PDFs):** hoje em disco local; em produção no **OneDrive/SharePoint do cliente**
   via Microsoft Graph, aproveitando o plano Microsoft 365 que ele já paga
 - **Hospedagem:** custo zero: Render (plano gratuito, região Virginia; dorme após 15 min) e
-  Supabase (gratuito); backup noturno do banco pelo GitHub Actions
+  Supabase (gratuito); backup noturno do banco pelo GitHub Actions. **Banco de produção em São
+  Paulo por decisão do cliente (LGPD: dados de clientes brasileiros ficam no Brasil)**, aceitando
+  ~120 ms por ida ao banco. Não proponha mover o banco para fora do Brasil
 
 ## Estrutura
 

@@ -355,6 +355,9 @@ consulta, e o resumo chegaria a 16 (~2 s só de espera). Banco na mesma região 
 dados passam a ficar nos EUA (transferência internacional pela LGPD: cite no aviso de
 privacidade).
 
+**Decisão:** banco de produção em **São Paulo** (LGPD: dados pessoais de clientes brasileiros
+ficam no Brasil), aceitando o tempo da coluna "Banco em SP".
+
 ### Primeira vez (uma vez só)
 
 **1. Supabase de produção.** Em supabase.com › New project: `guarusolar-producao`, senha do
