@@ -26,3 +26,39 @@ export type ServicoNaAgenda = {
   motivoDevolucao: string | null;
   projeto: { codigo: string; cliente: ClienteDoServico };
 };
+
+export type RevisaoFoto = 'PENDENTE' | 'OK' | 'REFAZER';
+
+/** Foto já recebida pela API. */
+export type FotoEnviada = {
+  id: string;
+  chave: string | null;
+  rotulo: string | null;
+  arquivoUrl: string;
+  capturadaEm: string | null;
+  revisao: RevisaoFoto;
+  comentario: string | null;
+  idLocal: string | null;
+};
+
+export type ItemChecklist = {
+  id: string;
+  chave: string;
+  rotulo: string;
+  obrigatoria: boolean;
+  ordem: number;
+  /** false também quando a foto foi marcada para refazer */
+  enviada: boolean;
+  foto: FotoEnviada | null;
+};
+
+/** Serviço aberto (GET /api/tecnico/servicos/:id). */
+export type ServicoDetalhe = Omit<ServicoNaAgenda, 'projeto'> & {
+  observacoesTecnico: string | null;
+  sistemaTestado: boolean;
+  enviadoEm: string | null;
+  projeto: { codigo: string; cliente: ClienteDoServico };
+  /** todas as fotos, inclusive extras (chave nula) e as marcadas para refazer */
+  fotos: FotoEnviada[];
+  checklist: ItemChecklist[];
+};

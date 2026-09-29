@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { Prisma, type StatusAgendamento } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
@@ -316,6 +317,18 @@ async function servicoDoTecnico(id: string, usuarioId: string, equipeId: string 
   return servico;
 }
 
+/**
+ * Fotos e envio para validação só valem com o serviço em aberto. Sem esta conferência, um
+ * serviço cancelado ou já concluído voltaria para a validação (e o projeto junto).
+ */
+function conferirServicoAberto(status: StatusAgendamento) {
+  if (status === 'AGUARDANDO_VALIDACAO') {
+    throw new ErroHttp(409, 'Este serviço já foi enviado para validação. Aguarde a resposta do gestor.');
+  }
+  if (status === 'APROVADO') throw new ErroHttp(409, 'Este serviço já foi concluído.');
+  if (status === 'CANCELADO') throw new ErroHttp(409, 'Este serviço foi cancelado pelo escritório.');
+}
+
 rotasTecnico.get(
   '/agenda',
   rota(async (req, res) => {
@@ -328,13 +341,22 @@ rotasTecnico.get(
 
     const servicos = await prisma.agendamento.findMany({
       where: {
-        OR: [
-          { tecnicoResponsavelId: req.usuario!.id },
-          ...(req.usuario!.equipeId ? [{ equipeId: req.usuario!.equipeId }] : []),
+        AND: [
+          {
+            OR: [
+              { tecnicoResponsavelId: req.usuario!.id },
+              ...(req.usuario!.equipeId ? [{ equipeId: req.usuario!.equipeId }] : []),
+            ],
+          },
+          {
+            OR: [
+              { dataInicio: { lte: ate }, dataFim: { gte: de }, status: { notIn: ['CANCELADO', 'APROVADO'] } },
+              // Em aberto de dias anteriores (não terminado ou devolvido pelo gestor): continua na
+              // agenda até ser enviado para validação, senão sumiria na virada do dia.
+              { dataFim: { lt: de }, status: { in: ['AGENDADO', 'EM_EXECUCAO', 'DEVOLVIDO'] } },
+            ],
+          },
         ],
-        dataInicio: { lte: ate },
-        dataFim: { gte: de },
-        status: { notIn: ['CANCELADO', 'APROVADO'] },
       },
       orderBy: { dataInicio: 'asc' },
       include: {
@@ -394,17 +416,27 @@ rotasTecnico.post(
       })
       .parse(req.body);
 
-    if (idLocal) {
-      const jaRecebida = await prisma.fotoServico.findUnique({ where: { idLocal } });
-      if (jaRecebida) {
-        if (jaRecebida.agendamentoId !== servico.id) throw new ErroHttp(409, 'Esta foto já foi enviada para outro serviço');
-        return res.status(200).json(jaRecebida);
+    // Reenvio de uma foto que já chegou (a resposta se perdeu no caminho): devolve a mesma,
+    // antes de qualquer outra regra — inclusive se o serviço já foi enviado depois disso.
+    const fotoJaRecebida = async () => {
+      if (!idLocal) return null;
+      const foto = await prisma.fotoServico.findUnique({ where: { idLocal } });
+      if (foto && foto.agendamentoId !== servico.id) {
+        throw new ErroHttp(409, 'Esta foto já foi enviada para outro serviço');
       }
-    }
+      return foto;
+    };
+    const jaRecebida = await fotoJaRecebida();
+    if (jaRecebida) return res.status(200).json(jaRecebida);
 
-    const rotulo = chave
-      ? (await prisma.checklistFoto.findFirst({ where: { tipoServico: servico.tipo, chave } }))?.rotulo
-      : 'Foto extra';
+    conferirServicoAberto(servico.status);
+
+    let rotulo = 'Foto extra';
+    if (chave) {
+      const item = await prisma.checklistFoto.findFirst({ where: { tipoServico: servico.tipo, chave } });
+      if (!item) throw new ErroHttp(400, 'Este item não faz parte do checklist deste serviço.');
+      rotulo = item.rotulo;
+    }
 
     const arquivo = await salvarArquivo(
       req.file.buffer,
@@ -412,31 +444,44 @@ rotasTecnico.post(
       `${servico.projeto.codigo}/${servico.id}`,
     );
 
-    const foto = await prisma.$transaction(async (tx) => {
-      // refazendo uma foto: a antiga sai do checklist
-      if (chave) {
-        await tx.fotoServico.deleteMany({ where: { agendamentoId: servico.id, chave } });
-      }
-      if (servico.status === 'AGENDADO') {
-        await tx.agendamento.update({ where: { id: servico.id }, data: { status: 'EM_EXECUCAO' } });
-        await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
-      }
-      return tx.fotoServico.create({
-        data: {
-          agendamentoId: servico.id,
-          chave,
-          rotulo,
-          arquivoUrl: arquivo.url,
-          arquivoNome: arquivo.nome,
-          tamanhoBytes: arquivo.tamanhoBytes,
-          latitude,
-          longitude,
-          capturadaEm: capturadaEm ?? new Date(),
-          enviadaPorId: req.usuario!.id,
-          idLocal,
-        },
+    const gravarFoto = () =>
+      prisma.$transaction(async (tx) => {
+        // refazendo uma foto: a antiga sai do checklist
+        if (chave) {
+          await tx.fotoServico.deleteMany({ where: { agendamentoId: servico.id, chave } });
+        }
+        if (servico.status === 'AGENDADO') {
+          await tx.agendamento.update({ where: { id: servico.id }, data: { status: 'EM_EXECUCAO' } });
+          await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
+        }
+        return tx.fotoServico.create({
+          data: {
+            agendamentoId: servico.id,
+            chave,
+            rotulo,
+            arquivoUrl: arquivo.url,
+            arquivoNome: arquivo.nome,
+            tamanhoBytes: arquivo.tamanhoBytes,
+            latitude,
+            longitude,
+            capturadaEm: capturadaEm ?? new Date(),
+            enviadaPorId: req.usuario!.id,
+            idLocal,
+          },
+        });
       });
-    });
+
+    let foto;
+    try {
+      foto = await gravarFoto();
+    } catch (erro) {
+      // Dois envios da mesma foto ao mesmo tempo (a fila reenviou antes da primeira resposta):
+      // os dois passaram pela conferência acima e o segundo bate na chave única do idLocal.
+      const repetida = idLocal && erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002';
+      const existente = repetida ? await fotoJaRecebida() : null;
+      if (!existente) throw erro;
+      return res.status(200).json(existente);
+    }
 
     res.status(201).json(foto);
   }),
@@ -477,6 +522,7 @@ rotasTecnico.post(
   '/servicos/:id/concluir',
   rota(async (req, res) => {
     const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
+    conferirServicoAberto(servico.status);
     const { observacoesTecnico, sistemaTestado } = z
       .object({ observacoesTecnico: z.string().optional(), sistemaTestado: z.boolean() })
       .parse(req.body);

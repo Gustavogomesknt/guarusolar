@@ -109,14 +109,28 @@ packages/web/               o que os dois fronts usam no navegador
 
 ## App do técnico (PWA)
 
-O técnico usa o próprio celular pelo navegador, muitas vezes com internet móvel fraca.
-Por isso o PWA deve **redimensionar cada foto antes do envio**:
+O técnico usa o próprio celular pelo navegador (`apps/tecnico`), muitas vezes com internet
+móvel fraca. Por isso o app **reduz cada foto no aparelho antes do envio**
+(`apps/tecnico/src/fotos/reduzir.ts`):
 
-- **Lado maior com 2000 px**, mantendo a proporção. Fotos menores seguem como estão.
+- **Lado maior com 2000 px**, mantendo a proporção e já girada conforme o EXIF. Fotos menores
+  mantêm o tamanho.
 - **JPEG com qualidade 85.** Uma foto assim costuma ficar entre 400 KB e 1 MB.
-- **Manter a data/hora e a localização da captura.** Ao redesenhar a imagem num canvas,
-  os metadados EXIF se perdem. Leia-os antes de reduzir e envie-os nos campos
-  `capturadaEm`, `latitude` e `longitude` da rota `POST /api/tecnico/servicos/:id/fotos`.
+- **Uma foto por vez.** Decodificar uma foto de 12 MP ocupa uns 50 MB de memória; várias ao
+  mesmo tempo derrubam a aba em celular simples.
+- **Data/hora e localização da captura** vão nos campos `capturadaEm`, `latitude` e
+  `longitude` da rota `POST /api/tecnico/servicos/:id/fotos`, porque o canvas descarta o EXIF.
+  O app lê o EXIF antes de reduzir (`fotos/metadados.ts`, com a versão enxuta da `exifr`).
+  **Atenção:** os navegadores costumam *remover a localização* das fotos entregues a uma página
+  (Chrome no Android e Safari no iOS, por privacidade). Por isso o app também pede a posição ao
+  navegador. A permissão é pedida num toque próprio ("Permitir localização"), nunca no mesmo
+  toque que abre a câmera: no iPhone o pedido é um alerta do sistema e pode impedir a câmera
+  de abrir. Sem permissão, a foto segue sem o local; a espera pela posição é de no máximo 4 s.
+
+**Câmera e galeria.** Tocar num item do checklist abre a câmera do celular
+(`<input type="file" capture="environment">`); "Da galeria" é a opção secundária, para uma
+foto tirada antes. Os campos de arquivo ficam escondidos só visualmente: com `display:none`,
+algumas versões do Safari ignoram o clique programático.
 
 A API aceita apenas `image/jpeg`, `image/png` e `image/webp`, até 15 MB, no campo `arquivo`.
 Uma foto maior é recusada com status 413, e um formato diferente com status 400, os dois com
@@ -125,6 +139,11 @@ mensagem pronta para mostrar ao técnico.
 **Reenvio sem duplicar.** O app manda em cada foto um `idLocal` (UUID gerado no celular).
 Se a foto já chegou e só a resposta se perdeu, o reenvio devolve a foto existente (200) em
 vez de criar outra.
+
+**Serviço em aberto.** Fotos e o envio para validação só são aceitos com o serviço agendado,
+em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e a foto de um item
+precisa ser de um item do checklist daquele tipo de serviço (400). A agenda do técnico mostra,
+além de hoje a 7 dias, os serviços em aberto de dias anteriores, até serem enviados.
 
 **Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
 no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).

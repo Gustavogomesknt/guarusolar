@@ -8,3 +8,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Versão enxuta da exifr (só JPEG/HEIC, EXIF e GPS): mesmos tipos do pacote completo. */
+declare module 'exifr/dist/lite.esm.mjs' {
+  import exifr from 'exifr';
+  export default exifr;
+}

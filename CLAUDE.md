@@ -86,9 +86,9 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                de criar/editar com margem ao vivo (calcularMargem)
   src/paginas/agenda/          agenda das equipes (/agenda, só GESTOR): faixa "A agendar",
                                grade da semana (segunda a sábado) por equipe, agendar,
-                               remarcar e cancelar. Datas como texto AAAA-MM-DD (datas.ts);
-                               serviço de N dias pula o domingo (fimDoServico). A duração não
-                               existe na API: o front pergunta os dias e manda dataFim
+                               remarcar e cancelar. Datas como texto AAAA-MM-DD (dias.ts no
+                               compartilhado); serviço de N dias pula o domingo (fimDoServico).
+                               A duração não existe na API: o front pergunta os dias e manda dataFim
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
   src/app/menu.ts              itens do menu, os papéis de cada um e o grupo (Comercial ou
                                Operação)
@@ -102,7 +102,15 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
   src/app/rotas.tsx            SessaoProvider com papeisAceitos=['TECNICO']: outros papéis recebem
                                o aviso para usar o escritório
   src/paginas/Agenda.tsx       hoje e os próximos 7 dias; serviço de vários dias aparece em cada
-                               dia; devolvidos pelo gestor no topo; WhatsApp e "Como chegar"
+                               dia; no topo, os devolvidos pelo gestor e os em aberto de dias
+                               anteriores; WhatsApp e "Como chegar"
+  src/paginas/Servico.tsx      serviço aberto (protótipo "Técnico — concluir serviço"): checklist,
+                               extras, observações e teste (rascunho no localStorage), botão do
+                               rodapé que diz o que falta e leva até lá
+  src/fotos/                   reduzir.ts (2000 px, JPEG 85), metadados.ts (EXIF + posição do
+                               navegador), useLocalizacao.ts (permissão pedida num toque próprio,
+                               nunca junto com a câmera), envio.ts e useFotos.ts (preparo uma
+                               foto por vez; idLocal em cada envio)
   src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
@@ -146,6 +154,8 @@ O `.env` da API fica em `apps/api/.env`.
    escondendo botões na interface.
 7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
    teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
+   Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
+   devolvido): `conferirServicoAberto` em `apps/api/src/rotas/operacao.ts`.
 8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`
    e ao remarcar em `PATCH /api/agenda/:id`; serviços cancelados não contam). Cancelar um
    serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
@@ -226,6 +236,13 @@ Próximos passos, nesta ordem:
   entrega qualquer foto a quem tiver o link, sem login: são fotos da casa do cliente, com
   localização. Antes de produção, servir as fotos por rota autenticada (ou link temporário
   assinado) — naturalmente junto com a troca do `armazenamento.ts` para o OneDrive/SharePoint.
+- **Arquivo órfão no envio duplicado.** Quando a mesma foto chega duas vezes ao mesmo tempo
+  (a fila reenviou antes da resposta), as duas requisições gravam o arquivo antes de a chave
+  única do `idLocal` barrar a segunda: a resposta é certa (200 com a foto existente), mas o
+  segundo arquivo fica sem registro. Raro; resolver junto com o armazenamento (apagar o arquivo
+  quando o `P2002` acontece).
+- **Validação sem conferência de status.** `POST /api/validacao/:id/aprovar` e `/devolver` não
+  conferem se o serviço está `AGUARDANDO_VALIDACAO`. Corrigir ao fazer a tela de validação.
 
 ## Comandos
 

@@ -23,7 +23,8 @@ function nomeDoDia(dia: Dia, hoje: Dia) {
 /**
  * Agenda do técnico: hoje e os próximos 7 dias. Serviço de vários dias aparece em cada dia
  * ("dia 2 de 3"), porque o técnico pensa no que tem para fazer em cada dia.
- * Serviços devolvidos pelo gestor ficam no topo: são o que precisa de atenção primeiro.
+ * No topo, o que precisa de atenção primeiro: os devolvidos pelo gestor e os que ficaram em
+ * aberto de dias anteriores (a API os mantém na agenda até serem enviados).
  */
 export function Agenda() {
   const { usuario, sair } = useSessao();
@@ -36,6 +37,7 @@ export function Agenda() {
 
   const servicos = agenda.data ?? [];
   const devolvidos = servicos.filter((s) => s.status === 'DEVOLVIDO');
+  const atrasados = servicos.filter((s) => s.status !== 'DEVOLVIDO' && diaDaApi(s.dataFim) < hoje);
   const dias = Array.from({ length: DIAS_A_FRENTE + 1 }, (_, i) => somarDias(hoje, i))
     .map((dia) => ({
       dia,
@@ -107,6 +109,21 @@ export function Agenda() {
                 ))}
               </section>
             )}
+            {atrasados.length > 0 && (
+              <section aria-labelledby="titulo-atrasados" className="flex flex-col gap-3">
+                <h2 id="titulo-atrasados" className="text-lg font-bold">
+                  De dias anteriores
+                </h2>
+                {atrasados.map((s) => (
+                  <CartaoServico key={s.id} servico={s} dia={diaDaApi(s.dataFim)} atrasado />
+                ))}
+              </section>
+            )}
+            {dias.length === 0 && (
+              <p className="rounded-2xl border bg-card px-4 py-3 text-sm text-muted-foreground">
+                Nada agendado de hoje aos próximos {DIAS_A_FRENTE} dias.
+              </p>
+            )}
             {dias.map(({ dia, servicos: doDia }) => (
               <section key={dia} aria-labelledby={`dia-${dia}`} className="flex flex-col gap-3">
                 <h2 id={`dia-${dia}`} className="flex items-baseline gap-2 text-lg font-bold">
@@ -127,7 +144,7 @@ export function Agenda() {
   );
 }
 
-function CartaoServico({ servico, dia }: { servico: ServicoNaAgenda; dia: Dia }) {
+function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaAgenda; dia: Dia; atrasado?: boolean }) {
   const { cliente } = servico.projeto;
   const tipo = TIPOS_SERVICO_AGENDA[servico.tipo];
   const inicio = diaDaApi(servico.dataInicio);
@@ -149,10 +166,16 @@ function CartaoServico({ servico, dia }: { servico: ServicoNaAgenda; dia: Dia })
             {tipo.rotulo}
           </span>
           <SeloStatus status={servico.status} />
-          {total > 1 && (
-            <span className="text-xs text-muted-foreground">
-              dia {atual} de {total}
+          {atrasado ? (
+            <span className="text-xs text-destaque-texto">
+              {inicio === fim ? `era para ${nomeLongo(inicio)}` : `de ${nomeLongo(inicio)} a ${nomeLongo(fim)}`}
             </span>
+          ) : (
+            total > 1 && (
+              <span className="text-xs text-muted-foreground">
+                dia {atual} de {total}
+              </span>
+            )
           )}
         </span>
         <span className="text-lg leading-snug font-semibold">{cliente.nome}</span>

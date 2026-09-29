@@ -2,6 +2,7 @@ import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route 
 import { SessaoProvider } from '@guarusolar/web/sessao';
 import { Login } from '@/paginas/Login';
 import { Agenda } from '@/paginas/Agenda';
+import { Servico } from '@/paginas/Servico';
 import { RotaProtegida } from './RotaProtegida';
 
 // Só o técnico entra aqui; os demais papéis recebem este aviso no login.
@@ -24,6 +25,7 @@ export const roteador = createBrowserRouter(
       <Route element={<RotaProtegida />}>
         <Route index element={<Navigate to="/agenda" replace />} />
         <Route path="agenda" element={<Agenda />} />
+        <Route path="servico/:id" element={<Servico />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>,
