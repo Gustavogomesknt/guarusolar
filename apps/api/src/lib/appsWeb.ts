@@ -67,7 +67,7 @@ export function cabecalhosDeSeguranca(producao: boolean) {
       // o app do técnico usa câmera (pelo seletor de arquivo) e localização; nada além
       'Permissions-Policy': 'camera=(self), geolocation=(self), microphone=(), payment=()',
     });
-    // só com HTTPS garantido (produção atrás do Fly, que força https)
+    // só com HTTPS garantido (produção na Render, que só atende em https)
     if (producao) res.set('Strict-Transport-Security', 'max-age=31536000');
     next();
   };

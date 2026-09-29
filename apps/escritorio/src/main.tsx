@@ -12,6 +12,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import './estilos/tema.css';
 
 import { configurarApi } from '@guarusolar/web/api';
+import { AvisoServidorAcordando } from '@guarusolar/web/AvisoServidorAcordando';
 import { clienteConsultas } from '@/lib/consultas';
 import { Toaster } from '@/components/ui/sonner';
 import { roteador } from '@/app/rotas';
@@ -22,6 +23,7 @@ createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <QueryClientProvider client={clienteConsultas}>
       <RouterProvider router={roteador} />
+      <AvisoServidorAcordando />
       <Toaster position="top-right" />
     </QueryClientProvider>
   </StrictMode>,

@@ -35,8 +35,8 @@ instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
 - **Auth:** JWT com papéis
 - **Arquivos (fotos e PDFs):** hoje em disco local; em produção no **OneDrive/SharePoint do cliente**
   via Microsoft Graph, aproveitando o plano Microsoft 365 que ele já paga
-- **Hospedagem pretendida:** custo zero enquanto der (plano gratuito de Postgres gerenciado),
-  com backup automático do banco para o OneDrive do cliente
+- **Hospedagem:** custo zero: Render (plano gratuito, região Virginia; dorme após 15 min) e
+  Supabase (gratuito); backup noturno do banco pelo GitHub Actions
 
 ## Estrutura
 
@@ -176,7 +176,9 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
                                o Vite de cada app compila e o `tsc -b` de cada app confere)
   src/api.ts                   cliente HTTP: token no cabeçalho (chave própria de cada app),
-                               JSON ou FormData, ErroApi, 401 encerra a sessão
+                               JSON ou FormData, ErroApi, 401 encerra a sessão; ouvirDemora
+                               avisa quando um GET ou o login passa de 4 s (servidor acordando)
+  src/AvisoServidorAcordando.tsx  "Conectando ao sistema…" enquanto a Render acorda (30–60 s)
   src/sessao.tsx               usuário logado, entrar(), sair(), aviso de sessão expirada e
                                papeisAceitos (o app do técnico só aceita TECNICO)
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
@@ -184,10 +186,12 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
   src/FormularioTrocaSenha.tsx troca da própria senha (escritório /conta/senha, técnico /senha);
                                a RotaProtegida leva quem tem senha temporária direto para ela
-Dockerfile, fly.toml           produção no Fly.io (README, "Publicar em produção"); o Fly compila
-.github/workflows/             verificação (build a cada push), publicar (manual), backup do banco
   src/ImagemProtegida.tsx      <img> de foto de serviço: busca com o token no cabeçalho (o navegador
                                não manda token em <img src>) e exibe; use com urlDaFoto(id)
+Dockerfile, render.yaml        produção na Render, plano gratuito (README, "Publicar em produção");
+                               a Render compila a imagem. Publicação só pelo Actions (autoDeploy off)
+.github/workflows/             verificação (build a cada push), publicar (manual: migrations, deploy
+                               hook da Render, confere a versão no /saude), backup do banco
 ```
 
 O que depende de navegador ou React (fetch, localStorage, componentes, CSS) vai em
@@ -310,9 +314,9 @@ Próximos passos, nesta ordem:
 
 ## Dívida técnica (resolver antes da produção)
 
-- **`TRUST_PROXY` na hospedagem.** Atrás de proxy, sem `TRUST_PROXY` = número de proxies,
-  todos os usuários chegam com o IP do proxy e o limite por IP do login valeria para a empresa
-  inteira. Conferir no deploy (o log `login_falhou` mostra a `origem`).
+- **`TRUST_PROXY` na Render** (começa em 1 no `render.yaml`). Atrás de proxy, sem `TRUST_PROXY` =
+  número de proxies, todos os usuários chegam com o IP do proxy e o limite por IP do login valeria
+  para a empresa inteira. Conferir no primeiro deploy (o log `login_falhou` mostra a `origem`).
 - **`STORAGE_PUBLIC_URL` não é mais usada** (as fotos saem pela rota autenticada). Se ainda
   estiver no `.env` de alguém, pode ser apagada; não tem efeito.
 - **Arquivos órfãos (só no disco).** Foto refeita já vai para "Substituídas/". Resta: quando a mesma foto chega duas vezes ao mesmo tempo
@@ -372,6 +376,11 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
   publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).
 - **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
-  armazenamento.ts): o disco do Fly é apagado a cada publicação. Não contorne isso.
+  armazenamento.ts): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
+  persistente no plano gratuito). Não contorne isso.
+- **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
+  pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
+  sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.
+- **Não crie "ping" para manter a Render acordada** (contraria o plano gratuito).
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.

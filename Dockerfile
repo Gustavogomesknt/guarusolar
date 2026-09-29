@@ -1,5 +1,5 @@
-# Imagem da Guarusolar para o Fly.io: API + escritório (/) + app dos técnicos (/campo/).
-# O Fly compila esta imagem nos servidores dele (fly deploy), não precisa de Docker local.
+# Imagem da Guarusolar para a Render: API + escritório (/) + app dos técnicos (/campo/).
+# A Render compila esta imagem nos servidores dela; não precisa de Docker local.
 
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
@@ -29,11 +29,10 @@ RUN npm prune --omit=dev
 
 # ---------------------------------------------------------------------------------------------
 FROM base AS producao
-ARG VERSAO=desconhecida
+# a Render define PORT (10000 por padrão); a versão no ar sai de RENDER_GIT_COMMIT (/saude)
 ENV NODE_ENV=production \
-    PORT=8080 \
-    VERSAO=$VERSAO
+    PORT=10000
 COPY --from=build --chown=node:node /app /app
 USER node
-EXPOSE 8080
+EXPOSE 10000
 CMD ["node", "apps/api/dist/server.js"]

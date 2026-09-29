@@ -1,0 +1,49 @@
+# Render — Guarusolar em produção (README, "Publicar em produção (Render)").
+# Blueprint: na Render, New › Blueprint › escolha este repositório. Um serviço só: API +
+# escritório (/) + app dos técnicos (/campo/). Plano gratuito: dorme após 15 min parado e o
+# primeiro pedido leva de 30 a 60 s (as telas avisam: AvisoServidorAcordando).
+services:
+  - type: web
+    name: guarusolar
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    # Não há região no Brasil: Virginia (leste dos EUA) é a mais próxima de São Paulo.
+    region: virginia
+    branch: main
+    # Publicação só pelo GitHub Actions (Actions › Publicar): roda as migrations antes e
+    # chama o deploy hook. Push no main NÃO publica sozinho.
+    autoDeploy: false
+    # A Render só troca para a versão nova quando /saude responde 200 (a API alcança o banco).
+    healthCheckPath: /saude
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: America/Sao_Paulo
+      # Quantos proxies há na frente (a Render e o Cloudflare dela). Conferir no primeiro
+      # deploy pelo log login_falhou (campo "origem" deve ser o IP de quem tentou).
+      - key: TRUST_PROXY
+        value: "1"
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: JWT_EXPIRES_IN_TECNICO
+        value: 7d
+      # Sem SharePoint, o app dos técnicos fica bloqueado sozinho (o disco da Render é apagado
+      # a cada publicação e não há disco persistente no plano gratuito).
+      - key: STORAGE_PROVIDER
+        value: disco
+      # Endereço do serviço (o nome pode ganhar um sufixo se "guarusolar" já existir na Render):
+      # confira no painel e ajuste os dois abaixo.
+      - key: API_URL_PUBLICA
+        value: https://guarusolar.onrender.com
+      - key: CORS_ORIGINS
+        value: https://guarusolar.onrender.com
+      # Segredos: preenchidos no painel ao criar o Blueprint (nunca no repositório).
+      # As duas com a conexão de SESSÃO do Supabase (porta 5432), sem pgbouncer=true.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

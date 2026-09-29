@@ -294,53 +294,77 @@ pasta de armazenamento não são removidos.
   códigos (GS-2026-0148), a validade padrão e as datas exibidas, no PDF e no WhatsApp. Pode
   hospedar a API em servidor configurado em UTC sem ajustes.
 - **Banco:** PostgreSQL gerenciado (plano gratuito do Supabase, Neon ou similar). Use
-  `DATABASE_URL` com a conexão pooled e `DIRECT_URL` com a conexão direta, que as migrations
-  usam (detalhes em `apps/api/.env.example`).
+  `DATABASE_URL` e `DIRECT_URL` com o Session pooler (porta 5432) em servidor sempre ligado
+  (o porquê em `apps/api/.env.example` e em "Região e velocidade", abaixo).
 - **PDF do orçamento:** gerado pela própria API com pdfmake (só JavaScript, sem navegador
   embutido; em teste, o processo ficou abaixo de 160 MB gerando 20 PDFs seguidos). Defina
   `API_URL_PUBLICA` com o endereço público da API: é o link que o cliente recebe pelo WhatsApp
   (`/api/orcamentos/:id/pdf?token=...`), aberto sem login e protegido pelo token do orçamento.
-- **Publicar:** ver "Publicar em produção (Fly.io)" abaixo.
+- **Publicar:** ver "Publicar em produção (Render)" abaixo.
 
-## Publicar em produção (Fly.io)
+## Publicar em produção (Render)
 
-Um serviço só, no Fly.io em São Paulo (`gru`), junto do banco no Supabase em São Paulo:
+Um serviço só, no plano **gratuito** da Render (`render.yaml`), com o banco no Supabase:
 
 ```
-https://<app>.fly.dev/          escritório (comercial e gestor)
-https://<app>.fly.dev/campo/    app dos técnicos (PWA)
-https://<app>.fly.dev/api/...   API
+https://<servico>.onrender.com/          escritório (comercial e gestor)
+https://<servico>.onrender.com/campo/    app dos técnicos (PWA)
+https://<servico>.onrender.com/api/...   API
 ```
 
-Mesmo endereço para os apps e a API: sem CORS no navegador. A imagem (`Dockerfile`) é compilada
-pelo próprio Fly: não precisa de Docker na máquina. Custo estimado: US$ 3–5/mês (1 máquina de
-512 MB, sempre ligada). Quando houver domínio próprio, cada app pode ganhar o seu endereço.
+Mesmo endereço para os apps e a API: sem CORS no navegador. HTTPS vem pronto. A imagem
+(`Dockerfile`) é compilada pela própria Render: não precisa de Docker na máquina. Quando houver
+domínio próprio, ele entra em Settings › Custom Domains (também no plano gratuito).
 
-**App dos técnicos sem SharePoint:** em produção, sem lugar persistente para as fotos, o login do
-técnico e as rotas `/api/tecnico` ficam bloqueados ("O app dos técnicos ainda não foi liberado")
-— melhor não receber fotos do que perdê-las na próxima publicação. Liberam sozinhos com
-`STORAGE_PROVIDER=sharepoint` (segredos `MS_*`). Alternativa, se precisar antes: volume do Fly
-(`fly volumes create fotos --region gru --size 1`, `[mounts]` em `/data`, `STORAGE_DIR=/data/fotos`,
-`FOTOS_EM_DISCO_PERSISTENTE=sim` e `strategy = "immediate"`: com volume, cada publicação derruba o
-serviço por uns 10–20 s).
+### O que o plano gratuito implica
+
+- **Dorme depois de 15 min sem acesso.** O primeiro pedido depois disso leva de 30 a 60 s. As
+  telas mostram "Conectando ao sistema…" quando uma consulta passa de 4 s
+  (`packages/web/src/AvisoServidorAcordando.tsx`). O app dos técnicos abre na hora (service
+  worker) e só os dados esperam; o escritório, na primeira abertura, só aparece quando o
+  servidor acorda. **Não use robôs de "ping" para mantê-lo acordado:** contraria o propósito do
+  plano gratuito (a Render pode suspender o serviço). Se a espera incomodar, o caminho é o
+  plano pago (Starter), que não dorme.
+- **0,1 de CPU e 512 MB.** Login (bcrypt) e PDF ficam mais lentos que na sua máquina.
+- **O limite de tentativas de login zera** quando o serviço dorme ou reinicia (fica em memória).
+- **Disco apagado a cada publicação, reinício e sono**, e o plano gratuito não tem disco
+  persistente (só os pagos). Por isso, **o app dos técnicos segue bloqueado** até o SharePoint:
+  login do técnico e `/api/tecnico` respondem "O app dos técnicos ainda não foi liberado".
+  Libera sozinho com `STORAGE_PROVIDER=sharepoint` e os segredos `MS_*`.
+- **Minutos de compilação limitados por mês** (cada publicação leva uns 5–10 min): publique
+  quando houver o que publicar, não a cada commit.
+
+### Região e velocidade
+
+A Render não tem servidores no Brasil; `virginia` (leste dos EUA) é a mais próxima, a ~120 ms
+de ida e volta de São Paulo. O que pesa é quantas vezes cada pedido vai ao banco:
+
+| Pedido | Idas ao banco (Session pooler) | Banco em SP (~120 ms cada) | Banco na Virginia |
+| --- | --- | --- | --- |
+| login, `/eu`, fila de validação | 1 | ~0,1 s | ~0 |
+| lista de orçamentos, pendentes | 3 | ~0,4 s | ~0 |
+| indicadores (resumo) | 4 | ~0,5 s | ~0 |
+| agenda da semana | 6 | ~0,7 s | ~0 |
+| orçamento aberto | 8 | ~1 s | ~0 |
+
+Medido contando as consultas de cada rota. Em todos os casos soma-se a ida e volta do
+navegador até a Render (~120 ms a partir de Guarulhos). **Use o Session pooler** (porta 5432,
+`?connection_limit=5`, sem `pgbouncer=true`): com o Transaction pooler o Prisma faz 4 idas por
+consulta, e o resumo chegaria a 16 (~2 s só de espera). Banco na mesma região da Render
+(Supabase "East US (North Virginia)") deixa as telas tão rápidas quanto em desenvolvimento; os
+dados passam a ficar nos EUA (transferência internacional pela LGPD: cite no aviso de
+privacidade).
 
 ### Primeira vez (uma vez só)
 
-**1. GitHub.** Em github.com › New repository: nome `guarusolar`, **Private**, sem README. Depois:
+**1. Supabase de produção.** Em supabase.com › New project: `guarusolar-producao`, senha do
+banco forte (guarde num gerenciador de senhas), região conforme "Região e velocidade". Em
+Connect, copie a **Session pooler** (porta 5432). No PowerShell, na raiz do projeto (as
+variáveis da sessão valem mais que o `.env`, que não muda):
 
 ```powershell
-git remote add origin https://github.com/<seu-usuario>/guarusolar.git
-git push -u origin main
-```
-
-**2. Supabase de produção.** Em supabase.com › New project: `guarusolar-producao`, região
-**South America (São Paulo)**, senha do banco forte (guarde num gerenciador de senhas). Em
-Connect, copie a **Transaction pooler** (porta 6543) e a **Session pooler** (porta 5432). No
-PowerShell, na raiz do projeto (as variáveis da sessão valem mais que o `.env`, que não muda):
-
-```powershell
-$env:DATABASE_URL = "<transaction pooler, porta 6543>?pgbouncer=true&connection_limit=5"
-$env:DIRECT_URL   = "<session pooler, porta 5432>"
+$env:DATABASE_URL = "<session pooler, porta 5432>?connection_limit=5"
+$env:DIRECT_URL   = $env:DATABASE_URL
 npm run db:migrate:deploy          # cria as tabelas
 npm run db:marcar-producao         # digite PRODUCAO: db:limpar e usuários de teste passam a recusar
 npm run db:seed:base               # equipes, catálogo inicial, checklist (sem usuários)
@@ -352,49 +376,50 @@ Remove-Item Env:DATABASE_URL, Env:DIRECT_URL   # volta para o banco de desenvolv
 A senha que o comando mostra é temporária: no primeiro acesso a pessoa cria a própria.
 Os dados reais que estão hoje no banco de desenvolvimento são copiados num passo à parte.
 
-**3. Fly.io.** Crie a conta em fly.io (pede cartão; a cobrança é pelo uso). No PowerShell:
+**2. Render.** Crie a conta em render.com entrando com o GitHub (sem cartão) e dê acesso ao
+repositório `guarusolar`. New › **Blueprint** › escolha o repositório: a Render lê o
+`render.yaml` e pede `DATABASE_URL` e `DIRECT_URL` (as duas com o valor do passo 1); o
+`JWT_SECRET` ela mesma gera. Se o nome `guarusolar` já existir na Render, o endereço ganha um
+sufixo: corrija `API_URL_PUBLICA` e `CORS_ORIGINS` em Environment. Confira
+`https://<servico>.onrender.com/saude` (`"banco":"ok"` e a versão) e entre com o usuário criado.
 
-```powershell
-iwr https://fly.io/install.ps1 -useb | iex        # instala o flyctl (abra outro terminal depois)
-fly auth login
-fly apps create guarusolar-sistema                 # se o nome existir, escolha outro e troque em fly.toml
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"   # gera o JWT_SECRET
-fly secrets set DATABASE_URL="<a mesma do passo 2>" DIRECT_URL="<a mesma do passo 2>" JWT_SECRET="<gerado acima>"
-fly deploy
-```
+**3. Publicação pelo GitHub.** Na Render, Settings › Deploy Hook: copie a URL (é um segredo:
+quem a tem publica). No GitHub, Settings › Secrets and variables › Actions:
 
-Confira `https://guarusolar-sistema.fly.dev/saude` (`"banco":"ok"` e a versão) e entre em
-`https://guarusolar-sistema.fly.dev` com o usuário criado.
+- segredos `RENDER_DEPLOY_HOOK_URL` (o hook), `PRODUCAO_DATABASE_URL` (a mesma do passo 1) e
+  `BACKUP_SENHA` (senha da criptografia do backup; guarde fora do GitHub: sem ela o backup não abre);
+- variável (aba Variables) `PRODUCAO_URL` = `https://<servico>.onrender.com`.
 
-**4. Publicação pelo GitHub.** `fly tokens create deploy` gera um token; no repositório,
-Settings › Secrets and variables › Actions › `FLY_API_TOKEN`. Para o backup noturno, também
-`BACKUP_DATABASE_URL` (a Session pooler de produção) e `BACKUP_SENHA` (guarde fora do GitHub:
-sem ela o backup não abre).
+**4. `TRUST_PROXY`.** Erre a senha uma vez e veja em Logs a linha `login_falhou`: o campo
+`origem` tem de ser o IP da sua internet (confira num site "qual é o meu IP"). Se aparecer um
+IP interno ou sempre o mesmo para pessoas diferentes, suba `TRUST_PROXY` para 2 e repita.
 
 ### Publicar uma versão nova
 
-Aba **Actions › Publicar › Run workflow** (ou `fly deploy` no PowerShell). O Fly:
+Aba **Actions › Publicar › Run workflow** (branch `main`). O push no `main` **não** publica
+sozinho (`autoDeploy: false`). O workflow:
 
-1. roda as migrations (`release_command`) — se falharem, nada é publicado;
-2. sobe a versão nova **ao lado** da atual e espera o `/saude` responder (a API precisa
-   alcançar o banco);
-3. só então troca o tráfego e desliga a antiga (`strategy = "bluegreen"`): ninguém cai.
+1. aplica as migrations no banco de produção — se falharem, nada é publicado;
+2. chama o deploy hook: a Render compila o commit mais recente do `main`, sobe a versão nova
+   ao lado da atual e só troca o tráfego quando o `/saude` responde (a API precisa alcançar o
+   banco); se não responder, a anterior continua atendendo: ninguém cai;
+3. confere que o `/saude` mostra o commit publicado.
 
 Técnicos com o app aberto veem "Nova versão disponível — Atualizar" e seguem trabalhando até
 tocar. Toda alteração enviada ao GitHub passa pela verificação (`npm run build`).
 
-**Migrations precisam funcionar também com a versão anterior do código** (durante a troca, as
-duas rodam; e voltar atrás não desfaz o banco): só adições numa publicação; renomear ou apagar
+**Migrations precisam funcionar também com a versão anterior do código** (entram antes da
+versão nova; e voltar atrás não desfaz o banco): só adições numa publicação; renomear ou apagar
 coluna em duas (primeiro adiciona e passa a usar, depois remove). Antes de publicar uma
 migration, rode o backup (Actions › Backup do banco › Run workflow).
 
 ### Voltar atrás
 
-```powershell
-fly releases --image                    # lista as versões publicadas e a imagem de cada uma
-fly deploy --image <imagem da versão boa>   # volta em ~1 min, sem recompilar
-fly logs                                # o que a API está registrando agora
-```
+- **Rápido:** no painel da Render, Events › na publicação boa, **Rollback**. Volta a imagem já
+  compilada em ~1 min. O banco não volta (por isso as migrations só adicionam).
+- **Definitivo:** `git revert <commit ruim>`, push e Publicar. Sem isso, a próxima publicação
+  traria o problema de volta.
+- **Logs:** painel da Render › Logs (o que a API está registrando agora).
 
 ### Backup e restauração do banco
 

@@ -1,5 +1,10 @@
-# Publicação em produção: só manual (aba Actions › Publicar › Run workflow).
-# Precisa do segredo FLY_API_TOKEN no repositório (README, "Publicar em produção").
+# Publicação em produção: só manual (aba Actions › Publicar › Run workflow, na branch main).
+# 1. aplica as migrations no banco de produção (se falharem, nada é publicado);
+# 2. chama o deploy hook da Render, que compila o Dockerfile do commit mais recente do main;
+# 3. espera o /saude responder com a versão (commit) nova e o banco ok.
+# Segredos: PRODUCAO_DATABASE_URL (Session pooler de produção, porta 5432) e
+# RENDER_DEPLOY_HOOK_URL. Variável: PRODUCAO_URL (ex.: https://guarusolar.onrender.com).
+# README, "Publicar em produção (Render)".
 name: Publicar
 
 on:
@@ -10,11 +15,46 @@ concurrency: publicar
 
 jobs:
   publicar:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      # a versão (commit) aparece em /saude: dá para conferir o que está no ar
-      - run: flyctl deploy --remote-only --build-arg VERSAO=${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12'
+          cache: npm
+      - run: npm ci
+
+      # Migrations ANTES da versão nova: a antiga segue no ar com o banco já expandido
+      # (por isso só adições numa publicação; CLAUDE.md, "Migrations em produção").
+      - name: Migrations
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          DATABASE_URL: ${{ secrets.PRODUCAO_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCAO_DATABASE_URL }}
+        run: npm run db:migrate:deploy
+
+      - name: Publicar na Render
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$HOOK" > /dev/null
+
+      # A Render só troca o tráfego quando /saude responde 200; aqui confirmamos que a versão
+      # no ar é este commit. O plano gratuito compila devagar: até ~20 min.
+      - name: Conferir a versão no ar
+        env:
+          URL: ${{ vars.PRODUCAO_URL }}
+          ESPERADA: ${{ github.sha }}
+        run: |
+          for tentativa in $(seq 1 80); do
+            resposta=$(curl -fsS --max-time 70 "$URL/saude" || true)
+            versao=$(echo "$resposta" | jq -r '.versao // empty' 2>/dev/null || true)
+            if [ "$versao" = "$ESPERADA" ]; then
+              echo "No ar: $resposta"
+              exit 0
+            fi
+            echo "Ainda não (no ar: ${versao:-sem resposta}); nova conferência em 15 s"
+            sleep 15
+          done
+          echo "::error::A versão $ESPERADA não entrou no ar. Veja Events e Logs no painel da Render; a versão anterior continua atendendo."
+          exit 1

@@ -12,6 +12,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import './estilos/app.css';
 
 import { configurarApi } from '@guarusolar/web/api';
+import { AvisoServidorAcordando } from '@guarusolar/web/AvisoServidorAcordando';
 import { Toaster } from 'sonner';
 import { clienteConsultas, OPCOES_DE_PERSISTENCIA } from '@/lib/consultas';
 import { iniciarFila } from '@/fotos/fila';
@@ -24,6 +25,7 @@ createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <PersistQueryClientProvider client={clienteConsultas} persistOptions={OPCOES_DE_PERSISTENCIA}>
       <RouterProvider router={roteador} />
+      <AvisoServidorAcordando />
       <Toaster position="top-center" richColors closeButton />
     </PersistQueryClientProvider>
   </StrictMode>,

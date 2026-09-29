@@ -125,7 +125,49 @@ type Opcoes = {
   comoArquivo?: boolean;
 };
 
+// ---------------------------------------------------------------------------------------------
+// Pedido demorado: no plano gratuito da Render o servidor "dorme" depois de 15 min parado e o
+// primeiro pedido leva de 30 a 60 s. As telas mostram um aviso (AvisoServidorAcordando) quando
+// uma leitura ou o login passa de alguns segundos, para ninguém achar que travou.
+// Envio de foto não conta: pode demorar pelo tamanho, não por o servidor estar acordando.
+// ---------------------------------------------------------------------------------------------
+
+const ESPERA_ANTES_DO_AVISO = 4000;
+let pedidosDemorados = 0;
+const ouvintesDaDemora = new Set<(demorando: boolean) => void>();
+const avisarDemora = () => ouvintesDaDemora.forEach((ouvir) => ouvir(pedidosDemorados > 0));
+
+/** Para o AvisoServidorAcordando: avisa quando há (ou deixa de haver) pedido demorado. */
+export function ouvirDemora(ouvir: (demorando: boolean) => void) {
+  ouvintesDaDemora.add(ouvir);
+  return () => {
+    ouvintesDaDemora.delete(ouvir);
+  };
+}
+
+function acompanharDemora<T>(pedido: Promise<T>): Promise<T> {
+  let demorou = false;
+  const relogio = setTimeout(() => {
+    demorou = true;
+    pedidosDemorados++;
+    avisarDemora();
+  }, ESPERA_ANTES_DO_AVISO);
+  return pedido.finally(() => {
+    clearTimeout(relogio);
+    if (demorou) {
+      pedidosDemorados--;
+      avisarDemora();
+    }
+  });
+}
+
 async function requisitar<T>(metodo: string, caminho: string, opcoes: Opcoes = {}): Promise<T> {
+  const acompanhado = metodo === 'GET' || caminho === '/api/auth/login';
+  const pedido = executar<T>(metodo, caminho, opcoes);
+  return acompanhado ? acompanharDemora(pedido) : pedido;
+}
+
+async function executar<T>(metodo: string, caminho: string, opcoes: Opcoes = {}): Promise<T> {
   const { corpo, signal, semRedirecionarEm401, comoArquivo } = opcoes;
   const cabecalhos: Record<string, string> = { Accept: comoArquivo ? '*/*' : 'application/json' };
   const formulario = corpo instanceof FormData;

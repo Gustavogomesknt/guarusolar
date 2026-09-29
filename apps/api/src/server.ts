@@ -38,11 +38,12 @@ app.use(express.json({ limit: '2mb' }));
 // Nada de pasta pública de arquivos: as fotos só saem por /api/fotos/:id, com login (rotas/fotos.ts).
 
 /**
- * Saúde, usada pelo Fly para liberar uma versão nova: só responde 200 se alcança o banco.
+ * Saúde, usada pela Render para liberar uma versão nova: só responde 200 se alcança o banco.
  * Uma versão que não fala com o banco não recebe tráfego (a anterior continua atendendo).
  */
 app.get('/saude', async (_req, res) => {
-  const versao = process.env.VERSAO ?? process.env.FLY_IMAGE_REF ?? 'desenvolvimento';
+  // RENDER_GIT_COMMIT: a Render informa o commit publicado (o workflow Publicar confere por ela)
+  const versao = process.env.VERSAO ?? process.env.RENDER_GIT_COMMIT ?? 'desenvolvimento';
   try {
     await Promise.race([
       prisma.$queryRaw`SELECT 1`,
