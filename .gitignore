@@ -1,4 +1,9 @@
 node_modules
 dist
 uploads
+*.log
+
+# Segredos: nenhum .env entra no repositório (só os .env.example, com valores de modelo)
 .env
+.env.*
+!.env.example
