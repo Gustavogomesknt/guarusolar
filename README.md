@@ -19,6 +19,7 @@ cp apps/api/.env.example apps/api/.env     # ajuste DATABASE_URL, DIRECT_URL e J
 npm run db:migrate                         # cria as tabelas
 npm run db:seed                            # catálogo, equipes, checklist e usuários de teste
 npm run dev:api                            # http://localhost:3333
+npm run db:limpar                          # apaga os dados de teste (pede para digitar LIMPAR)
 npm run dev:escritorio                     # front do escritório em http://localhost:5173
 ```
 
@@ -109,6 +110,18 @@ Por isso o PWA deve **redimensionar cada foto antes do envio**:
 A API aceita apenas `image/jpeg`, `image/png` e `image/webp`, até 15 MB, no campo `arquivo`.
 Uma foto maior é recusada com status 413, e um formato diferente com status 400, os dois com
 mensagem pronta para mostrar ao técnico.
+
+## Limpar os dados de teste
+
+`npm run db:limpar` apaga, **sem possibilidade de recuperar**, clientes, orçamentos (com itens
+e histórico), projetos, agendamentos, fotos e materiais, e zera a numeração dos códigos: o
+próximo orçamento volta a ser `GS-<ano>-0001` e o próximo projeto `PRJ-<ano>-0001`.
+Usuários, equipes, checklist de fotos e o catálogo de produtos ficam como estão.
+
+Antes de apagar, o script mostra em qual banco vai rodar e quanto existe em cada tabela, e só
+continua se alguém digitar `LIMPAR`. Com `NODE_ENV=production`, ele se recusa a rodar. Tudo é
+apagado numa transação só: se algo falhar, nada é apagado. Arquivos de fotos já enviados à
+pasta de armazenamento não são removidos.
 
 ## Hospedagem
 

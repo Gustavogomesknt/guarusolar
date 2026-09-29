@@ -48,6 +48,7 @@ apps/api/                      API (Express + Prisma)
   prisma/schema.prisma         tabelas (clientes, produtos, orçamentos, itens, projetos,
                                equipes, agendamentos, checklist de fotos, fotos, materiais)
   prisma/seed.ts               catálogo inicial, equipes, checklist e usuários de teste
+  prisma/limpar.ts             apaga os dados de operação (npm run db:limpar)
   src/server.ts                sobe a API e monta as rotas
   src/lib/auth.ts              JWT, hash de senha, middleware autenticar/autorizar
   src/lib/conferencia-enums.ts falha o build se os enums do Prisma e do pacote divergirem
@@ -203,6 +204,9 @@ npm run db:seed          # catálogo, equipes, checklist e usuários de teste
 npm run dev:api          # API em http://localhost:3333
 npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
 npm run db:studio        # inspecionar o banco
+npm run db:limpar        # APAGA clientes, orçamentos, projetos etc. e zera os códigos;
+                         # mantém usuários, equipes, checklist e catálogo. Pede LIMPAR;
+                         # recusa em produção. Nunca rode por conta própria: quem roda é o usuário.
 npm run build            # compila todos os workspaces
 ```
 
