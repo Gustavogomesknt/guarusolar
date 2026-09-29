@@ -370,7 +370,7 @@ $env:DATABASE_URL = "<session pooler, porta 5432>?connection_limit=5"
 $env:DIRECT_URL   = $env:DATABASE_URL
 npm run db:migrate:deploy          # cria as tabelas
 npm run db:marcar-producao         # digite PRODUCAO: db:limpar e usuários de teste passam a recusar
-npm run db:seed:base               # equipes, catálogo inicial, checklist (sem usuários)
+npm run db:seed:base               # equipes e checklist (em produção, pula o catálogo de exemplo)
 npm run usuario -- criar --nome "Seu Nome" --email voce@guarusolar.com.br --papel ADMIN
 # repita para cada pessoa (COMERCIAL, GESTOR; TECNICO com --equipe "Equipe A")
 Remove-Item Env:DATABASE_URL, Env:DIRECT_URL   # volta para o banco de desenvolvimento

@@ -49,7 +49,8 @@ package.json                   workspaces e atalhos (build, dev:api, db:*)
 apps/api/                      API (Express + Prisma)
   prisma/schema.prisma         tabelas (clientes, produtos, orçamentos, itens, projetos,
                                equipes, agendamentos, checklist de fotos, fotos, materiais)
-  prisma/seed-base.ts          equipes, catálogo inicial e checklist (produção também; sem usuários)
+  prisma/seed-base.ts          equipes, catálogo de exemplo e checklist (produção também, mas lá
+                               sem o catálogo de exemplo; sem usuários)
   prisma/seed-teste.ts         usuários de teste (senha pública guarusolar123): NUNCA em produção
                                (recusa com NODE_ENV=production e em banco marcado como produção)
   scripts/usuario.ts           npm run usuario -- criar|nova-senha|desativar|listar: usuários reais,

@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
 
 /*
  * Dados de BASE, iguais em qualquer banco (produção inclusive): equipes, catálogo inicial e
  * checklist de fotos. Pode rodar de novo sem duplicar nada (npm run db:seed:base).
+ * Em banco marcado como produção, o catálogo de EXEMPLO não entra: o catálogo real vem da cópia
+ * dos dados, e produto não se apaga (os exemplos ficariam para sempre, desativados).
  * Usuários NÃO entram aqui: em produção, cada pessoa é criada com npm run usuario.
  */
 
@@ -30,9 +33,13 @@ async function main() {
     { nome: 'String box CC 1 entrada / 1 saída', categoria: 'OUTROS', unidade: 'UN', precoCusto: 262, precoVenda: 389 },
     { nome: 'Instalação e homologação (até 6 kWp)', categoria: 'MAO_DE_OBRA', unidade: 'SERVICO', precoCusto: 1900, precoVenda: 3200 },
   ] as const;
-  for (const p of produtos) {
-    const existe = await prisma.produto.findFirst({ where: { nome: p.nome } });
-    if (!existe) await prisma.produto.create({ data: p as never });
+  if (await bancoDeProducao(prisma)) {
+    console.log('Catálogo de exemplo pulado: banco de produção (o catálogo real vem da cópia dos dados).');
+  } else {
+    for (const p of produtos) {
+      const existe = await prisma.produto.findFirst({ where: { nome: p.nome } });
+      if (!existe) await prisma.produto.create({ data: p as never });
+    }
   }
 
   // --- Checklist de fotos por tipo de serviço ------------------------------
