@@ -150,3 +150,51 @@ export type Produto = {
   /** linhas de orçamento que usam o item */
   usadoEmOrcamentos: number;
 };
+
+/** Serviço na fila de validação (GET /api/validacao/fila). */
+export type ServicoNaFila = {
+  id: string;
+  tipo: TipoServico;
+  status: StatusAgendamento;
+  enviadoEm: string | null;
+  motivoDevolucao: string | null;
+  /** já tinha sido devolvido e voltou com fotos novas */
+  reenviado: boolean;
+  projeto: { codigo: string; cliente: { nome: string; cidade: string | null; uf: string | null } };
+  _count: { fotos: number };
+};
+
+export type FotoEmValidacao = {
+  id: string;
+  chave: string | null;
+  rotulo: string | null;
+  arquivoUrl: string;
+  capturadaEm: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  revisao: 'PENDENTE' | 'OK' | 'REFAZER';
+  comentario: string | null;
+  enviadaPor: { nome: string };
+};
+
+/** Serviço aberto na validação (GET /api/validacao/:id). Fotos já na ordem do checklist. */
+export type ServicoEmValidacao = {
+  id: string;
+  tipo: TipoServico;
+  status: StatusAgendamento;
+  dataInicio: string;
+  dataFim: string;
+  enviadoEm: string | null;
+  sistemaTestado: boolean;
+  observacoesTecnico: string | null;
+  motivoDevolucao: string | null;
+  equipe: { nome: string };
+  tecnicoResponsavel: { nome: string; telefone: string | null } | null;
+  projeto: {
+    codigo: string;
+    cliente: Cliente;
+    orcamento: { id: string; codigo: string };
+  };
+  fotos: FotoEmValidacao[];
+  materiais: { id: string; quantidade: string; observacao: string | null; produto: { nome: string; unidade: Unidade } }[];
+};

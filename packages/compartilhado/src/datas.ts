@@ -62,3 +62,22 @@ export const anoNoFuso = (agora: Date = new Date()) => partesNoFuso(agora).ano;
 /** 28/09/2026 no fuso da empresa. */
 export const formatarData = (instante: Date | string) =>
   new Date(instante).toLocaleDateString('pt-BR', { timeZone: FUSO_EMPRESA });
+
+/** 14:42 no fuso da empresa (hora da foto, do envio). */
+export const formatarHora = (instante: Date | string) =>
+  new Date(instante).toLocaleTimeString('pt-BR', { timeZone: FUSO_EMPRESA, hour: '2-digit', minute: '2-digit' });
+
+/** 28/09/2026 às 14:42 no fuso da empresa. */
+export const formatarDataHora = (instante: Date | string) => `${formatarData(instante)} às ${formatarHora(instante)}`;
+
+/** "agora", "há 5 min", "há 2 h", "ontem", "há 3 dias" (dias contados no fuso da empresa). */
+export function tempoDesde(instante: Date | string, agora: Date = new Date()): string {
+  const minutos = Math.floor((agora.getTime() - new Date(instante).getTime()) / 60_000);
+  if (minutos < 1) return 'agora';
+  if (minutos < 60) return `há ${minutos} min`;
+  const diaDe = (d: Date) => Date.parse(`${diaDeHoje(d)}T00:00:00Z`);
+  const dias = Math.round((diaDe(agora) - diaDe(new Date(instante))) / 86_400_000);
+  if (dias === 0) return `há ${Math.floor(minutos / 60)} h`;
+  if (dias === 1) return 'ontem';
+  return `há ${dias} dias`;
+}

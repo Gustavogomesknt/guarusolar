@@ -160,7 +160,8 @@ export function FotosExtras({
   onTentarDeNovo,
   onDescartar,
 }: {
-  enviadas: { id: string; url?: string }[];
+  /** `refazer`: o gestor marcou esta extra para refazer (tire outra e mande de novo) */
+  enviadas: { id: string; url?: string; refazer?: boolean }[];
   locais: FotoLocal[];
   onCamera: () => void;
   onGaleria: () => void;
@@ -190,12 +191,24 @@ export function FotosExtras({
       {total > 0 && (
         <ul className="flex flex-wrap gap-2">
           {enviadas.map((f) => (
-            <li key={f.id} className="relative flex size-16 items-center justify-center overflow-hidden rounded-lg bg-[#C6D5E8] text-[#2C5484]">
+            <li
+              key={f.id}
+              className={cn(
+                'relative flex size-16 items-center justify-center overflow-hidden rounded-lg bg-[#C6D5E8] text-[#2C5484]',
+                f.refazer && 'border-2 border-destaque',
+              )}
+            >
               {f.url ? <img src={f.url} alt="" className="size-full object-cover" /> : <ImageIcon className="size-6" aria-hidden />}
-              <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full bg-[#17653E] text-white">
-                <Check className="size-3" strokeWidth={3} aria-hidden />
-              </span>
-              <span className="sr-only">Foto extra enviada</span>
+              {f.refazer ? (
+                <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full border border-destaque bg-destaque-suave text-destaque-texto">
+                  <AlertTriangle className="size-3" aria-hidden />
+                </span>
+              ) : (
+                <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full bg-[#17653E] text-white">
+                  <Check className="size-3" strokeWidth={3} aria-hidden />
+                </span>
+              )}
+              <span className="sr-only">{f.refazer ? 'Foto extra que o gestor pediu para refazer' : 'Foto extra enviada'}</span>
             </li>
           ))}
           {locais.map((f) => (

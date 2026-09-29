@@ -183,19 +183,41 @@ rotasAgenda.patch(
 export const rotasValidacao = Router();
 rotasValidacao.use(autenticar, autorizar('GESTOR'));
 
+/** Aprovar e devolver só valem para serviço aguardando validação ou já devolvido. */
+async function servicoEmValidacao(id: string) {
+  const servico = await prisma.agendamento.findUnique({ where: { id }, include: { fotos: true } });
+  if (!servico) throw new ErroHttp(404, 'Serviço não encontrado');
+  if (servico.status !== 'AGUARDANDO_VALIDACAO' && servico.status !== 'DEVOLVIDO') {
+    const motivo: Record<string, string> = {
+      AGENDADO: 'ainda não foi feito',
+      EM_EXECUCAO: 'ainda está em execução: o técnico não enviou para validação',
+      APROVADO: 'já foi aprovado',
+      CANCELADO: 'foi cancelado',
+    };
+    throw new ErroHttp(409, `Este serviço ${motivo[servico.status] ?? 'não está em validação'}.`);
+  }
+  return servico;
+}
+
+/**
+ * Fila do gestor: aguardando validação primeiro (mais antigos antes) e, depois, os devolvidos,
+ * que esperam o técnico. `reenviado`: já tinha sido devolvido e voltou com fotos novas.
+ */
 rotasValidacao.get(
   '/fila',
   rota(async (_req, res) => {
     const fila = await prisma.agendamento.findMany({
       where: { status: { in: ['AGUARDANDO_VALIDACAO', 'DEVOLVIDO'] } },
-      orderBy: { enviadoEm: 'asc' },
+      orderBy: [{ status: 'asc' }, { enviadoEm: 'asc' }],
       include: {
         projeto: { include: { cliente: { select: { nome: true, cidade: true, uf: true } } } },
         tecnicoResponsavel: { select: { nome: true } },
         _count: { select: { fotos: true } },
       },
     });
-    res.json(fila);
+    res.json(
+      fila.map((s) => ({ ...s, reenviado: s.status === 'AGUARDANDO_VALIDACAO' && s.validadoEm !== null })),
+    );
   }),
 );
 
@@ -206,27 +228,46 @@ rotasValidacao.get(
       where: { id: req.params.id },
       include: {
         projeto: { include: { cliente: true, orcamento: { select: { codigo: true, id: true } } } },
+        equipe: { select: { nome: true } },
         tecnicoResponsavel: { select: { nome: true, telefone: true } },
         fotos: { orderBy: { criadoEm: 'asc' }, include: { enviadaPor: { select: { nome: true } } } },
         materiais: { include: { produto: { select: { nome: true, unidade: true } } } },
       },
     });
     if (!servico) throw new ErroHttp(404, 'Serviço não encontrado');
-    res.json(servico);
+
+    // fotos na ordem do checklist do tipo de serviço; extras (sem item) no fim
+    const checklist = await prisma.checklistFoto.findMany({ where: { tipoServico: servico.tipo } });
+    const ordem = new Map(checklist.map((c) => [c.chave, c.ordem]));
+    const fotos = [...servico.fotos].sort(
+      (a, b) =>
+        (a.chave ? (ordem.get(a.chave) ?? 999) : 1000) - (b.chave ? (ordem.get(b.chave) ?? 999) : 1000) ||
+        a.criadoEm.getTime() - b.criadoEm.getTime(),
+    );
+    res.json({ ...servico, fotos });
   }),
 );
 
-/** Aprova o serviço. Só passa se nenhuma foto estiver marcada como REFAZER. */
+/**
+ * Aprova o serviço e conclui o projeto: todas as fotos passam a OK.
+ * Foto marcada para REFAZER bloqueia, a não ser que o gestor confirme que a aceita
+ * (`confirmarFotosMarcadas`: ex. o técnico não conseguiu voltar ao cliente para refazer).
+ */
 rotasValidacao.post(
   '/:id/aprovar',
   rota(async (req, res) => {
-    const servico = await prisma.agendamento.findUnique({
-      where: { id: req.params.id },
-      include: { fotos: true },
-    });
-    if (!servico) throw new ErroHttp(404, 'Serviço não encontrado');
-    if (servico.fotos.some((f) => f.revisao === 'REFAZER')) {
-      throw new ErroHttp(409, 'Há fotos marcadas para refazer. Devolva o serviço ao técnico.');
+    const { confirmarFotosMarcadas } = z
+      .object({ confirmarFotosMarcadas: z.boolean().optional() })
+      .parse(req.body ?? {});
+    const servico = await servicoEmValidacao(req.params.id);
+    const marcadas = servico.fotos.filter((f) => f.revisao === 'REFAZER').length;
+    if (marcadas > 0 && !confirmarFotosMarcadas) {
+      throw new ErroHttp(
+        409,
+        marcadas === 1
+          ? 'Há 1 foto marcada para refazer. Devolva o serviço ao técnico ou confirme que aceita a foto.'
+          : `Há ${marcadas} fotos marcadas para refazer. Devolva o serviço ao técnico ou confirme que aceita as fotos.`,
+      );
     }
 
     const atualizado = await prisma.$transaction(async (tx) => {
@@ -240,7 +281,7 @@ rotasValidacao.post(
         },
       });
       await tx.fotoServico.updateMany({
-        where: { agendamentoId: servico.id, revisao: 'PENDENTE' },
+        where: { agendamentoId: servico.id, revisao: { not: 'OK' } },
         data: { revisao: 'OK' },
       });
       await tx.projeto.update({
@@ -254,24 +295,38 @@ rotasValidacao.post(
   }),
 );
 
-/** Devolve ao técnico, marcando quais fotos precisam ser refeitas. */
+/**
+ * Devolve ao técnico, marcando quais fotos precisam ser refeitas. Pode ser repetido com o
+ * serviço já devolvido (ex.: o gestor mudou de ideia): as fotos que saírem da lista voltam a
+ * pendentes. O projeto volta a "em execução" — está de novo com o técnico.
+ */
 rotasValidacao.post(
   '/:id/devolver',
   rota(async (req, res) => {
     const { motivo, fotosParaRefazer } = z
       .object({
-        motivo: z.string().min(5, 'Explique ao técnico o que precisa ser refeito'),
-        fotosParaRefazer: z.array(z.string().uuid()).min(1),
+        motivo: z.string().trim().min(5, 'Explique ao técnico o que precisa ser refeito'),
+        fotosParaRefazer: z.array(z.string().uuid()).min(1, 'Marque ao menos uma foto para refazer'),
       })
       .parse(req.body);
+    const servico = await servicoEmValidacao(req.params.id);
+    const doServico = new Set(servico.fotos.map((f) => f.id));
+    if (!fotosParaRefazer.every((id) => doServico.has(id))) {
+      throw new ErroHttp(400, 'Há fotos marcadas que não são deste serviço. Recarregue a tela.');
+    }
 
     const atualizado = await prisma.$transaction(async (tx) => {
       await tx.fotoServico.updateMany({
-        where: { id: { in: fotosParaRefazer }, agendamentoId: req.params.id },
+        where: { agendamentoId: servico.id, revisao: 'REFAZER', id: { notIn: fotosParaRefazer } },
+        data: { revisao: 'PENDENTE', comentario: null },
+      });
+      await tx.fotoServico.updateMany({
+        where: { id: { in: fotosParaRefazer }, agendamentoId: servico.id },
         data: { revisao: 'REFAZER', comentario: motivo },
       });
+      await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
       return tx.agendamento.update({
-        where: { id: req.params.id },
+        where: { id: servico.id },
         data: {
           status: 'DEVOLVIDO',
           motivoDevolucao: motivo,

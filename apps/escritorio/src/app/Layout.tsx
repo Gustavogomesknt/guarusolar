@@ -38,7 +38,7 @@ export function Layout() {
                 >
                   {grupo}
                 </p>
-                {doGrupo.map(({ rotulo, caminho, icone: Icone, disponivel }) =>
+                {doGrupo.map(({ rotulo, caminho, icone: Icone, disponivel, contador: Contador }) =>
                   disponivel ? (
                     <NavLink
                       key={caminho}
@@ -54,6 +54,7 @@ export function Layout() {
                     >
                       <Icone className="size-4" aria-hidden />
                       {rotulo}
+                      {Contador && <Contador />}
                     </NavLink>
                   ) : (
                     <span

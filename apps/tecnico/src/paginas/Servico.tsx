@@ -306,7 +306,7 @@ export function Servico() {
         </div>
 
         <FotosExtras
-          enviadas={extrasEnviadas.map((f) => ({ id: f.id, url: fotos.miniaturas[f.id] }))}
+          enviadas={extrasEnviadas.map((f) => ({ id: f.id, url: fotos.miniaturas[f.id], refazer: f.revisao === 'REFAZER' }))}
           locais={extrasLocais}
           onCamera={() => escolherFoto(null, 'camera')}
           onGaleria={() => escolherFoto(null, 'galeria')}

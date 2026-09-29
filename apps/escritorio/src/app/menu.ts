@@ -9,7 +9,9 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import type { ComponentType } from 'react';
 import type { Papel } from '@guarusolar/compartilhado';
+import { ContadorValidacao } from './ContadorValidacao';
 
 export type ItemMenu = {
   rotulo: string;
@@ -18,6 +20,8 @@ export type ItemMenu = {
   papeis: readonly Papel[];
   /** false enquanto a tela ainda não existe: aparece no menu com o selo "Em breve". */
   disponivel: boolean;
+  /** número ao lado do item (ex.: serviços aguardando validação) */
+  contador?: ComponentType;
   /** seção do menu: o comercial vende, a operação executa */
   grupo: 'Comercial' | 'Operação';
 };
@@ -31,6 +35,6 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Agenda', caminho: '/agenda', icone: CalendarDays, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação' },
-  { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: false, grupo: 'Operação' },
+  { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação', contador: ContadorValidacao },
   { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['GESTOR'], disponivel: false, grupo: 'Operação' },
 ];

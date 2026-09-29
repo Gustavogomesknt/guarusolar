@@ -82,9 +82,10 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |
 | POST | `/api/agenda` | gestor | agendar serviço (409 se a equipe já tem serviço no período) |
 | PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas) ou cancelar (`status: CANCELADO`) |
-| GET | `/api/validacao/fila` | gestor | serviços aguardando validação |
-| POST | `/api/validacao/:id/aprovar` | gestor | conclui o serviço |
-| POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo |
+| GET | `/api/validacao/fila` | gestor | aguardando validação (mais antigos primeiro) e, depois, os devolvidos |
+| GET | `/api/validacao/:id` | gestor | serviço com fotos na ordem do checklist, materiais, técnico e equipe |
+| POST | `/api/validacao/:id/aprovar` | gestor | conclui serviço e projeto; foto marcada para refazer exige `confirmarFotosMarcadas` |
+| POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
 | GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |
 | GET | `/api/tecnico/servicos/:id` | técnico | serviço com o checklist e as fotos já enviadas |
 | POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist; `idLocal` evita duplicata no reenvio |
@@ -140,6 +141,11 @@ mensagem pronta para mostrar ao técnico.
 **Reenvio sem duplicar.** O app manda em cada foto um `idLocal` (UUID gerado no celular).
 Se a foto já chegou e só a resposta se perdeu, o reenvio devolve a foto existente (200) em
 vez de criar outra.
+
+**Validação pelo gestor** (`/validacao` no escritório). Aprovar e devolver só valem para
+serviço aguardando validação ou já devolvido (409 nos demais). Devolver de novo troca as fotos
+marcadas (as que saem da lista voltam a pendentes). Aprovar um devolvido com foto ainda marcada
+pede confirmação explícita: o gestor aceita a foto como está (ex.: o técnico não pôde voltar).
 
 **Serviço em aberto.** Fotos e o envio para validação só são aceitos com o serviço agendado,
 em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e a foto de um item
@@ -243,8 +249,8 @@ pasta de armazenamento não são removidos.
 
 ## Próximos passos
 
-1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo e agenda);
-   faltam as telas de validação e de projetos do gestor.
+1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo, agenda e
+   validação); falta a tela de projetos do gestor.
 2. Empacotar o front em executável Windows (Electron ou Tauri).
 3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).

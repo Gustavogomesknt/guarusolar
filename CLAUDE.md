@@ -89,9 +89,15 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                remarcar e cancelar. Datas como texto AAAA-MM-DD (dias.ts no
                                compartilhado); serviço de N dias pula o domingo (fimDoServico).
                                A duração não existe na API: o front pergunta os dias e manda dataFim
+  src/paginas/validacao/       validação (/validacao, só GESTOR): fila à esquerda (aguardando,
+                               depois devolvidos; serviço aberto em ?servico=), detalhe com fotos
+                               OK/Refazer, foto ampliada (← → navegam, O/R marcam, Esc fecha),
+                               motivo, aprovar com confirmação; ao resolver, a fila muda na hora
+                               (setQueryData) e o próximo abre. fila.ts fica separado para o
+                               contador do menu (app/ContadorValidacao) não puxar a tela
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
-  src/app/menu.ts              itens do menu, os papéis de cada um e o grupo (Comercial ou
-                               Operação)
+  src/app/menu.ts              itens do menu, os papéis de cada um, o grupo (Comercial ou
+                               Operação) e o `contador` opcional (número ao lado do item)
   src/app/permissoes.ts        papéis do escritório e podeAcessar() (ADMIN acessa tudo)
   src/components/ui/           gerados pelo shadcn (npx shadcn@latest add ... --cwd apps/escritorio).
                                ATENÇÃO: o CLI instala um pacote npm "cn" e importa `from "cn"`;
@@ -134,6 +140,7 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
   src/enums.ts                 enums do banco como listas `as const` + tipos
   src/calculo.ts               totais, desconto e condições de pagamento
   src/dias.ts                  dias como texto AAAA-MM-DD (somar, nome do dia, semana...)
+  src/datas.ts                 fuso da empresa: diaDeHoje, formatarData/Hora/DataHora, tempoDesde
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
                                o Vite de cada app compila e o `tsc -b` de cada app confere)
   src/api.ts                   cliente HTTP: token no cabeçalho (chave própria de cada app),
@@ -173,7 +180,10 @@ O `.env` da API fica em `apps/api/.env`.
 7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
    teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
    Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
-   devolvido): `conferirServicoAberto` em `apps/api/src/rotas/operacao.ts`.
+   devolvido): `conferirServicoAberto` em `apps/api/src/rotas/operacao.ts`. Aprovar e devolver
+   (gestor) só com o serviço aguardando validação ou devolvido: `servicoEmValidacao`. Devolver
+   põe o projeto de volta em `EM_EXECUCAO`; aprovar conclui o projeto e marca todas as fotos OK
+   (foto ainda marcada para refazer exige `confirmarFotosMarcadas`).
 8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`
    e ao remarcar em `PATCH /api/agenda/:id`; serviços cancelados não contam). Cancelar um
    serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
@@ -233,8 +243,8 @@ status e WhatsApp, agenda, validação e rotas do técnico). Monorepo com o paco
 Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegidas por papel.
 Orçamentos no escritório: lista com indicadores e mudança de status, gerador para criar e
 editar (cliente, itens, condições, salvar, WhatsApp) e modo leitura para aprovados.
-Pipeline, clientes e catálogo prontos. Operação: agenda das equipes (semana); as visões
-Dia e Mês aparecem desativadas.
+Pipeline, clientes e catálogo prontos. Operação: agenda das equipes (semana; as visões
+Dia e Mês aparecem desativadas) e validação dos serviços pelo gestor. Falta a tela de projetos.
 App do técnico (`apps/tecnico`, PWA): login só para TECNICO, agenda, serviço com checklist de
 fotos (câmera, redução no aparelho, data e local), observações, teste e envio para validação;
 fila offline das fotos, abre sem sinal, versão nova com "Atualizar", instalação na tela
@@ -245,8 +255,8 @@ o usuário combina com o Gustavo como expor o ambiente.
 Próximos passos, nesta ordem:
 
 1. ~~Front do escritório: **gerador de orçamentos**~~ (feito).
-2. ~~Demais telas do escritório: lista, pipeline, catálogo, clientes~~ (feito; faltam as telas
-   de **validação** e de **projetos** do gestor).
+2. ~~Demais telas do escritório: lista, pipeline, catálogo, clientes~~ (feito, e também agenda
+   e validação; falta a tela de **projetos** do gestor).
 3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
 4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
    teste no celular com HTTPS).
@@ -266,8 +276,6 @@ Próximos passos, nesta ordem:
   única do `idLocal` barrar a segunda: a resposta é certa (200 com a foto existente), mas o
   segundo arquivo fica sem registro. Raro; resolver junto com o armazenamento (apagar o arquivo
   quando o `P2002` acontece).
-- **Validação sem conferência de status.** `POST /api/validacao/:id/aprovar` e `/devolver` não
-  conferem se o serviço está `AGUARDANDO_VALIDACAO`. Corrigir ao fazer a tela de validação.
 
 ## Comandos
 
