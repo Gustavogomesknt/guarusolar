@@ -1,6 +1,8 @@
 # Backup do banco de produção: toda madrugada (03h em São Paulo) e sob demanda.
 # O plano gratuito do Supabase não dá backup restaurável; este guarda um dump CRIPTOGRAFADO
-# como artefato do GitHub por 14 dias. Segredos: PRODUCAO_DATABASE_URL (a Session pooler de
+# como artefato do GitHub por 14 dias (o do dia 1º de cada mês, por 90). Só o schema public: as
+# tabelas do sistema, as migrations e a SequenciaCodigo (as internas do Supabase ficam de fora).
+# Segredos: PRODUCAO_DATABASE_URL (a Session pooler de
 # produção, porta 5432; a mesma do Publicar) e BACKUP_SENHA (senha da criptografia: guarde fora do GitHub).
 name: Backup do banco
 
@@ -28,12 +30,15 @@ jobs:
             echo "::error::BACKUP_SENHA curta demais: use 16 caracteres ou mais."
             exit 1
           fi
-          arquivo="guarusolar-$(date -u +%Y-%m-%dT%H%M)Z.dump"
+          # dia 1º: cópia mensal, guardada 90 dias (o máximo do GitHub); nos outros dias, 14
+          if [ "$(date -u +%d)" = "01" ]; then tipo=mensal; dias=90; else tipo=diario; dias=14; fi
+          echo "DIAS=$dias" >> "$GITHUB_ENV"
+          arquivo="guarusolar-$tipo-$(date -u +%Y-%m-%dT%H%M)Z.dump"
           # sem os parâmetros do Prisma (?connection_limit=...): o pg_dump recusa os que não conhece
           url_limpa="${BACKUP_DATABASE_URL%%\?*}"
           # pg_dump 17 (imagem oficial) lê servidores 15, 16 e 17
           docker run --rm -e URL="$url_limpa" -v "$PWD:/saida" postgres:17 \
-            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$URL" > /saida/'"$arquivo"
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges --schema=public "$URL" > /saida/'"$arquivo"
           # confere que o arquivo abre e tem dados antes de guardar (um dump vazio "passaria")
           tabelas=$(docker run --rm -v "$PWD:/saida" postgres:17 pg_restore --list "/saida/$arquivo" | grep -c "TABLE DATA" || true)
           echo "Tabelas com dados no dump: $tabelas"
@@ -49,4 +54,4 @@ jobs:
         with:
           name: ${{ env.ARQUIVO }}
           path: ${{ env.ARQUIVO }}
-          retention-days: 14
+          retention-days: ${{ env.DIAS }}

@@ -429,8 +429,15 @@ migration, rode o backup (Actions › Backup do banco › Run workflow).
 ### Backup e restauração do banco
 
 O plano gratuito do Supabase não dá backup restaurável. O workflow **Backup do banco** faz um
-`pg_dump` toda madrugada (03h), criptografado com `BACKUP_SENHA`, guardado 14 dias como artefato
-do GitHub. Para restaurar: baixe o artefato, `gpg --decrypt arquivo.dump.gpg > arquivo.dump` e
+`pg_dump` do schema `public` (tabelas, dados, migrations e sequência de códigos) toda madrugada
+(03h), criptografado com `BACKUP_SENHA`, guardado 14 dias como artefato do GitHub; o do dia 1º
+de cada mês (`guarusolar-mensal-...`) fica 90 dias. Segredos: `PRODUCAO_DATABASE_URL` e
+`BACKUP_SENHA` (16+ caracteres; **perdê-la é perder todos os backups**: guarde em dois lugares).
+
+**Rotina mensal (manual):** no começo de cada mês, baixe o backup `guarusolar-mensal-...` (Actions ›
+Backup do banco › a execução do dia 1º › Artifacts) e guarde fora do GitHub (OneDrive da empresa
+ou outro local). O arquivo já vem criptografado. Assim um problema na conta do GitHub não leva
+os backups junto. Para restaurar: baixe o artefato, `gpg --decrypt arquivo.dump.gpg > arquivo.dump` e
 `pg_restore --no-owner --dbname "<url do banco de destino>" arquivo.dump` (de preferência num
 projeto novo, para conferir antes de trocar).
 
