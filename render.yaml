@@ -40,10 +40,11 @@ services:
       - key: CORS_ORIGINS
         value: https://guarusolar.onrender.com
       # Segredos: preenchidos no painel ao criar o Blueprint (nunca no repositório).
-      # As duas com a conexão de SESSÃO do Supabase (porta 5432), sem pgbouncer=true.
+      # As duas do banco com a conexão de SESSÃO do Supabase (porta 5432), sem pgbouncer=true.
+      # JWT_SECRET: novo, só de produção (README, "Render"); trocá-lo encerra todas as sessões.
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
       - key: JWT_SECRET
-        generateValue: true
+        sync: false

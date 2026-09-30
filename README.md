@@ -381,8 +381,10 @@ Os dados reais que estão hoje no banco de desenvolvimento são copiados num pas
 
 **2. Render.** Crie a conta em render.com entrando com o GitHub (sem cartão) e dê acesso ao
 repositório `guarusolar`. New › **Blueprint** › escolha o repositório: a Render lê o
-`render.yaml` e pede `DATABASE_URL` e `DIRECT_URL` (as duas com o valor do passo 1); o
-`JWT_SECRET` ela mesma gera. Se o nome `guarusolar` já existir na Render, o endereço ganha um
+`render.yaml` e pede `DATABASE_URL` e `DIRECT_URL` (as duas com o valor do passo 1) e o
+`JWT_SECRET`, novo e só de produção:
+`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
+A região (Virginia) vem do `render.yaml` e não muda depois de criado o serviço. Se o nome `guarusolar` já existir na Render, o endereço ganha um
 sufixo: corrija `API_URL_PUBLICA` e `CORS_ORIGINS` em Environment. Confira
 `https://<servico>.onrender.com/saude` (`"banco":"ok"` e a versão) e entre com o usuário criado.
 
