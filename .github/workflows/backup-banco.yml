@@ -19,12 +19,28 @@ jobs:
           BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
         run: |
           set -euo pipefail
+          # sem os segredos, falha com a explicação (sem BACKUP_SENHA o gpg cifraria com senha vazia)
+          if [ -z "$BACKUP_DATABASE_URL" ] || [ -z "$BACKUP_SENHA" ]; then
+            echo "::error::Faltam os segredos PRODUCAO_DATABASE_URL e/ou BACKUP_SENHA (Settings › Secrets and variables › Actions)."
+            exit 1
+          fi
+          if [ "${#BACKUP_SENHA}" -lt 16 ]; then
+            echo "::error::BACKUP_SENHA curta demais: use 16 caracteres ou mais."
+            exit 1
+          fi
           arquivo="guarusolar-$(date -u +%Y-%m-%dT%H%M)Z.dump"
           # sem os parâmetros do Prisma (?connection_limit=...): o pg_dump recusa os que não conhece
           url_limpa="${BACKUP_DATABASE_URL%%\?*}"
           # pg_dump 17 (imagem oficial) lê servidores 15, 16 e 17
           docker run --rm -e URL="$url_limpa" -v "$PWD:/saida" postgres:17 \
             sh -c 'pg_dump --format=custom --no-owner --no-privileges "$URL" > /saida/'"$arquivo"
+          # confere que o arquivo abre e tem dados antes de guardar (um dump vazio "passaria")
+          tabelas=$(docker run --rm -v "$PWD:/saida" postgres:17 pg_restore --list "/saida/$arquivo" | grep -c "TABLE DATA" || true)
+          echo "Tabelas com dados no dump: $tabelas"
+          if [ "$tabelas" -lt 1 ]; then
+            echo "::error::O dump não tem nenhuma tabela com dados."
+            exit 1
+          fi
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_SENHA" --symmetric --cipher-algo AES256 "$arquivo"
           rm "$arquivo"
           ls -lh "$arquivo.gpg"
