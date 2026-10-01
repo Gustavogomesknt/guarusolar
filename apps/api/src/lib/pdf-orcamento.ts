@@ -33,6 +33,8 @@ import { EMPRESA, INSTITUCIONAL, PAGINA_1, type IconePilar } from '../conteudo/p
 const COR = {
   marinho: '#0E2E60',
   laranja: '#F26B21',
+  // fundo do valor total, com texto branco: 4,84:1 (o laranja da marca dá 3,04:1)
+  laranjaFundo: '#C14D10',
   laranjaClaro: '#FEF5EE',
   laranjaBorda: '#F3C9A8',
   laranjaTexto: '#8A4B07',
@@ -387,7 +389,7 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
           {
             largura: larguraTotal,
             altura: alturaPagamento,
-            fundo: COR.laranja,
+            fundo: COR.laranjaFundo,
             padding: [15, Math.max(10, (alturaPagamento - (linhaDoDesconto ? 58 : 46)) / 2), 15, 8],
           },
         ) as object),

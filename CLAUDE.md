@@ -279,6 +279,9 @@ Cores da marca: **azul, laranja e branco**.
 **Laranja só em ícones, bordas, selos e no logo — nunca como fundo com texto branco**
 (contraste de ~2,8:1, abaixo do mínimo de 4,5:1). Selo laranja = borda laranja, fundo
 `destaque-suave` e texto `destaque-texto` (componente `Selo`). Botões usam o azul de ação.
+**Única exceção aprovada:** o laranja escuro **`#C14D10`** pode ser fundo de texto branco
+(4,84:1). Hoje é o bloco do valor total na proposta em PDF (`COR.laranjaFundo`); use esse tom,
+e não o laranja da marca, se outro lugar precisar de laranja com texto branco.
 
 Verde e vermelho ficam reservados para "Aprovado" e "Recusado". Tipografia do protótipo:
 Bricolage Grotesque nos títulos, IBM Plex Sans no texto, IBM Plex Mono em códigos e valores.
