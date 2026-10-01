@@ -1,4 +1,5 @@
 import { FileText, Loader2, MessageCircle } from 'lucide-react';
+import type { PagamentoCartao } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { CartaoCondicoes } from './CartaoCondicoes';
@@ -9,6 +10,10 @@ export type Totais = {
   descontoAplicado: number;
   valorTotal: number;
   resumoPagamento: string;
+  entrada: number;
+  /** o que o cliente paga (com a taxa do cartão repassada) */
+  valorTotalCliente: number;
+  cartao: PagamentoCartao | null;
 };
 
 /**
@@ -46,7 +51,7 @@ export function ResumoOrcamento({
     <aside aria-label="Resumo do orçamento" className="flex flex-col gap-4">
       <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
         <legend className="sr-only">Condições</legend>
-        <CartaoCondicoes subtotal={totais.subtotal} descontoAplicado={totais.descontoAplicado} />
+        <CartaoCondicoes totais={totais} />
       </fieldset>
 
       <section aria-labelledby="titulo-total" className="flex flex-col gap-1.5 rounded-[14px] bg-sidebar p-[22px]">

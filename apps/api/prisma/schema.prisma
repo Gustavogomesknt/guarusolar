@@ -206,8 +206,19 @@ model Orcamento {
   // resultado do cálculo do pagamento, gravado junto com os totais: PDF e WhatsApp leem
   // daqui e nunca recalculam
   valorEntrada    Decimal? @db.Decimal(12, 2) // ENTRADA_PARCELAS
-  valorParcela    Decimal? @db.Decimal(12, 2) // ENTRADA_PARCELAS
-  resumoPagamento String? // "Entrada de R$ 5.318,67 + 6x de R$ 2.068,37"
+  valorParcela    Decimal? @db.Decimal(12, 2) // ENTRADA_PARCELAS (da 2ª em diante)
+  resumoPagamento String? // "Entrada de R$ 3.000,00 + 12x de R$ 664,31 (1ª de R$ 664,35)"
+
+  // cartão (ENTRADA_PARCELAS; a entrada é Pix/transferência, sem taxa). A taxa da operadora usada
+  // fica GRAVADA: renegociar a tabela (compartilhado/taxasCartao.ts) não muda proposta salva.
+  // valorTotal continua sendo o que a Guarusolar recebe (indicadores); valorTotalCliente, o que o
+  // cliente paga com a taxa repassada (PDF e WhatsApp)
+  pagamentoDebito      Boolean  @default(false)
+  absorverTaxaCartao   Boolean  @default(false)
+  taxaCartaoPct        Decimal? @db.Decimal(5, 2)
+  valorPrimeiraParcela Decimal? @db.Decimal(12, 2)
+  valorTotalCliente    Decimal? @db.Decimal(12, 2)
+  valorTaxaAbsorvida   Decimal? @db.Decimal(12, 2) // quanto a empresa deixa de receber (absorvida)
 
   // chave do link público do PDF (/api/orcamentos/:id/pdf?token=...), enviado ao cliente
   // pelo WhatsApp; 64 caracteres hexadecimais aleatórios gerados pelo próprio Postgres

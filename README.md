@@ -55,7 +55,8 @@ apps/tecnico/               app do técnico: PWA aberto no navegador do celular
   src/paginas/              telas (por enquanto: login e início)
 packages/compartilhado/
   src/enums.ts              enums do banco, usados pelos fronts sem depender do Prisma
-  src/calculo.ts            regra de totais, desconto e parcelamento
+  src/calculo.ts            regra de totais, desconto e parcelamento (com a taxa do cartão)
+  src/taxasCartao.ts        tabela de taxas do Mercado Pago: edite aqui quando renegociar
 packages/web/               o que os dois fronts usam no navegador
   src/api.ts                cliente HTTP com token e tratamento central de erro
   src/sessao.tsx            login, saída e sessão expirada
@@ -98,6 +99,16 @@ packages/web/               o que os dois fronts usam no navegador
 - **Valores calculados no servidor.** O front manda itens e descontos; quem soma é a API.
   Assim ninguém consegue gravar um total diferente do que as regras permitem. A regra fica em
   `packages/compartilhado`, e o front usa a mesma função só para mostrar a prévia em tela.
+- **Taxa do cartão repassada ao cliente.** Na condição "Entrada + cartão", a entrada é Pix ou
+  transferência (sem taxa) e o saldo vai para o cartão (débito ou 1x a 18x) com a taxa do Mercado
+  Pago repassada: valor cobrado = saldo ÷ (1 − taxa), para a Guarusolar receber o valor cheio da
+  proposta. Ex.: proposta de R$ 10.000,00, entrada de 30%, 12x (12,19%): R$ 7.000,00 viram
+  R$ 7.971,76 no cartão (1ª de R$ 664,35 + 11x de R$ 664,31); o cliente paga R$ 10.971,76 e a
+  empresa recebe R$ 10.000,00. O vendedor pode absorver a taxa numa negociação (a tela mostra
+  quanto a empresa deixa de receber). A tabela fica em `packages/compartilhado/src/taxasCartao.ts`;
+  cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
+  Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
+  com a taxa.
 - **Itens do orçamento são uma cópia.** Nome, unidade e preço ficam gravados no item.
   Mudar o catálogo depois não altera orçamentos antigos.
 - **Nada é apagado.** Clientes e produtos são desativados, preservando o histórico.

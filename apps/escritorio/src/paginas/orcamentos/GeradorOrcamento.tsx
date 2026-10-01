@@ -30,6 +30,7 @@ import {
   valoresIniciais,
   type FormularioOrcamento,
   type OrcamentoSalvo,
+  cartaoDoSalvo,
   type ProblemaFormulario,
 } from './formulario';
 
@@ -82,6 +83,10 @@ export function GeradorOrcamento({
         descontoAplicado: Number(salvo.descontoAplicado),
         valorTotal: Number(salvo.valorTotal),
         resumoPagamento: salvo.resumoPagamento,
+        // o cartão como foi gravado: proposta salva não muda com a tabela de taxas
+        entrada: Number(salvo.valorEntrada ?? 0),
+        valorTotalCliente: Number(salvo.valorTotalCliente ?? salvo.valorTotal),
+        cartao: cartaoDoSalvo(salvo),
       }
     : previa;
 

@@ -6,6 +6,7 @@ import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import {
   calcularOrcamento,
+  MAXIMO_PARCELAS,
   formatarBRL,
   formatarData,
   inicioDoMes,
@@ -33,7 +34,9 @@ const orcamentoSchema = z.object({
   condicaoPagamento: z.enum(['A_VISTA', 'ENTRADA_PARCELAS', 'FINANCIAMENTO']),
   descontoAVistaPct: z.number().min(0).max(100).optional(),
   entradaPct: z.number().min(0).max(100).optional(),
-  parcelas: z.number().int().min(1).max(60).optional(),
+  parcelas: z.number().int().min(1).max(MAXIMO_PARCELAS, `Até ${MAXIMO_PARCELAS}x no cartão`).optional(),
+  pagamentoDebito: z.boolean().default(false),
+  absorverTaxaCartao: z.boolean().default(false),
   bancoFinanciamento: z.string().optional(),
   observacoes: z.string().optional(),
   // proposta em PDF: serviço no título e se a tabela mostra os preços de cada item
@@ -48,10 +51,18 @@ const orcamentoSchema = z.object({
  */
 function pagamentoGravado(condicao: CondicaoPagamento, totais: ResultadoCalculo) {
   const parcelado = condicao === 'ENTRADA_PARCELAS';
+  const c = parcelado ? totais.cartao : null;
   return {
     valorEntrada: parcelado ? totais.entrada : null,
     valorParcela: parcelado ? totais.valorParcela : null,
     resumoPagamento: totais.resumoPagamento,
+    // a taxa usada fica gravada: a tabela renegociada não muda proposta salva
+    pagamentoDebito: c?.debito ?? false,
+    absorverTaxaCartao: c?.absorvida ?? false,
+    taxaCartaoPct: c ? c.taxaPct : null,
+    valorPrimeiraParcela: c ? c.valorPrimeiraParcela : null,
+    valorTotalCliente: c ? totais.valorTotalCliente : null,
+    valorTaxaAbsorvida: c ? c.valorAbsorvido : null,
   };
 }
 
@@ -242,6 +253,8 @@ rotasOrcamentos.post(
       descontoAVistaPct: dados.descontoAVistaPct,
       entradaPct: dados.entradaPct,
       parcelas: dados.parcelas,
+      debito: dados.pagamentoDebito,
+      absorverTaxaCartao: dados.absorverTaxaCartao,
     });
 
     // o código sai dentro da mesma transação: se a criação falhar, o número não é perdido
@@ -299,6 +312,8 @@ rotasOrcamentos.put(
       descontoAVistaPct: dados.descontoAVistaPct,
       entradaPct: dados.entradaPct,
       parcelas: dados.parcelas,
+      debito: dados.pagamentoDebito,
+      absorverTaxaCartao: dados.absorverTaxaCartao,
     });
 
     // troca os itens em bloco: se algo falhar, nada é gravado
@@ -425,7 +440,8 @@ rotasOrcamentos.post(
       `Segue o orçamento ${orcamento.codigo} da Guarusolar para o seu sistema de energia solar:`,
       '',
       // valores gravados ao salvar; nada é recalculado para a mensagem
-      `• Valor total: ${formatarBRL(Number(orcamento.valorTotal))}`,
+      // com cartão, o total com a taxa repassada; sem cartão (ou orçamento antigo), o valor da proposta
+      `• Valor total: ${formatarBRL(Number(orcamento.valorTotalCliente ?? orcamento.valorTotal))}`,
       `• Pagamento: ${orcamento.resumoPagamento ?? '[CONDIÇÃO DE PAGAMENTO]'}`,
       `• Validade: ${formatarData(orcamento.validade)}`,
       '',

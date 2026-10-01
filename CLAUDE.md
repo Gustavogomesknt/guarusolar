@@ -183,7 +183,9 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
   src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
-  src/calculo.ts               totais, desconto e condições de pagamento
+  src/calculo.ts               totais, desconto e condições de pagamento; calcularCartao
+  src/taxasCartao.ts           EDITÁVEL: tabela de taxas do Mercado Pago (débito, 1x a 18x) e a
+                               data da última atualização
   src/dias.ts                  dias como texto AAAA-MM-DD (somar, nome do dia, semana...)
   src/datas.ts                 fuso da empresa: diaDeHoje, formatarData/Hora/DataHora, tempoDesde
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
@@ -223,6 +225,13 @@ O `.env` da API fica em `apps/api/.env`.
 1. **Quem calcula é o servidor.** O front envia itens, desconto e condição de pagamento;
    a API recalcula tudo com `calcularOrcamento` (`packages/compartilhado/src/calculo.ts`) e grava.
    Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
+   **Cartão (Entrada + cartão):** a entrada é Pix ou transferência, sem taxa; só o saldo vai ao
+   cartão, com a taxa da operadora (MDR) REPASSADA: cobrado = saldo ÷ (1 − taxa), arredondado
+   para cima (nunca saldo × (1 + taxa)). Parcelas em centavos inteiros; a 1ª leva a sobra e a soma
+   fecha com o cobrado. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
+   `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
+   fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
+   (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
    gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
    não altera orçamento antigo. Na edição (PUT),

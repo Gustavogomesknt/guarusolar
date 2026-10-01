@@ -353,9 +353,13 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
     76,
     35 + alturaDoTexto(textoPagamento, larguraPagamento - 28, 10.5, 1.3, true) + (PAGINA_1.notaDoPagamento ? 4 + alturaDoTexto(PAGINA_1.notaDoPagamento, larguraPagamento - 28, 9, 1.3) : 0),
   );
+  // O cliente vê o total JÁ com a taxa do cartão repassada, sem linha de "taxa da operadora".
+  // Com a taxa embutida, "subtotal · desconto" não fecharia com o total: fica só o desconto.
+  const totalCliente = numero(o.valorTotalCliente ?? o.valorTotal);
+  const comTaxaEmbutida = totalCliente !== numero(o.valorTotal);
   const linhaDoDesconto =
     desconto > 0
-      ? detalhar
+      ? detalhar && !comTaxaEmbutida
         ? `Subtotal ${formatarBRL(numero(o.subtotal))} · desconto de ${formatarBRL(desconto)}`
         : `Já com desconto de ${formatarBRL(desconto)}`
       : '';
@@ -382,7 +386,7 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
           {
             stack: [
               { text: 'VALOR TOTAL DA PROPOSTA', fontSize: 8, bold: true, characterSpacing: 0.9, color: COR.branco },
-              { text: formatarBRL(numero(o.valorTotal)), fontSize: 27, bold: true, color: COR.branco, lineHeight: 1.1, margin: [0, 2, 0, 0] },
+              { text: formatarBRL(totalCliente), fontSize: 27, bold: true, color: COR.branco, lineHeight: 1.1, margin: [0, 2, 0, 0] },
               ...(linhaDoDesconto ? [{ text: linhaDoDesconto, fontSize: 8.5, color: COR.branco, margin: [0, 2, 0, 0] }] : []),
             ],
           },

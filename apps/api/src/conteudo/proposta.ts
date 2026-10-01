@@ -33,7 +33,7 @@ export const PAGINA_1 = {
   /** rodapé da tabela de itens */
   notaDosItens: 'Todos os equipamentos e serviços seguem rigorosamente as normas ABNT NBR.',
   /** abaixo da condição de pagamento escolhida no orçamento */
-  notaDoPagamento: 'Parcelamos em até 21x no cartão, com taxa da operadora. À vista no Pix ou transferência, com desconto.',
+  notaDoPagamento: 'Parcelamos em até 18x no cartão, com taxa da operadora. À vista no Pix ou transferência, com desconto.',
   prazo: { titulo: 'PRAZO DE EXECUÇÃO', texto: '[PRAZO] após aprovação' },
   garantia: { titulo: 'GARANTIA DO SERVIÇO', texto: '[GARANTIA] · equipamentos conforme fabricante' },
   suporte: { titulo: 'SUPORTE', texto: 'Pós-venda dedicado em todo o Brasil' },

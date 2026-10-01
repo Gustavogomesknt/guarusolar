@@ -1,5 +1,5 @@
 import { Controller, useFormContext, useWatch } from 'react-hook-form';
-import type { CondicaoPagamento, TipoDesconto } from '@guarusolar/compartilhado';
+import { TAXAS_CARTAO, type CondicaoPagamento, type TipoDesconto } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,11 @@ import {
   problemaNoDesconto,
   type FormularioOrcamento,
 } from './formulario';
+import type { Totais } from './ResumoOrcamento';
 
 const CONDICOES: { valor: CondicaoPagamento; titulo: string; descricao: string }[] = [
   { valor: 'A_VISTA', titulo: 'À vista', descricao: 'Pix ou transferência, com desconto' },
-  { valor: 'ENTRADA_PARCELAS', titulo: 'Entrada + parcelas', descricao: 'Boleto ou cartão, sem juros' },
+  { valor: 'ENTRADA_PARCELAS', titulo: 'Entrada + cartão', descricao: 'Entrada no Pix, saldo no cartão com a taxa repassada' },
   { valor: 'FINANCIAMENTO', titulo: 'Financiamento', descricao: 'Linha de crédito solar do banco parceiro' },
 ];
 
@@ -29,7 +30,8 @@ const TIPOS_DESCONTO: { valor: TipoDesconto; rotulo: string; nome: string }[] = 
 const CLASSE_SELECT =
   'h-10 w-full rounded-[10px] border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
-export function CartaoCondicoes({ subtotal, descontoAplicado }: { subtotal: number; descontoAplicado: number }) {
+export function CartaoCondicoes({ totais }: { totais: Totais }) {
+  const { subtotal, descontoAplicado } = totais;
   const {
     control,
     register,
@@ -184,15 +186,17 @@ export function CartaoCondicoes({ subtotal, descontoAplicado }: { subtotal: numb
             </Campo>
             <Campo id="parcelas" rotulo="Parcelas" erro={errors.parcelas?.message}>
               <select {...ariaDoCampo('parcelas', errors.parcelas?.message)} {...register('parcelas', { onChange: () => clearErrors('parcelas') })} className={CLASSE_SELECT}>
-                {OPCOES_PARCELAS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}x
+                {OPCOES_PARCELAS.map(({ valor, rotulo }) => (
+                  <option key={valor} value={valor}>
+                    {rotulo}
                   </option>
                 ))}
               </select>
             </Campo>
           </div>
         )}
+
+        {condicao === 'ENTRADA_PARCELAS' && totais.cartao && <QuadroDoCartao totais={totais} />}
 
         {condicao === 'FINANCIAMENTO' && (
           <p className="rounded-[10px] bg-background px-3 py-2.5 text-[13px] leading-relaxed text-foreground/80">
@@ -253,5 +257,70 @@ export function CartaoCondicoes({ subtotal, descontoAplicado }: { subtotal: numb
         )}
       />
     </section>
+  );
+}
+
+const pct = (v: number) => `${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+/**
+ * As contas do cartão para o vendedor: parcelas, total do cliente, taxa e o que a Guarusolar
+ * recebe. E a opção de absorver a taxa (negociação), com o quanto a empresa deixa de receber.
+ */
+function QuadroDoCartao({ totais }: { totais: Totais }) {
+  const { control } = useFormContext<FormularioOrcamento>();
+  const c = totais.cartao!;
+  const recebe = totais.valorTotal - c.valorAbsorvido;
+  const parcelas = c.debito
+    ? `Débito de ${formatarBRL(c.valorCobrado)}`
+    : `${c.parcelas}x de ${formatarBRL(c.valorParcela)}` +
+      (c.valorPrimeiraParcela !== c.valorParcela ? ` (1ª de ${formatarBRL(c.valorPrimeiraParcela)})` : '');
+  const linhas: [string, string][] = [
+    ['No cartão', parcelas],
+    ['Taxa da operadora', `${pct(c.taxaPct)} · ${c.absorvida ? 'absorvida pela Guarusolar' : 'repassada ao cliente'}`],
+    [
+      'Cliente paga no total',
+      totais.entrada > 0
+        ? `${formatarBRL(totais.valorTotalCliente)} (${formatarBRL(totais.entrada)} no Pix + ${formatarBRL(c.valorCobrado)} no cartão)`
+        : formatarBRL(totais.valorTotalCliente),
+    ],
+    ['Guarusolar recebe', formatarBRL(recebe)],
+  ];
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <dl className="flex flex-col gap-1.5 rounded-[10px] bg-background px-3 py-2.5 text-[13px]">
+        {linhas.map(([rotulo, valor]) => (
+          <div key={rotulo} className="flex flex-col gap-0.5">
+            <dt className="text-muted-foreground">{rotulo}</dt>
+            <dd className="font-medium text-foreground">{valor}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <Controller
+        control={control}
+        name="absorverTaxaCartao"
+        render={({ field }) => (
+          <div className="flex items-start justify-between gap-3">
+            <Label htmlFor="absorver-taxa" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
+              Absorver a taxa nesta proposta
+              <span id="absorver-taxa-ajuda" className="text-xs font-normal text-muted-foreground">
+                Para negociação: o cliente paga o valor da proposta e a Guarusolar arca com a taxa.
+              </span>
+            </Label>
+            <Switch id="absorver-taxa" aria-describedby="absorver-taxa-ajuda" checked={field.value} onCheckedChange={field.onChange} />
+          </div>
+        )}
+      />
+      {c.absorvida && (
+        <p role="status" className="rounded-[10px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
+          A Guarusolar deixa de receber <strong>{formatarBRL(c.valorAbsorvido)}</strong>: recebe {formatarBRL(recebe)} em vez de{' '}
+          {formatarBRL(totais.valorTotal)}.
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Taxas do Mercado Pago atualizadas em {TAXAS_CARTAO.atualizadoEm}. A entrada é no Pix ou na transferência, sem taxa.
+      </p>
+    </div>
   );
 }

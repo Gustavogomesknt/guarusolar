@@ -1,8 +1,9 @@
-import { partesNoFuso } from '@guarusolar/compartilhado';
+import { MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
   EntradaCalculo,
+  PagamentoCartao,
   StatusOrcamento,
   TipoDesconto,
   Unidade,
@@ -34,7 +35,10 @@ export type FormularioOrcamento = {
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct: string;
   entradaPct: string;
+  /** 'D' = débito; '1' a '18' = crédito em N vezes */
   parcelas: string;
+  /** a Guarusolar absorve a taxa do cartão (negociação) */
+  absorverTaxaCartao: boolean;
   /** AAAA-MM-DD, como o <input type="date"> usa */
   validade: string;
   observacoes: string;
@@ -49,7 +53,17 @@ export const ESTILO_SOMENTE_LEITURA =
   '[&:disabled_.busca-catalogo]:hidden [&:disabled_button]:cursor-not-allowed [&:disabled_button]:opacity-40 [&:disabled_input]:opacity-60 [&:disabled_select]:opacity-60';
 
 export const OPCOES_ENTRADA =['0', '10', '20', '30', '40', '50'];
-export const OPCOES_PARCELAS = ['2', '3', '4', '6', '10', '12'];
+const pct = (v: number) => `${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+export const DEBITO = 'D';
+/** Débito e 1x a 18x no crédito, com a taxa da tabela (compartilhado/taxasCartao.ts). */
+export const OPCOES_PARCELAS = [
+  { valor: DEBITO, rotulo: `Débito · ${pct(TAXAS_CARTAO.debito)}` },
+  ...Array.from({ length: MAXIMO_PARCELAS }, (_, i) => i + 1).map((n) => ({
+    valor: String(n),
+    rotulo: `${n}x${n === 1 ? ' crédito' : ''} · ${pct(TAXAS_CARTAO.credito[n])}`,
+  })),
+];
+const parcelaValida = (v: string) => OPCOES_PARCELAS.some((o) => o.valor === v);
 export const DIAS_DE_VALIDADE = 30;
 
 /** Data AAAA-MM-DD `dias` à frente de hoje, contando "hoje" no fuso da empresa. */
@@ -69,6 +83,7 @@ export function valoresIniciais(): FormularioOrcamento {
     descontoAVistaPct: '0',
     entradaPct: '30',
     parcelas: '6',
+    absorverTaxaCartao: false,
     validade: dataDaquiA(DIAS_DE_VALIDADE),
     observacoes: '',
     descricaoServico: '',
@@ -111,7 +126,9 @@ export function entradaDoCalculo(f: FormularioOrcamento): EntradaCalculo {
     condicaoPagamento: f.condicaoPagamento,
     descontoAVistaPct: numeroOuZero(f.descontoAVistaPct),
     entradaPct: numeroOuZero(f.entradaPct),
-    parcelas: Math.max(1, Math.trunc(numeroOuZero(f.parcelas))),
+    parcelas: f.parcelas === DEBITO ? 1 : Math.max(1, Math.trunc(numeroOuZero(f.parcelas))),
+    debito: f.parcelas === DEBITO,
+    absorverTaxaCartao: f.absorverTaxaCartao,
   };
 }
 
@@ -174,7 +191,12 @@ export function paraApi(f: FormularioOrcamento) {
     condicaoPagamento: f.condicaoPagamento,
     ...(f.condicaoPagamento === 'A_VISTA' ? { descontoAVistaPct: numeroOuZero(f.descontoAVistaPct) } : {}),
     ...(f.condicaoPagamento === 'ENTRADA_PARCELAS'
-      ? { entradaPct: numeroOuZero(f.entradaPct), parcelas: Math.trunc(numeroOuZero(f.parcelas)) }
+      ? {
+          entradaPct: numeroOuZero(f.entradaPct),
+          parcelas: f.parcelas === DEBITO ? 1 : Math.trunc(numeroOuZero(f.parcelas)),
+          pagamentoDebito: f.parcelas === DEBITO,
+          absorverTaxaCartao: f.absorverTaxaCartao,
+        }
       : {}),
     observacoes: f.observacoes.trim() || undefined,
     descricaoServico: f.descricaoServico.trim() || undefined,
@@ -205,7 +227,37 @@ export type OrcamentoSalvo = {
   resumoPagamento: string;
   /** chave do link público do PDF */
   tokenPdf: string;
+  // cartão, como a API gravou (nulos sem cartão ou em orçamento antigo)
+  parcelas?: number | null;
+  pagamentoDebito?: boolean;
+  absorverTaxaCartao?: boolean;
+  taxaCartaoPct?: string | null;
+  valorEntrada?: string | null;
+  valorParcela?: string | null;
+  valorPrimeiraParcela?: string | null;
+  valorTotalCliente?: string | null;
+  valorTaxaAbsorvida?: string | null;
 };
+
+/** O pagamento no cartão como foi GRAVADO (a taxa da época; a tabela atual não entra). */
+export function cartaoDoSalvo(s: OrcamentoSalvo): PagamentoCartao | null {
+  if (s.taxaCartaoPct == null || s.valorTotalCliente == null) return null;
+  const entrada = Number(s.valorEntrada ?? 0);
+  const saldo = Math.round((Number(s.valorTotal) - entrada) * 100) / 100;
+  const absorvido = Number(s.valorTaxaAbsorvida ?? 0);
+  return {
+    debito: Boolean(s.pagamentoDebito),
+    parcelas: s.parcelas ?? 1,
+    taxaPct: Number(s.taxaCartaoPct),
+    absorvida: Boolean(s.absorverTaxaCartao),
+    saldo,
+    valorCobrado: Math.round((Number(s.valorTotalCliente) - entrada) * 100) / 100,
+    valorParcela: Number(s.valorParcela ?? 0),
+    valorPrimeiraParcela: Number(s.valorPrimeiraParcela ?? s.valorParcela ?? 0),
+    valorRecebido: Math.round((saldo - absorvido) * 100) / 100,
+    valorAbsorvido: absorvido,
+  };
+}
 
 /** Caminho do PDF na API (o mesmo link que vai para o cliente pelo WhatsApp). */
 export const caminhoDoPdf = (o: Pick<OrcamentoSalvo, 'id' | 'tokenPdf'>) =>
@@ -233,7 +285,8 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     descontoAVistaPct: numeroTexto(o.descontoAVistaPct, '0'),
     // os selects só têm estas opções; valores fora delas voltam ao padrão
     entradaPct: OPCOES_ENTRADA.includes(String(Number(o.entradaPct))) ? String(Number(o.entradaPct)) : '30',
-    parcelas: OPCOES_PARCELAS.includes(String(o.parcelas)) ? String(o.parcelas) : '6',
+    parcelas: o.pagamentoDebito ? DEBITO : parcelaValida(String(o.parcelas)) ? String(o.parcelas) : '6',
+    absorverTaxaCartao: o.absorverTaxaCartao,
     // gravada ao meio-dia UTC: os 10 primeiros caracteres são a data certa
     validade: o.validade.slice(0, 10),
     observacoes: o.observacoes ?? '',
@@ -251,4 +304,13 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   valorTotal: o.valorTotal,
   resumoPagamento,
   tokenPdf: o.tokenPdf,
+  parcelas: o.parcelas,
+  pagamentoDebito: o.pagamentoDebito,
+  absorverTaxaCartao: o.absorverTaxaCartao,
+  taxaCartaoPct: o.taxaCartaoPct,
+  valorEntrada: o.valorEntrada,
+  valorParcela: o.valorParcela,
+  valorPrimeiraParcela: o.valorPrimeiraParcela,
+  valorTotalCliente: o.valorTotalCliente,
+  valorTaxaAbsorvida: o.valorTaxaAbsorvida,
 });

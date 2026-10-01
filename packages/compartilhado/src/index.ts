@@ -1,5 +1,6 @@
 export * from './enums.js';
 export * from './calculo.js';
+export * from './taxasCartao.js';
 export * from './rotulos.js';
 export * from './status.js';
 export * from './datas.js';

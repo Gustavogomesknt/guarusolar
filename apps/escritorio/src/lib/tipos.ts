@@ -119,6 +119,15 @@ export type OrcamentoCompleto = {
   observacoes: string | null;
   descricaoServico: string | null;
   detalharPrecosNoPdf: boolean;
+  /** cartão (ENTRADA_PARCELAS), gravado ao salvar */
+  pagamentoDebito: boolean;
+  absorverTaxaCartao: boolean;
+  taxaCartaoPct: string | null;
+  valorEntrada: string | null;
+  valorParcela: string | null;
+  valorPrimeiraParcela: string | null;
+  valorTotalCliente: string | null;
+  valorTaxaAbsorvida: string | null;
   subtotal: string;
   descontoAplicado: string;
   valorTotal: string;
