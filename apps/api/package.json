@@ -22,7 +22,8 @@
     "db:conferir-producao": "tsx scripts/conferir-producao.ts",
     "db:migrate:deploy": "prisma migrate deploy",
     "usuario": "tsx scripts/usuario.ts",
-    "pdf:exemplo": "tsx scripts/pdf-exemplo.ts"
+    "pdf:exemplo": "tsx scripts/pdf-exemplo.ts",
+    "produtos:importar": "tsx scripts/importar-produtos.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed-base.ts && tsx prisma/seed-teste.ts"
@@ -52,6 +53,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.10.2",
     "@types/pdfmake": "^0.3.3",
+    "exceljs": "^4.4.0",
     "typescript": "^5.7.2"
   }
 }

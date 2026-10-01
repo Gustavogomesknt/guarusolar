@@ -5,16 +5,25 @@ export const ROTULO_CATEGORIA: Record<CategoriaProduto, string> = {
   PAINEL_SOLAR: 'Painel solar',
   INVERSOR: 'Inversor',
   ESTRUTURA: 'Estrutura',
-  CABO: 'Cabo',
+  CARREGADOR: 'Carregador veicular',
+  PROTECAO: 'Proteção e aterramento',
+  QUADRO: 'Quadros e caixas',
+  CABO: 'Cabos e fios',
+  CONEXAO: 'Conectores e terminais',
+  INFRAESTRUTURA: 'Eletrodutos e fixação',
   MAO_DE_OBRA: 'Mão de obra',
+  PROJETO: 'Projeto e documentação',
   OUTROS: 'Outros',
 };
 
 /** Unidade abreviada, usada em "por un", "40 m", "1 kit". */
 export const ROTULO_UNIDADE: Record<Unidade, string> = {
   UN: 'un',
+  PECA: 'pç',
   KIT: 'kit',
   M: 'm',
+  BARRA: 'barra',
+  ROLO: 'rolo',
   SERVICO: 'serviço',
   KWP: 'kWp',
 };

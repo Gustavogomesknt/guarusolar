@@ -84,12 +84,12 @@ export function PaginaCatalogo() {
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex h-10 w-[260px] items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30">
             <Search className="size-4 shrink-0" aria-hidden />
-            <span className="sr-only">Buscar item pelo nome</span>
+            <span className="sr-only">Buscar item pelo nome ou código</span>
             <input
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar item"
+              placeholder="Buscar por nome ou código"
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </label>
@@ -207,7 +207,10 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
           </button>
           {inativo && <Selo className="shrink-0">Desativado</Selo>}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{apoio}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {item.codigoFornecedor && <span className="font-mono">Cód. {item.codigoFornecedor} · </span>}
+          {apoio}
+        </span>
       </span>
       <span role="cell" className={cn(inativo && 'opacity-60')}>
         <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground/80">

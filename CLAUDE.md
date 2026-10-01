@@ -104,6 +104,10 @@ apps/api/                      API (Express + Prisma)
                                institucional inteira. Orçamento: descricaoServico (título) e
                                detalharPrecosNoPdf (preço unitário e subtotal; padrão false)
   scripts/pdf-exemplo.ts       npm run pdf:exemplo [pasta]: PDFs de exemplo sem banco
+  scripts/importar-produtos.ts npm run produtos:importar -- revisar|gravar: catálogo a partir de
+                               .xlsx em duas etapas (revisão em Excel, depois grava tudo ou nada).
+                               Categoria e unidade por palavra-chave (REGRAS, a primeira que casa
+                               vence); serviços sem margem; repetidos ficam "?" para o usuário
   src/rotas/orcamentoPdf.ts    GET /api/orcamentos/:id/pdf?token= — público, protegido pelo tokenPdf
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
@@ -399,6 +403,12 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   em modo disco elas respondem 503. O serviço cancelado PRJ-2026-0016 (TESTE SharePoint) tem
   fotos assim, gravadas contra o simulador nos testes.
 - Toda rota nova precisa de `autenticar` e `autorizar(...)` com os papéis corretos.
+- **Categoria e unidade são enums com ORDEM**: o catálogo lista pela ordem do enum no banco.
+  Valor novo: `ALTER TYPE ... ADD VALUE 'X' BEFORE 'Y'` escrito à mão na migration (o diff do
+  Prisma põe no fim), e a mesma ordem em `packages/compartilhado/src/enums.ts`.
+- **`Produto.codigoFornecedor` é único entre os ATIVOS** por um índice parcial criado à mão
+  (`Produto_codigoFornecedor_ativo_key`), que o schema do Prisma não descreve. Se um `migrate diff`
+  gerar `DROP INDEX` dele, apague essa linha do SQL. A API confere antes (409 com o nome do item).
 - **Migrations em produção funcionam com a versão anterior do código** (publicação sem queda
   roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
   publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).

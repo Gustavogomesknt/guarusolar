@@ -121,19 +121,30 @@ model Cliente {
 // Catálogo de itens pré-moldados
 // ---------------------------------------------------------------------------
 
+// A ORDEM importa: o catálogo lista por categoria nesta ordem (solar, mobilidade, elétrica,
+// serviços). Valor novo entra com ADD VALUE ... BEFORE no SQL da migration, no lugar certo.
 enum CategoriaProduto {
   PAINEL_SOLAR
   INVERSOR
   ESTRUTURA
+  CARREGADOR // carregador veicular e wallbox
+  PROTECAO // disjuntor, DPS, DR/IDR, fusível, seccionadora, aterramento
+  QUADRO // quadros e caixas de proteção, string box
   CABO
+  CONEXAO // conectores e terminais
+  INFRAESTRUTURA // eletrodutos, conduletes, caixas de passagem e fixação
   MAO_DE_OBRA
+  PROJETO // ART, TRT, diagrama unifilar, homologação
   OUTROS
 }
 
 enum Unidade {
   UN
+  PECA
   KIT
   M
+  BARRA
+  ROLO
   SERVICO
   KWP
 }
@@ -146,6 +157,10 @@ model Produto {
   precoCusto      Decimal          @db.Decimal(12, 2)
   precoVenda      Decimal          @db.Decimal(12, 2)
   descricaoTecnica String?
+  /// código que a Guarusolar já usa (113, 320...): aparece na busca. ÚNICO entre os ATIVOS:
+  /// índice parcial "Produto_codigoFornecedor_ativo_key", criado à mão na migration (o Prisma
+  /// não descreve índice parcial; ver CLAUDE.md antes de gerar migration com o diff)
+  codigoFornecedor String?
   ativo           Boolean          @default(true)
   criadoEm        DateTime         @default(now())
   editadoEm       DateTime         @updatedAt

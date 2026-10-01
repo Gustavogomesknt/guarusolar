@@ -10,17 +10,24 @@ export type Papel = (typeof PAPEIS)[number];
 export const TIPOS_PESSOA = ['FISICA', 'JURIDICA'] as const;
 export type TipoPessoa = (typeof TIPOS_PESSOA)[number];
 
+/** Na ordem do catálogo: solar, mobilidade, elétrica, serviços, outros (a mesma do banco). */
 export const CATEGORIAS_PRODUTO = [
   'PAINEL_SOLAR',
   'INVERSOR',
   'ESTRUTURA',
+  'CARREGADOR',
+  'PROTECAO',
+  'QUADRO',
   'CABO',
+  'CONEXAO',
+  'INFRAESTRUTURA',
   'MAO_DE_OBRA',
+  'PROJETO',
   'OUTROS',
 ] as const;
 export type CategoriaProduto = (typeof CATEGORIAS_PRODUTO)[number];
 
-export const UNIDADES = ['UN', 'KIT', 'M', 'SERVICO', 'KWP'] as const;
+export const UNIDADES = ['UN', 'PECA', 'KIT', 'M', 'BARRA', 'ROLO', 'SERVICO', 'KWP'] as const;
 export type Unidade = (typeof UNIDADES)[number];
 
 export const STATUS_ORCAMENTO = [

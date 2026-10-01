@@ -75,7 +75,7 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
           inputRef={campoBusca}
           destacado
           rotulo="Adicionar item do catálogo"
-          placeholder="Digite para buscar no catálogo: painel, inversor, cabo…"
+          placeholder="Busque por nome ou código: painel, disjuntor, 113…"
           dica="Enter adiciona"
           termo={termo}
           onTermoChange={setTermo}
@@ -91,6 +91,7 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="truncate text-sm font-medium">{p.nome}</span>
                   <span className="text-xs text-muted-foreground">
+                    {p.codigoFornecedor && <span className="font-mono">Cód. {p.codigoFornecedor} · </span>}
                     {ROTULO_CATEGORIA[p.categoria]} · por {ROTULO_UNIDADE[p.unidade]}
                     {noOrcamento && ` · já no orçamento (${noOrcamento})`}
                   </span>

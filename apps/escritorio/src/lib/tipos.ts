@@ -154,6 +154,8 @@ export type Produto = {
   precoCusto: string;
   precoVenda: string;
   descricaoTecnica: string | null;
+  /** código que a Guarusolar já usa (113, 320...) */
+  codigoFornecedor: string | null;
   ativo: boolean;
   /** calculados pela API com calcularMargem */
   margemPercentual: number;

@@ -109,6 +109,37 @@ packages/web/               o que os dois fronts usam no navegador
   cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
   Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
   com a taxa.
+- **Catálogo para solar e carregador veicular.** Categorias: painel solar, inversor, estrutura,
+  carregador veicular, proteção e aterramento, quadros e caixas, cabos e fios, conectores e
+  terminais, eletrodutos e fixação, mão de obra, projeto e documentação, outros. Unidades: un, pç,
+  kit, m, barra, rolo, serviço, kWp. Cada item pode ter o **código do fornecedor** (o que a
+  Guarusolar já usa: 113, 320...), único entre os itens ativos e aceito na busca do catálogo e do
+  gerador de orçamentos.
+
+## Importar o catálogo de uma planilha
+
+Planilha `.xlsx` com as colunas COD, PRODUTO e VALOR (custo); UNIDADE é opcional. Em duas etapas,
+no banco do `.env` (desenvolvimento), para revisar antes de levar à produção:
+
+```powershell
+npm run produtos:importar -- revisar materiais.xlsx --margem 30
+# ou por categoria:  --margem "PROTECAO=35,CABO=25,*=30"
+```
+
+Gera `materiais-revisao.xlsx` (nada é gravado) com, por linha: categoria e unidade sugeridas por
+palavra-chave (listas de escolha), margem, preço de venda (fórmula: muda ao mexer na margem),
+IMPORTAR (S, N ou ?) e a situação. Linhas inválidas saem N; **nomes ou códigos repetidos na
+planilha saem "?"** para você decidir (para manter os dois, mude o nome de um); o que já está no
+catálogo sai N. Margem sobre a venda, como o catálogo calcula: venda = custo ÷ (1 − margem).
+Serviços (ART, instalação, indicação, mão de obra) entram sem margem: venda = custo. Revise no
+Excel e grave:
+
+```powershell
+npm run produtos:importar -- gravar materiais-revisao.xlsx
+```
+
+Confere tudo de novo, mostra o banco, o resumo por categoria e uma amostra, e só grava (tudo ou
+nada) depois que você digitar `IMPORTAR`.
 - **Itens do orçamento são uma cópia.** Nome, unidade e preço ficam gravados no item.
   Mudar o catálogo depois não altera orçamentos antigos.
 - **Nada é apagado.** Clientes e produtos são desativados, preservando o histórico.

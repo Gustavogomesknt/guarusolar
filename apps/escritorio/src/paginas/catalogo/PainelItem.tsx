@@ -43,8 +43,11 @@ import { Campo, ariaDoCampo } from '@/components/Campo';
 
 const ROTULO_UNIDADE_LONGO: Record<Unidade, string> = {
   UN: 'Unidade (un)',
+  PECA: 'Peça (pç)',
   KIT: 'Kit',
   M: 'Metro (m)',
+  BARRA: 'Barra',
+  ROLO: 'Rolo',
   SERVICO: 'Serviço',
   KWP: 'kWp',
 };
@@ -56,6 +59,7 @@ const esquema = z.object({
   precoCusto: z.string().refine((v) => lerNumero(v || '0') >= 0, 'Informe o custo (use 0 se não houver)'),
   precoVenda: z.string().refine((v) => lerNumero(v) > 0, 'Informe o preço de venda'),
   descricaoTecnica: z.string().max(1500, 'Use no máximo 1.500 caracteres'),
+  codigoFornecedor: z.string().trim().max(30, 'Use até 30 caracteres'),
   ativo: z.boolean(),
 });
 type DadosItem = z.infer<typeof esquema>;
@@ -68,6 +72,7 @@ function valoresDoItem(item: Produto | null): DadosItem {
     precoCusto: item ? formatarDecimal(Number(item.precoCusto)) : '',
     precoVenda: item ? formatarDecimal(Number(item.precoVenda)) : '',
     descricaoTecnica: item?.descricaoTecnica ?? '',
+    codigoFornecedor: item?.codigoFornecedor ?? '',
     ativo: item?.ativo ?? true,
   };
 }
@@ -79,6 +84,7 @@ const paraApi = (d: DadosItem) => ({
   precoCusto: lerNumero(d.precoCusto || '0'),
   precoVenda: lerNumero(d.precoVenda),
   descricaoTecnica: d.descricaoTecnica.trim() || null,
+  codigoFornecedor: d.codigoFornecedor.trim() || null,
   ativo: d.ativo,
 });
 
@@ -183,6 +189,15 @@ export function PainelItem({
                   {...register('nome')}
                   placeholder="Ex.: Painel solar 550 W monocristalino"
                   className="h-11 rounded-[10px]"
+                />
+              </Campo>
+
+              <Campo id="item-codigo" rotulo="Código do fornecedor" erro={errors.codigoFornecedor?.message}>
+                <Input
+                  {...ariaDoCampo('item-codigo', errors.codigoFornecedor?.message)}
+                  {...register('codigoFornecedor')}
+                  placeholder="Ex.: 113 (opcional; também acha o item na busca)"
+                  className="h-11 rounded-[10px] font-mono"
                 />
               </Campo>
 
