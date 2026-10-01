@@ -17,6 +17,8 @@ const ListaClientes = lazy(() => import('@/paginas/clientes/ListaClientes').then
 const FichaCliente = lazy(() => import('@/paginas/clientes/FichaCliente').then((m) => ({ default: m.FichaCliente })));
 const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
 const PaginaAgenda = lazy(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
+const ListaProjetos = lazy(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
+const FichaProjeto = lazy(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
 const PaginaValidacao = lazy(() =>
   import('@/paginas/validacao/PaginaValidacao').then((m) => ({ default: m.PaginaValidacao })),
 );
@@ -55,6 +57,9 @@ export const roteador = createBrowserRouter(
             <Route path="clientes" element={<ListaClientes />} />
             <Route path="clientes/:id" element={<FichaCliente />} />
             <Route path="catalogo" element={<PaginaCatalogo />} />
+            {/* comercial consulta; as ações da ficha são só do gestor (a API confere) */}
+            <Route path="projetos" element={<ListaProjetos />} />
+            <Route path="projetos/:id" element={<FichaProjeto />} />
           </Route>
           {/* Operação: só gestor (e ADMIN) */}
           <Route element={<RotaProtegida papeis={['GESTOR']} />}>

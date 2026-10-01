@@ -36,5 +36,6 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Agenda', caminho: '/agenda', icone: CalendarDays, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação' },
   { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação', contador: ContadorValidacao },
-  { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['GESTOR'], disponivel: false, grupo: 'Operação' },
+  // comercial consulta ("quando vão instalar?"); só o gestor edita e cancela
+  { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Operação' },
 ];

@@ -55,6 +55,21 @@ export const STATUS_PROJETO = [
 ] as const;
 export type StatusProjeto = (typeof STATUS_PROJETO)[number];
 
+export const TIPOS_EVENTO_PROJETO = [
+  'PROJETO_CRIADO',
+  'SERVICO_AGENDADO',
+  'SERVICO_REMARCADO',
+  'SERVICO_INICIADO',
+  'SERVICO_ENVIADO',
+  'SERVICO_DEVOLVIDO',
+  'SERVICO_APROVADO',
+  'SERVICO_CANCELADO',
+  'PROJETO_EDITADO',
+  'PROJETO_CONCLUIDO',
+  'PROJETO_CANCELADO',
+] as const;
+export type TipoEventoProjeto = (typeof TIPOS_EVENTO_PROJETO)[number];
+
 export const TIPOS_SERVICO = [
   'INSTALACAO',
   'VISITA_TECNICA',

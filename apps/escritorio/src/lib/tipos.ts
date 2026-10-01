@@ -3,6 +3,8 @@ import type {
   CondicaoPagamento,
   StatusAgendamento,
   StatusOrcamento,
+  StatusProjeto,
+  TipoEventoProjeto,
   TipoServico,
   TipoDesconto,
   TipoPessoa,
@@ -70,7 +72,16 @@ export type ClienteNaLista = Cliente & { quantidadeOrcamentos: number };
 
 /** Ficha do cliente (GET /api/clientes/:id). */
 export type FichaDoCliente = Cliente & {
-  orcamentos: { id: string; codigo: string; status: StatusOrcamento; criadoEm: string; validade: string; valorTotal: string }[];
+  orcamentos: {
+    id: string;
+    codigo: string;
+    status: StatusOrcamento;
+    criadoEm: string;
+    validade: string;
+    valorTotal: string;
+    /** o projeto (obra) que o orçamento aprovado gerou */
+    projeto: { id: string; codigo: string; status: StatusProjeto } | null;
+  }[];
 };
 
 /** Linha da lista (GET /api/orcamentos). */
@@ -119,6 +130,8 @@ export type OrcamentoCompleto = {
   observacoes: string | null;
   descricaoServico: string | null;
   detalharPrecosNoPdf: boolean;
+  /** o projeto criado na aprovação */
+  projeto?: { id: string; codigo: string } | null;
   /** cópia dos dados do cliente gravada no orçamento (a do PDF); null só em orçamento antigo */
   clienteNome?: string | null;
   clienteDocumento?: string | null;
@@ -223,4 +236,104 @@ export type ServicoEmValidacao = {
   };
   fotos: FotoEmValidacao[];
   materiais: { id: string; quantidade: string; observacao: string | null; produto: { nome: string; unidade: Unidade } }[];
+};
+
+// ---------------------------------------------------------------------------------------------
+// Projetos (obras)
+// ---------------------------------------------------------------------------------------------
+
+/** Linha da lista (GET /api/projetos). */
+export type ProjetoNaLista = {
+  id: string;
+  codigo: string;
+  status: StatusProjeto;
+  criadoEm: string;
+  concluidoEm: string | null;
+  canceladoEm: string | null;
+  clienteNome: string;
+  clienteCidade: string | null;
+  clienteUf: string | null;
+  orcamentoCodigo: string;
+  valorTotal: string;
+  valorTotalCliente: string;
+  servicoAtual: {
+    id: string;
+    tipo: TipoServico;
+    status: StatusAgendamento;
+    dataInicio: string;
+    dataFim: string;
+    equipe: string;
+    enviadoEm: string | null;
+  } | null;
+};
+
+export type ListaDeProjetos = {
+  contagem: Record<StatusProjeto | 'EM_ANDAMENTO', number>;
+  itens: ProjetoNaLista[];
+};
+
+export type FotoDoProjeto = { id: string; chave: string | null; rotulo: string | null; revisao: 'PENDENTE' | 'OK' | 'REFAZER'; capturadaEm: string | null };
+
+export type FichaDoProjeto = {
+  id: string;
+  codigo: string;
+  status: StatusProjeto;
+  potenciaKwp: string | null;
+  observacoes: string | null;
+  criadoEm: string;
+  concluidoEm: string | null;
+  canceladoEm: string | null;
+  motivoCancelamento: string | null;
+  /** só o gestor vê as fotos (regra 6); o comercial recebe a contagem */
+  podeVerFotos: boolean;
+  cliente: { id: string; nome: string; whatsapp: string; ativo: boolean };
+  orcamento: {
+    id: string;
+    codigo: string;
+    tokenPdf: string;
+    aprovadoEm: string | null;
+    valorTotal: string;
+    valorTotalCliente: string | null;
+    resumoPagamento: string | null;
+    condicaoPagamento: CondicaoPagamento;
+    descricaoServico: string | null;
+    clienteNome: string | null;
+    clienteDocumento: string | null;
+    clienteWhatsapp: string | null;
+    clienteEmail: string | null;
+    clienteCep: string | null;
+    clienteLogradouro: string | null;
+    clienteNumero: string | null;
+    clienteComplemento: string | null;
+    clienteBairro: string | null;
+    clienteCidade: string | null;
+    clienteUf: string | null;
+    vendedor: { nome: string };
+    _count: { itens: number };
+  };
+  agendamentos: {
+    id: string;
+    tipo: TipoServico;
+    status: StatusAgendamento;
+    dataInicio: string;
+    dataFim: string;
+    enviadoEm: string | null;
+    validadoEm: string | null;
+    motivoDevolucao: string | null;
+    observacoesTecnico: string | null;
+    equipe: { nome: string };
+    tecnicoResponsavel: { nome: string } | null;
+    validadoPor: { nome: string } | null;
+    _count: { fotos: number };
+    fotos?: FotoDoProjeto[];
+  }[];
+  eventos: {
+    id: string;
+    tipo: TipoEventoProjeto;
+    descricao: string;
+    reconstruido: boolean;
+    criadoEm: string;
+    agendamentoId: string | null;
+    usuario: { nome: string } | null;
+  }[];
 };

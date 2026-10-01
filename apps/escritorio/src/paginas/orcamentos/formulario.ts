@@ -242,6 +242,8 @@ export type OrcamentoSalvo = {
   valorTotalCliente?: string | null;
   valorTaxaAbsorvida?: string | null;
   clienteId?: string;
+  /** o projeto criado na aprovação (orçamento aprovado) */
+  projeto?: { id: string; codigo: string } | null;
   /** cópia dos dados do cliente gravada no orçamento (a do PDF); null só em orçamento antigo */
   clienteNome?: string | null;
   clienteDocumento?: string | null;
@@ -371,6 +373,7 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   valorTotalCliente: o.valorTotalCliente,
   valorTaxaAbsorvida: o.valorTaxaAbsorvida,
   clienteId: o.cliente.id,
+  projeto: o.projeto ?? null,
   clienteNome: o.clienteNome,
   clienteDocumento: o.clienteDocumento,
   clienteWhatsapp: o.clienteWhatsapp,

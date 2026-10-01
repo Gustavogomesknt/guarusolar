@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { Prisma, type StatusAgendamento } from '@prisma/client';
 import { z } from 'zod';
+import { periodoDoServico, registrarEvento, rotuloDoServico } from '../lib/eventosProjeto';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -140,6 +141,13 @@ rotasAgenda.post(
     const agendamento = await prisma.$transaction(async (tx) => {
       const criado = await tx.agendamento.create({ data: dados });
       await tx.projeto.update({ where: { id: dados.projetoId }, data: { status: 'AGENDADO' } });
+      await registrarEvento(tx, {
+        projetoId: dados.projetoId,
+        agendamentoId: criado.id,
+        tipo: 'SERVICO_AGENDADO',
+        descricao: `${rotuloDoServico(dados.tipo)} agendada para ${periodoDoServico(dados.dataInicio, dados.dataFim)} · ${equipe.nome}`,
+        usuarioId: req.usuario!.id,
+      });
       return criado;
     });
 
@@ -174,10 +182,30 @@ rotasAgenda.patch(
     }
 
     const atualizado = await prisma.$transaction(async (tx) => {
-      const ag = await tx.agendamento.update({ where: { id: atual.id }, data: dados });
+      const ag = await tx.agendamento.update({ where: { id: atual.id }, data: dados, include: { equipe: { select: { nome: true } }, tecnicoResponsavel: { select: { nome: true } } } });
       // cancelado: o projeto volta para "A agendar" para ganhar outra data
       if (dados.status === 'CANCELADO') {
         await tx.projeto.update({ where: { id: atual.projetoId }, data: { status: 'AGUARDANDO_AGENDAMENTO' } });
+      }
+      // histórico do projeto: o que mudou, com os valores de antes
+      const servico = rotuloDoServico(atual.tipo);
+      const evento = (tipo: 'SERVICO_REMARCADO' | 'SERVICO_INICIADO' | 'SERVICO_CANCELADO', descricao: string) =>
+        registrarEvento(tx, { projetoId: atual.projetoId, agendamentoId: atual.id, tipo, descricao, usuarioId: req.usuario!.id });
+      if (dados.status === 'CANCELADO') {
+        await evento('SERVICO_CANCELADO', `${servico} de ${periodoDoServico(atual.dataInicio, atual.dataFim)} cancelada`);
+      } else {
+        const antes = periodoDoServico(atual.dataInicio, atual.dataFim);
+        const depois = periodoDoServico(ag.dataInicio, ag.dataFim);
+        const mudancas: string[] = [];
+        if (antes !== depois) mudancas.push(`de ${antes} para ${depois}`);
+        if (ag.equipeId !== atual.equipeId) mudancas.push(`equipe: ${ag.equipe.nome}`);
+        if (dados.tecnicoResponsavelId !== undefined && ag.tecnicoResponsavelId !== atual.tecnicoResponsavelId) {
+          mudancas.push(`técnico responsável: ${ag.tecnicoResponsavel?.nome ?? 'nenhum'}`);
+        }
+        if (mudancas.length) await evento('SERVICO_REMARCADO', `${servico} remarcada: ${mudancas.join(' · ')}`);
+        if (dados.status === 'EM_EXECUCAO' && atual.status !== 'EM_EXECUCAO') {
+          await evento('SERVICO_INICIADO', `${servico} marcada como em execução`);
+        }
       }
       return ag;
     });
@@ -296,6 +324,15 @@ rotasValidacao.post(
         where: { id: servico.projetoId },
         data: { status: 'CONCLUIDO', concluidoEm: new Date() },
       });
+      const aceitas = marcadas > 0 ? ` (${marcadas} ${marcadas === 1 ? 'foto marcada para refazer foi aceita' : 'fotos marcadas para refazer foram aceitas'})` : '';
+      await registrarEvento(tx, {
+        projetoId: servico.projetoId,
+        agendamentoId: servico.id,
+        tipo: 'SERVICO_APROVADO',
+        descricao: `${rotuloDoServico(servico.tipo)} aprovada na validação${aceitas}`,
+        usuarioId: req.usuario!.id,
+      });
+      await registrarEvento(tx, { projetoId: servico.projetoId, tipo: 'PROJETO_CONCLUIDO', descricao: 'Projeto concluído', usuarioId: req.usuario!.id });
       return ag;
     });
 
@@ -333,6 +370,13 @@ rotasValidacao.post(
         data: { revisao: 'REFAZER', comentario: motivo },
       });
       await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
+      await registrarEvento(tx, {
+        projetoId: servico.projetoId,
+        agendamentoId: servico.id,
+        tipo: 'SERVICO_DEVOLVIDO',
+        descricao: `${rotuloDoServico(servico.tipo)} devolvida ao técnico (${fotosParaRefazer.length} ${fotosParaRefazer.length === 1 ? 'foto' : 'fotos'} para refazer): ${motivo}`,
+        usuarioId: req.usuario!.id,
+      });
       return tx.agendamento.update({
         where: { id: servico.id },
         data: {
@@ -533,6 +577,13 @@ rotasTecnico.post(
         if (servico.status === 'AGENDADO') {
           await tx.agendamento.update({ where: { id: servico.id }, data: { status: 'EM_EXECUCAO' } });
           await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
+          await registrarEvento(tx, {
+            projetoId: servico.projetoId,
+            agendamentoId: servico.id,
+            tipo: 'SERVICO_INICIADO',
+            descricao: `${rotuloDoServico(servico.tipo)} em execução: primeira foto enviada`,
+            usuarioId: req.usuario!.id,
+          });
         }
         return tx.fotoServico.create({
           data: {
@@ -645,6 +696,13 @@ rotasTecnico.post(
       await tx.projeto.update({
         where: { id: servico.projetoId },
         data: { status: 'AGUARDANDO_VALIDACAO' },
+      });
+      await registrarEvento(tx, {
+        projetoId: servico.projetoId,
+        agendamentoId: servico.id,
+        tipo: 'SERVICO_ENVIADO',
+        descricao: `${rotuloDoServico(servico.tipo)} ${servico.status === 'DEVOLVIDO' ? 'reenviada' : 'enviada'} para validação com o teste do sistema confirmado`,
+        usuarioId: req.usuario!.id,
       });
       return ag;
     });

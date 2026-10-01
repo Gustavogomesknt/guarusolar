@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { FilePlus2, Loader2, Pencil } from 'lucide-react';
-import { formatarData } from '@guarusolar/compartilhado';
+import { formatarData, ROTULO_STATUS_PROJETO } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { FichaDoCliente } from '@/lib/tipos';
 import { formatarBRL, mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
@@ -114,7 +114,7 @@ export function FichaCliente() {
           <div role="table" aria-label="Orçamentos do cliente" className="min-w-[620px]">
             <div
               role="row"
-              className="grid grid-cols-[140px_110px_110px_minmax(0,1fr)_170px] gap-4 border-y px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+              className="grid grid-cols-[140px_110px_110px_minmax(0,1fr)_230px] gap-4 border-y px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase"
             >
               <span role="columnheader">Código</span>
               <span role="columnheader">Criado em</span>
@@ -130,7 +130,7 @@ export function FichaCliente() {
                   key={o.id}
                   role="row"
                   onClick={() => navegar(`/orcamentos/${o.id}`)}
-                  className="grid min-h-14 cursor-pointer grid-cols-[140px_110px_110px_minmax(0,1fr)_170px] items-center gap-4 border-b px-5 py-2 last:border-b-0 hover:bg-background"
+                  className="grid min-h-14 cursor-pointer grid-cols-[140px_110px_110px_minmax(0,1fr)_230px] items-center gap-4 border-b px-5 py-2 last:border-b-0 hover:bg-background"
                 >
                   <span role="cell">
                     <Link
@@ -150,8 +150,18 @@ export function FichaCliente() {
                   <span role="cell" className="text-right font-mono text-sm">
                     {formatarBRL(Number(o.valorTotal))}
                   </span>
-                  <span role="cell">
+                  <span role="cell" className="flex flex-wrap items-center gap-2">
                     <SeloStatus status={o.status} />
+                    {o.projeto && (
+                      <Link
+                        to={`/projetos/${o.projeto.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-mono text-xs text-primary underline-offset-2 hover:underline"
+                        aria-label={`Projeto ${o.projeto.codigo}: ${ROTULO_STATUS_PROJETO[o.projeto.status]}`}
+                      >
+                        {o.projeto.codigo}
+                      </Link>
+                    )}
                   </span>
                 </div>
               ))}

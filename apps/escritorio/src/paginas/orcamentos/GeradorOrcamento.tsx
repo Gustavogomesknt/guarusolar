@@ -236,8 +236,18 @@ export function GeradorOrcamento({
             className="flex items-start gap-2.5 rounded-xl border border-[#9FD3B4] bg-[#DCF0E3] px-4 py-3 text-sm text-[#17653E]"
           >
             <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
-            Este orçamento foi aprovado e virou projeto. Ele fica disponível só para consulta: itens,
-            valores e condições não podem mais ser alterados.
+            <span>
+              Este orçamento foi aprovado e virou projeto
+              {salvo?.projeto && (
+                <>
+                  {' '}
+                  <Link to={`/projetos/${salvo.projeto.id}`} className="font-semibold underline underline-offset-2">
+                    {salvo.projeto.codigo}
+                  </Link>
+                </>
+              )}
+              . Ele fica disponível só para consulta: itens, valores e condições não podem mais ser alterados.
+            </span>
           </p>
         )}
 

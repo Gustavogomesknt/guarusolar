@@ -10,6 +10,7 @@ import { rotasOrcamentos } from './rotas/orcamentos';
 import { rotasOrcamentoPdf } from './rotas/orcamentoPdf';
 import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
 import { rotasFotos } from './rotas/fotos';
+import { rotasProjetos } from './rotas/projetos';
 import { conferirArmazenamentoAoIniciar } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
@@ -69,6 +70,7 @@ app.use('/api/agenda', rotasAgenda);
 app.use('/api/validacao', rotasValidacao);
 app.use('/api/tecnico', rotasTecnico);
 app.use('/api/fotos', rotasFotos);
+app.use('/api/projetos', rotasProjetos);
 
 app.use('/api', (_req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));
 

@@ -79,7 +79,7 @@ rotasClientes.get(
         // todos os orçamentos, só com o que a ficha mostra
         orcamentos: {
           orderBy: { criadoEm: 'desc' },
-          select: { id: true, codigo: true, status: true, criadoEm: true, validade: true, valorTotal: true },
+          select: { id: true, codigo: true, status: true, criadoEm: true, validade: true, valorTotal: true, projeto: { select: { id: true, codigo: true, status: true } } },
         },
       },
     });

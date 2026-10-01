@@ -21,4 +21,5 @@ export type ConferenciaEnums = [
   Confere<'TipoServico', Igual<Banco.TipoServico, Compartilhado.TipoServico>>,
   Confere<'StatusAgendamento', Igual<Banco.StatusAgendamento, Compartilhado.StatusAgendamento>>,
   Confere<'RevisaoFoto', Igual<Banco.RevisaoFoto, Compartilhado.RevisaoFoto>>,
+  Confere<'TipoEventoProjeto', Igual<Banco.TipoEventoProjeto, Compartilhado.TipoEventoProjeto>>,
 ];

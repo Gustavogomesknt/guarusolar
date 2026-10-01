@@ -1,4 +1,4 @@
-import type { CategoriaProduto, StatusAgendamento, TipoServico, Unidade } from './enums.js';
+import type { CategoriaProduto, StatusAgendamento, StatusProjeto, TipoServico, Unidade } from './enums.js';
 
 /** Como cada categoria aparece para o usuário (telas, PDF, WhatsApp). */
 export const ROTULO_CATEGORIA: Record<CategoriaProduto, string> = {
@@ -34,6 +34,16 @@ export const ROTULO_TIPO_SERVICO: Record<TipoServico, string> = {
   VISITA_TECNICA: 'Visita técnica',
   MANUTENCAO: 'Manutenção',
   VISTORIA_CONCESSIONARIA: 'Vistoria da concessionária',
+};
+
+/** Situação da obra (projeto), como aparece na lista e na ficha. */
+export const ROTULO_STATUS_PROJETO: Record<StatusProjeto, string> = {
+  AGUARDANDO_AGENDAMENTO: 'A agendar',
+  AGENDADO: 'Agendado',
+  EM_EXECUCAO: 'Em execução',
+  AGUARDANDO_VALIDACAO: 'Em validação',
+  CONCLUIDO: 'Concluído',
+  CANCELADO: 'Cancelado',
 };
 
 /** Situação do serviço agendado, na linguagem de quem está em campo. */

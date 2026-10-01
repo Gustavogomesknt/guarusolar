@@ -16,6 +16,7 @@ import {
   type ResultadoCalculo,
 } from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
+import { registrarEvento } from '../lib/eventosProjeto';
 
 export const rotasOrcamentos = Router();
 rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -443,12 +444,18 @@ async function mudarStatus(
 
   // Orçamento aprovado vira projeto e entra na fila de agendamento
   if (status === 'APROVADO') {
-    await tx.projeto.create({
+    const projeto = await tx.projeto.create({
       data: {
         codigo: await gerarCodigoProjeto(tx),
         orcamentoId: orcamento.id,
         clienteId: orcamento.clienteId,
       },
+    });
+    await registrarEvento(tx, {
+      projetoId: projeto.id,
+      tipo: 'PROJETO_CRIADO',
+      descricao: `Orçamento ${novo.codigo} aprovado: projeto criado`,
+      usuarioId,
     });
   }
 
