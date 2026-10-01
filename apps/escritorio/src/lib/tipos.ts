@@ -117,6 +117,8 @@ export type OrcamentoCompleto = {
   entradaPct: string | null;
   parcelas: number | null;
   observacoes: string | null;
+  descricaoServico: string | null;
+  detalharPrecosNoPdf: boolean;
   subtotal: string;
   descontoAplicado: string;
   valorTotal: string;

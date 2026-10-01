@@ -36,6 +36,9 @@ const orcamentoSchema = z.object({
   parcelas: z.number().int().min(1).max(60).optional(),
   bancoFinanciamento: z.string().optional(),
   observacoes: z.string().optional(),
+  // proposta em PDF: serviço no título e se a tabela mostra os preços de cada item
+  descricaoServico: z.string().trim().max(100, 'Use até 100 caracteres').optional(),
+  detalharPrecosNoPdf: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
 });
 
@@ -257,6 +260,8 @@ rotasOrcamentos.post(
           parcelas: dados.parcelas,
           bancoFinanciamento: dados.bancoFinanciamento,
           observacoes: dados.observacoes,
+          descricaoServico: dados.descricaoServico || null,
+          detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
           subtotal: totais.subtotal,
           descontoAplicado: totais.descontoAplicado,
           valorTotal: totais.valorTotal,
@@ -312,6 +317,8 @@ rotasOrcamentos.put(
           parcelas: dados.parcelas,
           bancoFinanciamento: dados.bancoFinanciamento,
           observacoes: dados.observacoes,
+          descricaoServico: dados.descricaoServico || null,
+          detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
           subtotal: totais.subtotal,
           descontoAplicado: totais.descontoAplicado,
           valorTotal: totais.valorTotal,

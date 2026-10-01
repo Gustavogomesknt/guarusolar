@@ -300,6 +300,14 @@ pasta de armazenamento não são removidos.
   embutido; em teste, o processo ficou abaixo de 160 MB gerando 20 PDFs seguidos). Defina
   `API_URL_PUBLICA` com o endereço público da API: é o link que o cliente recebe pelo WhatsApp
   (`/api/orcamentos/:id/pdf?token=...`), aberto sem login e protegido pelo token do orçamento.
+- **Proposta em PDF (layout do canvas "Nova proposta comercial"):** página 1 com a proposta e
+  última página institucional, fixa. Textos fixos, dados da empresa (razão social, CNPJ,
+  endereço, contatos, logo) e todo o conteúdo institucional ficam em
+  `apps/api/src/conteudo/proposta.ts`; texto entre colchetes, como `[PRAZO]`, é pendência e sai
+  assim no PDF. Depois de editar, `npm run pdf:exemplo` gera três PDFs de exemplo, sem banco
+  (padrão, com preços e com muitos itens), para conferir. No gerador de orçamentos, "Serviço"
+  vira o título da proposta e "Detalhar preços por item no PDF" (desmarcado por padrão) mostra
+  preço unitário e subtotal de cada item.
 - **Publicar:** ver "Publicar em produção (Render)" abaixo.
 
 ## Publicar em produção (Render)
@@ -483,7 +491,8 @@ publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro b
 2. Empacotar o front em executável Windows (Electron ou Tauri).
 3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).
-4. ~~Geração do PDF do orçamento~~ (feito; falta o logo da Guarusolar).
+4. ~~Geração do PDF do orçamento~~ (feito, no layout novo; faltam o logo, o prazo e a garantia
+   em `apps/api/src/conteudo/proposta.ts`).
 5. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
    conferir com `npm run sharepoint:conferir`).
 6. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).

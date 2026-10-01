@@ -7,3 +7,5 @@ uploads
 .env
 .env.*
 !.env.example
+# npm run pdf:exemplo
+proposta-exemplo*.pdf

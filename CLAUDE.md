@@ -94,8 +94,16 @@ apps/api/                      API (Express + Prisma)
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/lib/zod-pt.ts            mensagens padrão do Zod em português (importado no server.ts)
-  src/lib/pdf-orcamento.ts     PDF A4 do orçamento (pdfmake), só com dados gravados; fontes em
-                               WOFF (WOFF2 e IBM Plex Mono quebram o subset do pdfkit)
+  src/lib/pdf-orcamento.ts     proposta A4 (pdfmake), só com dados gravados: página 1 = proposta,
+                               última = institucional. Caixas arredondadas = retângulo (canvas
+                               fora do fluxo) sob tabela de altura fixa; alturas de texto MEDIDAS
+                               com o pdfkit (nunca estimar). Fontes em WOFF (WOFF2 e IBM Plex Mono
+                               quebram o subset do pdfkit; Bricolage só existe variável: títulos
+                               em Plex negrito). Conferir com `npm run pdf:exemplo` e olhar o PDF
+  src/conteudo/proposta.ts     EDITÁVEL: dados da empresa, textos fixos da página 1 e a página
+                               institucional inteira. Orçamento: descricaoServico (título) e
+                               detalharPrecosNoPdf (preço unitário e subtotal; padrão false)
+  scripts/pdf-exemplo.ts       npm run pdf:exemplo [pasta]: PDFs de exemplo sem banco
   src/rotas/orcamentoPdf.ts    GET /api/orcamentos/:id/pdf?token= — público, protegido pelo tokenPdf
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)

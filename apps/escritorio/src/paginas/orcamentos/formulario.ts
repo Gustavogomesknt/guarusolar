@@ -38,6 +38,10 @@ export type FormularioOrcamento = {
   /** AAAA-MM-DD, como o <input type="date"> usa */
   validade: string;
   observacoes: string;
+  /** título do serviço no PDF ("Instalação de carregador veicular · Residencial") */
+  descricaoServico: string;
+  /** PDF com preço unitário e subtotal de cada item (padrão: só item e quantidade) */
+  detalharPrecosNoPdf: boolean;
 };
 
 /** Modo leitura (fieldset desabilitado): esconde a busca do catálogo e esmaece botões e campos. */
@@ -67,6 +71,8 @@ export function valoresIniciais(): FormularioOrcamento {
     parcelas: '6',
     validade: dataDaquiA(DIAS_DE_VALIDADE),
     observacoes: '',
+    descricaoServico: '',
+    detalharPrecosNoPdf: false,
   };
 }
 
@@ -171,6 +177,8 @@ export function paraApi(f: FormularioOrcamento) {
       ? { entradaPct: numeroOuZero(f.entradaPct), parcelas: Math.trunc(numeroOuZero(f.parcelas)) }
       : {}),
     observacoes: f.observacoes.trim() || undefined,
+    descricaoServico: f.descricaoServico.trim() || undefined,
+    detalharPrecosNoPdf: f.detalharPrecosNoPdf,
     itens: f.itens.map((item) => ({
       produtoId: item.produtoId,
       quantidade: lerNumero(item.quantidade),
@@ -229,6 +237,8 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     // gravada ao meio-dia UTC: os 10 primeiros caracteres são a data certa
     validade: o.validade.slice(0, 10),
     observacoes: o.observacoes ?? '',
+    descricaoServico: o.descricaoServico ?? '',
+    detalharPrecosNoPdf: o.detalharPrecosNoPdf,
   };
 }
 

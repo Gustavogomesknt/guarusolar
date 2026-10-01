@@ -215,6 +215,10 @@ model Orcamento {
 
   validade    DateTime
   observacoes String?
+  // proposta em PDF: o serviço no título ("Instalação de carregador veicular · Residencial") e
+  // se a tabela mostra preço unitário e subtotal de cada item (padrão: só item e quantidade)
+  descricaoServico    String?
+  detalharPrecosNoPdf Boolean @default(false)
   enviadoEm   DateTime?
   aprovadoEm  DateTime?
   recusadoEm  DateTime?

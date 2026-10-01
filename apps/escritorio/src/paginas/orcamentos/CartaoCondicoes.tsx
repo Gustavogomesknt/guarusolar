@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Campo, ariaDoCampo } from '@/components/Campo';
 import {
@@ -219,6 +220,38 @@ export function CartaoCondicoes({ subtotal, descontoAplicado }: { subtotal: numb
           className="rounded-[10px] text-sm leading-relaxed"
         />
       </Campo>
+
+      {/* Proposta em PDF */}
+      <Campo id="descricaoServico" rotulo="Serviço (título da proposta em PDF)" erro={errors.descricaoServico?.message}>
+        <Input
+          {...ariaDoCampo('descricaoServico', errors.descricaoServico?.message)}
+          {...register('descricaoServico', { onChange: () => clearErrors('descricaoServico') })}
+          maxLength={100}
+          placeholder="Ex.: Instalação de carregador veicular · Residencial"
+          className="h-11 rounded-[10px]"
+        />
+      </Campo>
+
+      <Controller
+        control={control}
+        name="detalharPrecosNoPdf"
+        render={({ field }) => (
+          <div className="flex items-start justify-between gap-3">
+            <Label htmlFor="detalhar-precos" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
+              Detalhar preços por item no PDF
+              <span id="detalhar-precos-ajuda" className="text-xs font-normal text-muted-foreground">
+                Desmarcado, o cliente vê só os itens, as quantidades e o valor total.
+              </span>
+            </Label>
+            <Switch
+              id="detalhar-precos"
+              aria-describedby="detalhar-precos-ajuda"
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          </div>
+        )}
+      />
     </section>
   );
 }

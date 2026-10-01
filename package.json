@@ -25,6 +25,7 @@
     "usuario": "npm run usuario -w @guarusolar/api --",
     "db:limpar": "npm run db:limpar -w @guarusolar/api --",
     "db:studio": "npm run db:studio -w @guarusolar/api --",
-    "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --"
+    "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --",
+    "pdf:exemplo": "npm run pdf:exemplo -w @guarusolar/api --"
   }
 }
