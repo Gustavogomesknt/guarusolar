@@ -224,8 +224,29 @@ function marca(tamanho: number): Content {
 // Página 1: a proposta
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Dados do cliente no documento: a CÓPIA gravada no orçamento (regra 2), nunca o cadastro de
+ * hoje. Só orçamento criado pela versão anterior durante uma publicação não tem cópia: usa o cadastro.
+ */
+function clienteDoDocumento(o: OrcamentoParaPdf) {
+  if (o.clienteNome == null) return o.cliente;
+  return {
+    nome: o.clienteNome,
+    documento: o.clienteDocumento ?? '',
+    whatsapp: o.clienteWhatsapp ?? '',
+    email: o.clienteEmail,
+    cep: o.clienteCep,
+    logradouro: o.clienteLogradouro,
+    numero: o.clienteNumero,
+    complemento: o.clienteComplemento,
+    bairro: o.clienteBairro,
+    cidade: o.clienteCidade,
+    uf: o.clienteUf,
+  };
+}
+
 function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
-  const c = o.cliente;
+  const c = clienteDoDocumento(o);
   const endereco = [[c.logradouro, c.numero].filter(Boolean).join(', '), c.complemento, c.bairro].filter(Boolean).join(' — ');
   const cidade = [[c.cidade, c.uf].filter(Boolean).join('/'), c.cep ? `CEP ${mascararCep(c.cep)}` : null].filter(Boolean).join(' · ');
   const contato = [mascararTelefone(c.whatsapp), c.email].filter(Boolean).join(' · ');

@@ -119,6 +119,19 @@ export type OrcamentoCompleto = {
   observacoes: string | null;
   descricaoServico: string | null;
   detalharPrecosNoPdf: boolean;
+  /** cópia dos dados do cliente gravada no orçamento (a do PDF); null só em orçamento antigo */
+  clienteNome?: string | null;
+  clienteDocumento?: string | null;
+  clienteWhatsapp?: string | null;
+  clienteEmail?: string | null;
+  clienteCep?: string | null;
+  clienteLogradouro?: string | null;
+  clienteNumero?: string | null;
+  clienteComplemento?: string | null;
+  clienteBairro?: string | null;
+  clienteCidade?: string | null;
+  clienteUf?: string | null;
+  clienteCopiadoEm?: string | null;
   /** cartão (ENTRADA_PARCELAS), gravado ao salvar */
   pagamentoDebito: boolean;
   absorverTaxaCartao: boolean;

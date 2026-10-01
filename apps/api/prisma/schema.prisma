@@ -241,6 +241,24 @@ model Orcamento {
 
   validade    DateTime
   observacoes String?
+  // CÓPIA dos dados do cliente para o documento (como os itens, regra 2): o PDF e o WhatsApp
+  // usam esta cópia, e editar o cadastro não muda proposta já salva. Copiada ao criar, ao trocar
+  // de cliente e quando o vendedor pede "usar dados atuais do cadastro". O vínculo (clienteId)
+  // continua para a ficha e os relatórios. Nula só em orçamento criado pela versão anterior
+  // durante uma publicação: aí o documento usa o cadastro.
+  clienteNome        String?
+  clienteTipoPessoa  TipoPessoa?
+  clienteDocumento   String?
+  clienteWhatsapp    String?
+  clienteEmail       String?
+  clienteCep         String?
+  clienteLogradouro  String?
+  clienteNumero      String?
+  clienteComplemento String?
+  clienteBairro      String?
+  clienteCidade      String?
+  clienteUf          String?  @db.Char(2)
+  clienteCopiadoEm   DateTime?
   // proposta em PDF: o serviço no título ("Instalação de carregador veicular · Residencial") e
   // se a tabela mostra preço unitário e subtotal de cada item (padrão: só item e quantidade)
   descricaoServico    String?

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { History, Plus } from 'lucide-react';
+import { formatarData } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import type { Cliente } from '@/lib/tipos';
 import { documentoParaExibir, mascararCep, mascararTelefone } from '@/lib/formatar';
@@ -9,11 +10,11 @@ import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { Button } from '@/components/ui/button';
 import { CampoBusca } from '@/components/CampoBusca';
 import { DialogCliente } from '@/components/DialogCliente';
-import type { FormularioOrcamento } from './formulario';
+import { copiaDoSalvo, diferencasDoCadastro, type DadosClienteDocumento, type FormularioOrcamento, type OrcamentoSalvo } from './formulario';
 
 const MINIMO_BUSCA = 2;
 
-export function CartaoCliente() {
+export function CartaoCliente({ gravado }: { gravado: OrcamentoSalvo | null }) {
   const {
     control,
     setValue,
@@ -21,6 +22,7 @@ export function CartaoCliente() {
     formState: { errors },
   } = useFormContext<FormularioOrcamento>();
   const cliente = useWatch({ control, name: 'cliente' });
+  const atualizar = useWatch({ control, name: 'atualizarDadosCliente' });
   const erroCliente = errors.root?.cliente?.message;
   const [termo, setTermo] = useState('');
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -54,7 +56,13 @@ export function CartaoCliente() {
       </div>
 
       {cliente ? (
-        <ClienteSelecionado cliente={cliente} onTrocar={() => selecionar(null)} />
+        <OrigemDosDados
+          cliente={cliente}
+          gravado={gravado}
+          atualizar={atualizar}
+          onAtualizar={(sim) => setValue('atualizarDadosCliente', sim, { shouldDirty: true })}
+          onTrocar={() => selecionar(null)}
+        />
       ) : (
         <CampoBusca<Cliente>
           rotulo="Buscar cliente"
@@ -110,7 +118,91 @@ export function CartaoCliente() {
   );
 }
 
-function ClienteSelecionado({ cliente, onTrocar }: { cliente: Cliente; onTrocar: () => void }) {
+/**
+ * O PDF e o WhatsApp usam a CÓPIA do cliente gravada no orçamento (regra 2), não o cadastro.
+ * Mostra de onde vêm os dados e, se o cadastro mudou depois, avisa e oferece atualizar a cópia.
+ */
+function OrigemDosDados({
+  cliente,
+  gravado,
+  atualizar,
+  onAtualizar,
+  onTrocar,
+}: {
+  cliente: Cliente;
+  gravado: OrcamentoSalvo | null;
+  atualizar: boolean;
+  onAtualizar: (sim: boolean) => void;
+  onTrocar: () => void;
+}) {
+  const copia = gravado && gravado.clienteId === cliente.id ? copiaDoSalvo(gravado) : null;
+  if (!copia) {
+    return (
+      <ClienteSelecionado
+        dados={cliente}
+        titulo="Cliente selecionado"
+        origem="Dados do cadastro. São copiados para o orçamento ao salvar e é com eles que o PDF sai."
+        onTrocar={onTrocar}
+      />
+    );
+  }
+  const mudou = diferencasDoCadastro(copia, cliente);
+  const quando = copia.copiadoEm ? ` em ${formatarData(copia.copiadoEm)}` : '';
+  if (atualizar) {
+    return (
+      <div className="flex flex-col gap-2">
+        <ClienteSelecionado
+          dados={cliente}
+          titulo="Cliente do orçamento"
+          origem="Dados atuais do cadastro: substituem os gravados no orçamento quando você salvar."
+          onTrocar={onTrocar}
+        />
+        <p role="status" className="flex flex-wrap items-center gap-2 text-[13px] text-foreground/80">
+          O PDF e o WhatsApp passam a usar estes dados depois de salvar.
+          <button type="button" className="font-medium text-primary underline underline-offset-2" onClick={() => onAtualizar(false)}>
+            Manter os dados gravados
+          </button>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <ClienteSelecionado
+        dados={copia}
+        titulo="Cliente do orçamento"
+        origem={`Dados gravados no orçamento${quando}. É o que sai no PDF e no WhatsApp, mesmo que o cadastro mude.`}
+        onTrocar={onTrocar}
+      />
+      {mudou.length > 0 && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destaque/40 bg-destaque-suave px-4 py-3 text-[13px] text-destaque-texto">
+          <span className="flex items-start gap-2">
+            <History className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              O cadastro de {cliente.nome} mudou depois que este orçamento foi salvo ({mudou.join(', ')}). O PDF continua
+              com os dados gravados.
+            </span>
+          </span>
+          <Button type="button" variant="outline" className="h-10 rounded-[10px] bg-card" onClick={() => onAtualizar(true)}>
+            Usar dados atuais do cadastro
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClienteSelecionado({
+  dados: cliente,
+  titulo,
+  origem,
+  onTrocar,
+}: {
+  dados: DadosClienteDocumento;
+  titulo: string;
+  origem: string;
+  onTrocar: () => void;
+}) {
   const rua = [cliente.logradouro, cliente.numero].filter(Boolean).join(', ');
   const linhaEndereco = [rua, cliente.bairro].filter(Boolean).join(' — ');
   const linhaCidade = [cliente.cidade, cliente.uf, cliente.cep ? mascararCep(cliente.cep) : null]
@@ -119,9 +211,10 @@ function ClienteSelecionado({ cliente, onTrocar }: { cliente: Cliente; onTrocar:
 
   return (
     // três colunas conforme a largura do próprio cartão (container query), não da janela
-    <div className="grid grid-cols-2 gap-4 rounded-xl border border-[#C3D8F0] bg-[#EAF2FB] px-[18px] py-4 @xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-[#C3D8F0] bg-[#EAF2FB] px-[18px] py-4">
+    <div className="grid grid-cols-2 gap-4 @xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="text-xs text-[#2C5484]">Cliente selecionado</div>
+        <div className="text-xs text-[#2C5484]">{titulo}</div>
         <div className="truncate text-[15px] font-semibold">{cliente.nome}</div>
         <div className="text-[13px] text-foreground/80">{documentoParaExibir(cliente.documento)}</div>
       </div>
@@ -143,6 +236,8 @@ function ClienteSelecionado({ cliente, onTrocar }: { cliente: Cliente; onTrocar:
       >
         Trocar
       </Button>
+    </div>
+    <p className="text-xs text-[#2C5484]">{origem}</p>
     </div>
   );
 }

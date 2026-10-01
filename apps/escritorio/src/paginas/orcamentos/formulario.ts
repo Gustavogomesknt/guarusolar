@@ -46,6 +46,8 @@ export type FormularioOrcamento = {
   descricaoServico: string;
   /** PDF com preço unitário e subtotal de cada item (padrão: só item e quantidade) */
   detalharPrecosNoPdf: boolean;
+  /** troca a cópia gravada do cliente pelos dados atuais do cadastro, ao salvar */
+  atualizarDadosCliente: boolean;
 };
 
 /** Modo leitura (fieldset desabilitado): esconde a busca do catálogo e esmaece botões e campos. */
@@ -88,6 +90,7 @@ export function valoresIniciais(): FormularioOrcamento {
     observacoes: '',
     descricaoServico: '',
     detalharPrecosNoPdf: false,
+    atualizarDadosCliente: false,
   };
 }
 
@@ -201,6 +204,7 @@ export function paraApi(f: FormularioOrcamento) {
     observacoes: f.observacoes.trim() || undefined,
     descricaoServico: f.descricaoServico.trim() || undefined,
     detalharPrecosNoPdf: f.detalharPrecosNoPdf,
+    atualizarDadosCliente: f.atualizarDadosCliente,
     itens: f.itens.map((item) => ({
       produtoId: item.produtoId,
       quantidade: lerNumero(item.quantidade),
@@ -237,7 +241,59 @@ export type OrcamentoSalvo = {
   valorPrimeiraParcela?: string | null;
   valorTotalCliente?: string | null;
   valorTaxaAbsorvida?: string | null;
+  clienteId?: string;
+  /** cópia dos dados do cliente gravada no orçamento (a do PDF); null só em orçamento antigo */
+  clienteNome?: string | null;
+  clienteDocumento?: string | null;
+  clienteWhatsapp?: string | null;
+  clienteEmail?: string | null;
+  clienteCep?: string | null;
+  clienteLogradouro?: string | null;
+  clienteNumero?: string | null;
+  clienteComplemento?: string | null;
+  clienteBairro?: string | null;
+  clienteCidade?: string | null;
+  clienteUf?: string | null;
+  clienteCopiadoEm?: string | null;
 };
+
+/** Dados do cliente como aparecem no documento (a cópia gravada ou o cadastro). */
+export type DadosClienteDocumento = Pick<
+  Cliente,
+  'nome' | 'documento' | 'whatsapp' | 'email' | 'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf'
+>;
+
+/** A cópia do cliente gravada no orçamento salvo; null se ainda não há (orçamento antigo). */
+export function copiaDoSalvo(s: OrcamentoSalvo): (DadosClienteDocumento & { copiadoEm: string | null }) | null {
+  if (s.clienteNome == null) return null;
+  return {
+    nome: s.clienteNome,
+    documento: s.clienteDocumento ?? '',
+    whatsapp: s.clienteWhatsapp ?? '',
+    email: s.clienteEmail ?? null,
+    cep: s.clienteCep ?? null,
+    logradouro: s.clienteLogradouro ?? null,
+    numero: s.clienteNumero ?? null,
+    complemento: s.clienteComplemento ?? null,
+    bairro: s.clienteBairro ?? null,
+    cidade: s.clienteCidade ?? null,
+    uf: s.clienteUf ?? null,
+    copiadoEm: s.clienteCopiadoEm ?? null,
+  };
+}
+
+/** O que mudou no cadastro em relação à cópia gravada (para o aviso ao vendedor). */
+export function diferencasDoCadastro(copia: DadosClienteDocumento, cadastro: DadosClienteDocumento): string[] {
+  const igual = (a: string | null | undefined, b: string | null | undefined) => (a ?? '').trim() === (b ?? '').trim();
+  const grupos: [string, (keyof DadosClienteDocumento)[]][] = [
+    ['nome', ['nome']],
+    ['CPF/CNPJ', ['documento']],
+    ['WhatsApp', ['whatsapp']],
+    ['e-mail', ['email']],
+    ['endereço', ['cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'uf']],
+  ];
+  return grupos.filter(([, campos]) => campos.some((c) => !igual(copia[c], cadastro[c]))).map(([rotulo]) => rotulo);
+}
 
 /** O pagamento no cartão como foi GRAVADO (a taxa da época; a tabela atual não entra). */
 export function cartaoDoSalvo(s: OrcamentoSalvo): PagamentoCartao | null {
@@ -292,6 +348,7 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     observacoes: o.observacoes ?? '',
     descricaoServico: o.descricaoServico ?? '',
     detalharPrecosNoPdf: o.detalharPrecosNoPdf,
+    atualizarDadosCliente: false,
   };
 }
 
@@ -313,4 +370,17 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   valorPrimeiraParcela: o.valorPrimeiraParcela,
   valorTotalCliente: o.valorTotalCliente,
   valorTaxaAbsorvida: o.valorTaxaAbsorvida,
+  clienteId: o.cliente.id,
+  clienteNome: o.clienteNome,
+  clienteDocumento: o.clienteDocumento,
+  clienteWhatsapp: o.clienteWhatsapp,
+  clienteEmail: o.clienteEmail,
+  clienteCep: o.clienteCep,
+  clienteLogradouro: o.clienteLogradouro,
+  clienteNumero: o.clienteNumero,
+  clienteComplemento: o.clienteComplemento,
+  clienteBairro: o.clienteBairro,
+  clienteCidade: o.clienteCidade,
+  clienteUf: o.clienteUf,
+  clienteCopiadoEm: o.clienteCopiadoEm,
 });

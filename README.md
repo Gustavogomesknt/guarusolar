@@ -142,6 +142,11 @@ Confere tudo de novo, mostra o banco, o resumo por categoria e uma amostra, e s�
 nada) depois que você digitar `IMPORTAR`.
 - **Itens do orçamento são uma cópia.** Nome, unidade e preço ficam gravados no item.
   Mudar o catálogo depois não altera orçamentos antigos.
+- **Os dados do cliente no orçamento também são uma cópia.** Nome, CPF/CNPJ, WhatsApp, e-mail e
+  endereço ficam gravados no orçamento ao salvar: o PDF e a mensagem do WhatsApp usam essa cópia,
+  e corrigir o cadastro não muda proposta já enviada. Se o cadastro mudou depois, o gerador avisa
+  e oferece "Usar dados atuais do cadastro" (vale ao salvar). A ficha do cliente e as listas
+  seguem o cadastro atual, e o WhatsApp vai para o número atual do cadastro.
 - **Nada é apagado.** Clientes e produtos são desativados, preservando o histórico.
 - **Aprovar orçamento cria o projeto** automaticamente, que entra na fila "A agendar".
 - **Checklist de fotos configurável** (tabela `ChecklistFoto`), por tipo de serviço.

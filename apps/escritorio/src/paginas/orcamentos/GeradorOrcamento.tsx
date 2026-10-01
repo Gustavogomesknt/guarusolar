@@ -114,7 +114,8 @@ export function GeradorOrcamento({
       setSalvo(resposta);
       setSalvoEm(new Date());
       // o que foi salvo vira a nova referência: isDirty volta a false
-      reset(dados);
+      // a cópia do cliente já foi atualizada: o pedido não vale para o próximo salvamento
+      reset({ ...dados, atualizarDadosCliente: false });
       alteradoRef.current = false;
       toast.success(`Orçamento ${resposta.codigo} salvo`);
       void clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] });
@@ -246,7 +247,7 @@ export function GeradorOrcamento({
           {/* fieldset desabilitado trava todos os campos e botões no modo leitura */}
           <fieldset disabled={somenteLeitura} className={`flex min-w-0 flex-col gap-5 ${ESTILO_SOMENTE_LEITURA}`}>
             <legend className="sr-only">Cliente e itens</legend>
-            <CartaoCliente />
+            <CartaoCliente gravado={salvo} />
             <CartaoItens subtotal={totais.subtotal} />
           </fieldset>
           <ResumoOrcamento

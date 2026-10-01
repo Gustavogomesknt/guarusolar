@@ -240,6 +240,13 @@ O `.env` da API fica em `apps/api/.env`.
    gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
    não altera orçamento antigo. Na edição (PUT),
    itens que já estavam no orçamento mantêm a cópia gravada; só itens novos copiam o catálogo.
+   **Os dados do cliente também são cópia** (`clienteNome`, `clienteDocumento`, `clienteWhatsapp`,
+   `clienteEmail`, endereço e `clienteCopiadoEm` no orçamento): o PDF e o texto do WhatsApp usam a
+   cópia, e editar o cadastro não muda proposta salva. A cópia é feita ao criar, ao trocar de
+   cliente e quando o vendedor pede "Usar dados atuais do cadastro" (`atualizarDadosCliente`); a
+   tela avisa quando o cadastro diverge da cópia. O `clienteId` continua para a ficha, listas e
+   relatórios (que mostram o cadastro atual), e o WhatsApp é enviado ao número ATUAL do cadastro.
+   Cópia nula (orçamento criado pela versão anterior numa publicação): o documento usa o cadastro.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
 5. **Status seguem transições válidas** (mapa `TRANSICOES_STATUS` em

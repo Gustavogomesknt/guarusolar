@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
+import { type Cliente, Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -42,6 +42,8 @@ const orcamentoSchema = z.object({
   // proposta em PDF: serviço no título e se a tabela mostra os preços de cada item
   descricaoServico: z.string().trim().max(100, 'Use até 100 caracteres').optional(),
   detalharPrecosNoPdf: z.boolean().default(false),
+  // o vendedor pediu para trocar a cópia gravada do cliente pelos dados atuais do cadastro
+  atualizarDadosCliente: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
 });
 
@@ -64,6 +66,34 @@ function pagamentoGravado(condicao: CondicaoPagamento, totais: ResultadoCalculo)
     valorTotalCliente: c ? totais.valorTotalCliente : null,
     valorTaxaAbsorvida: c ? c.valorAbsorvido : null,
   };
+}
+
+/**
+ * Cópia dos dados do cliente gravada no orçamento (como os itens, regra 2): é o que o PDF e o
+ * WhatsApp usam. Feita ao criar, ao trocar de cliente e quando o vendedor pede para atualizar.
+ */
+export function copiaDoCliente(c: Cliente) {
+  return {
+    clienteNome: c.nome,
+    clienteTipoPessoa: c.tipoPessoa,
+    clienteDocumento: c.documento,
+    clienteWhatsapp: c.whatsapp,
+    clienteEmail: c.email,
+    clienteCep: c.cep,
+    clienteLogradouro: c.logradouro,
+    clienteNumero: c.numero,
+    clienteComplemento: c.complemento,
+    clienteBairro: c.bairro,
+    clienteCidade: c.cidade,
+    clienteUf: c.uf,
+    clienteCopiadoEm: new Date(),
+  };
+}
+
+async function clienteDoOrcamento(id: string) {
+  const cliente = await prisma.cliente.findUnique({ where: { id } });
+  if (!cliente) throw new ErroHttp(400, 'Cliente não encontrado. Escolha o cliente de novo.');
+  return cliente;
 }
 
 /** Link público do PDF, com o token do orçamento (o cliente abre sem login). */
@@ -244,6 +274,7 @@ rotasOrcamentos.post(
   '/',
   rota(async (req, res) => {
     const dados = orcamentoSchema.parse(req.body);
+    const cliente = await clienteDoOrcamento(dados.clienteId);
     const itens = await prepararItens(dados.itens);
     const totais = calcularOrcamento({
       itens: itens.map((i) => i._calculo),
@@ -263,6 +294,7 @@ rotasOrcamentos.post(
         data: {
           codigo: await gerarCodigoOrcamento(tx),
           clienteId: dados.clienteId,
+          ...copiaDoCliente(cliente),
           vendedorId: req.usuario!.id,
           validade: dados.validade,
           descontoTipo: dados.descontoTipo,
@@ -302,7 +334,10 @@ rotasOrcamentos.put(
       throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
     }
 
-    // itens que já estavam no orçamento mantêm a cópia gravada (regra 2)
+    // itens que já estavam no orçamento mantêm a cópia gravada (regra 2); o cliente também:
+    // a cópia só muda ao trocar de cliente ou quando o vendedor pede "usar dados atuais do cadastro"
+    const copiarCliente = dados.clienteId !== atual.clienteId || dados.atualizarDadosCliente || atual.clienteNome == null;
+    const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId)) : {};
     const itens = await prepararItens(dados.itens, atual.itens);
     const totais = calcularOrcamento({
       itens: itens.map((i) => i._calculo),
@@ -323,6 +358,7 @@ rotasOrcamentos.put(
         where: { id: req.params.id },
         data: {
           clienteId: dados.clienteId,
+          ...novaCopia,
           validade: dados.validade,
           descontoTipo: dados.descontoTipo,
           descontoValor: dados.descontoValor,
@@ -433,7 +469,8 @@ rotasOrcamentos.post(
     });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
 
-    const primeiroNome = orcamento.cliente.nome.split(' ')[0];
+    // o texto usa a cópia gravada (a mesma do PDF); orçamento antigo sem cópia usa o cadastro
+    const primeiroNome = (orcamento.clienteNome ?? orcamento.cliente.nome).split(' ')[0];
     const mensagem = [
       `Olá, ${primeiroNome}! Tudo bem?`,
       '',
@@ -459,6 +496,7 @@ rotasOrcamentos.post(
       status = atualizado.status;
     }
 
+    // o envio vai para o WhatsApp ATUAL do cadastro: se o cliente trocou de número, chega no novo
     const telefone = `55${orcamento.cliente.whatsapp.replace(/\D/g, '')}`;
     res.json({
       mensagem,
