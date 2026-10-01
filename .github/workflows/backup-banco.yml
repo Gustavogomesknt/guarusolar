@@ -48,7 +48,9 @@ jobs:
           fi
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_SENHA" --symmetric --cipher-algo AES256 "$arquivo"
           rm "$arquivo"
-          ls -lh "$arquivo.gpg"
+          # prova no log, sem expor nada: o Restaurar backup mostra as mesmas linhas para comparar
+          echo "Arquivo: $(stat -c %s "$arquivo.gpg") bytes, sha256 $(sha256sum "$arquivo.gpg" | cut -c1-16)"
+          echo "Senha: impressão $(printf '%s' "$BACKUP_SENHA" | sha256sum | cut -c1-8) ($(printf '%s' "$BACKUP_SENHA" | wc -c) caracteres)"
           echo "ARQUIVO=$arquivo.gpg" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v7
         with:

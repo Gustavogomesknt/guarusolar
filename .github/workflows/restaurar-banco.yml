@@ -21,6 +21,10 @@ on:
       execucao:
         description: 'Número da execução do "Backup do banco" (vazio = o backup mais recente)'
         required: false
+      simular_senha_errada:
+        description: 'Teste da conferência: abre com uma senha errada de propósito (só com destino teste)'
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -46,6 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXECUCAO: ${{ inputs.execucao }}
           BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
+          SIMULAR_SENHA_ERRADA: ${{ inputs.simular_senha_errada || false }}
         run: |
           set -euo pipefail
           if [ -z "$EXECUCAO" ]; then
@@ -53,14 +58,37 @@ jobs:
           fi
           if [ -z "$EXECUCAO" ]; then echo "::error::Nenhum backup bem-sucedido encontrado."; exit 1; fi
           gh run download "$EXECUCAO" -R "$GITHUB_REPOSITORY" --dir baixado
-          cifrado=$(find baixado -name '*.dump.gpg' | head -1)
+          # o gh cria uma PASTA com o nome do artefato (que é o nome do arquivo, .dump.gpg):
+          # só arquivos contam, senão o gpg recebe a pasta ("read error: Is a directory")
+          cifrado=$(find baixado -type f -name '*.dump.gpg' | head -1)
           if [ -z "$cifrado" ]; then echo "::error::A execução $EXECUCAO não tem arquivo de backup (expirou?)."; exit 1; fi
           echo "Backup: $(basename "$cifrado") (execução $EXECUCAO)"
-          if ! gpg --batch --pinentry-mode loopback --passphrase "$BACKUP_SENHA" --decrypt -o backup.dump "$cifrado" 2>gpg.log; then
+
+          senha="$BACKUP_SENHA"
+          if [ "$SIMULAR_SENHA_ERRADA" = "true" ]; then
+            if [ "$DESTINO" != "teste" ]; then echo "::error::Simular senha errada só vale com destino teste."; exit 1; fi
+            senha="senha-errada-de-proposito-$(date +%s%N)"
+            echo "::warning::Simulação: abrindo com uma senha ERRADA de propósito. A falha a seguir é o esperado."
+          fi
+          # prova no log, sem expor nada: compare com o log do Backup do banco
+          echo "Arquivo: $(stat -c %s "$cifrado") bytes, sha256 $(sha256sum "$cifrado" | cut -c1-16)"
+          echo "Senha: impressão $(printf '%s' "$senha" | sha256sum | cut -c1-8) ($(printf '%s' "$senha" | wc -c) caracteres)"
+
+          if ! gpg --batch --pinentry-mode loopback --passphrase "$senha" --status-fd 3 \
+                 --decrypt -o backup.dump "$cifrado" 2>gpg.log 3>gpg.status; then
             cat gpg.log
-            echo "::error::Não foi possível abrir o backup: a BACKUP_SENHA não é a mesma usada para criá-lo."
+            if grep -q 'BAD_PASSPHRASE' gpg.status; then
+              echo "::error::Senha errada: a BACKUP_SENHA de agora não é a usada para criar este backup (compare a impressão da senha com a do log do Backup do banco)."
+            elif grep -q 'NODATA' gpg.status || grep -qiE 'no valid OpenPGP data|pending bytes|unknown version|invalid packet' gpg.log; then
+              echo "::error::O arquivo do backup está danificado ou não é um backup criptografado (compare tamanho e sha256 com o log do Backup do banco)."
+            elif grep -qiE 'Is a directory|can.t open|No such file' gpg.log; then
+              echo "::error::O gpg não encontrou o arquivo do backup ($cifrado). Falha do workflow, não do backup."
+            else
+              echo "::error::O gpg não conseguiu abrir o backup por um motivo não previsto: veja as linhas 'gpg:' acima."
+            fi
             exit 1
           fi
+          echo "Backup aberto: $(stat -c %s backup.dump) bytes."
           echo "BACKUP_NOME=$(basename "$cifrado")" >> "$GITHUB_ENV"
 
       - name: Escolher o destino
