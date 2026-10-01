@@ -38,14 +38,21 @@ const REGRAS: Regra[] = [
   { categoria: 'OUTROS', semMargem: true, padroes: [/INDICACAO/] },
   { categoria: 'CARREGADOR', padroes: [/CARREGADOR/, /WALL ?BOX/, /\bEVSE\b/, /TOMADA VEICULAR/] },
   { categoria: 'INVERSOR', padroes: [/INVERSOR/, /\bMICRO ?INV/] },
-  { categoria: 'PAINEL_SOLAR', padroes: [/PAINEL (SOLAR|FOTOVOLTAICO)/, /\bMODULO\b/, /PLACA SOLAR/, /\bPAINEL\b.*\d+ ?W\b/] },
+  // "módulo" sozinho também é módulo de tomada: só com solar/fotovoltaico ou potência
+  { categoria: 'PAINEL_SOLAR', padroes: [/PAINEL (SOLAR|FOTOVOLTAICO)/, /MODULO (SOLAR|FOTOVOLTAICO)/, /PLACA SOLAR/, /\b(PAINEL|MODULO)\b.*\d+ ?W\b/] },
+  // trilho DIN é de quadro, não de estrutura de painel
+  { categoria: 'QUADRO', padroes: [/TRILHO DIN/] },
   { categoria: 'ESTRUTURA', padroes: [/ESTRUTURA/, /\bTRILHO/, /\bGANCHO/, /\bLAJE\b/, /CLAMP/, /\bGRAMPO/] },
+  // antes de Cabos (prensa-cabo) e de Proteção ("conector p/ disj.")
+  { categoria: 'INFRAESTRUTURA', padroes: [/PRENSA ?CABO/] },
+  { categoria: 'CONEXAO', padroes: [/\bCONE?CTOR/, /\bMC ?4\b/, /TERMINAL/, /\bTERM\b/, /\bBORNE/, /BARRAMENTO/, /\bEMENDA/, /SPLIT ?BOLT/, /FITA ISOLANTE/] },
   { categoria: 'CABO', padroes: [/\bCABOS?\b/, /\bCAB\b/, /\bFIOS?\b/, /CORDOALHA/] },
   {
     categoria: 'INFRAESTRUTURA',
     padroes: [
-      /ELETRODUTO/, /\bELETROD\b/, /ELETROCALHA/, /CONDULETE/, /\bCURVA\b/, /\bLUVA\b/, /ABRACADEIRA/, /BRACADEIRA/,
-      /\bBUCHA\b/, /PARAFUSO/, /\bPORCA\b/, /ARRUELA/, /CHUMBADOR/, /PERFILADO/, /UNIDUT/, /CAIXA DE PASSAGEM/, /\bCX\.? ?(DE )?PASSAGEM/,
+      /ELETRODUTO/, /\bELETROD\b/, /ELETROCALHA/, /\bCALHAS?\b/, /CONDULET/, /CORRUGADO/, /\bCURVA\b/, /\bLUVA\b/, /ABRACADEIRA/, /BRACADEIRA/,
+      /\bBUCHA\b/, /PARAFUSO/, /\bPORCA\b/, /ARRUELA/, /CHUMBADOR/, /VERGALHAO/, /BARRA ROSCADA/, /PERFILADO/, /UNIDUT/, /\bTAMPAO\b/, /TAMPA CEGA/,
+      /IGREJINHA/, /BENGALA/, /^TRA\b/, /CAIXA DE PASSAGEM/, /\bCX\.? ?(DE )?PASSAGEM/, /ADAPTADOR/,
     ],
   },
   { categoria: 'QUADRO', padroes: [/\bQUADRO/, /\bQDC\b/, /\bQDG\b/, /\bQD\b/, /STRING ?BOX/, /\bCAIXA\b/, /\bCX\b/, /PAINEL (ELETRICO|DE COMANDO)/] },
@@ -53,11 +60,19 @@ const REGRAS: Regra[] = [
     categoria: 'PROTECAO',
     padroes: [/\bDISJ/, /\bDPS\b/, /\bDR\b/, /\bIDR\b/, /FUSIVEL/, /SECCIONADORA/, /CHAVE SECC/, /\bHASTE/, /ATERRAMENTO/, /BOTOEIRA/, /EMERGENCIA/, /SUPRESSOR/, /\bRELE\b/, /CONTATOR/],
   },
-  { categoria: 'CONEXAO', padroes: [/CONECTOR/, /\bMC ?4\b/, /TERMINAL/, /\bTERM\b/, /\bBORNE/, /BARRAMENTO/, /\bEMENDA/, /\bPLUGU?E?\b/, /\bTOMADA\b/, /SPLIT ?BOLT/, /ADAPTADOR/] },
+  { categoria: 'CONEXAO', padroes: [/\bPLUGU?E?\b/, /\bTOMADA\b/] },
+];
+
+/** Linhas que não parecem material nem serviço vendável: saem "?" para o usuário decidir. */
+const SUSPEITOS: [RegExp, string][] = [
+  [/\bMARGEM\b/, 'não parece um material (margem?)'],
+  [/SERRA COPO|\bBROCA\b|FERRAMENTA/, 'parece ferramenta da equipe, não item vendido'],
 ];
 
 const normalizar = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+/** Para achar repetidos: sem acento, pontuação nem espaços ("DISJ. IDR" = "DISJ IDR"). */
+const chaveDoNome = (s: string) => normalizar(s).replace(/[^A-Z0-9]/g, '');
 
 function inferirCategoria(nome: string): { categoria: CategoriaProduto; palavra: string; semMargem: boolean } {
   const n = normalizar(nome);
@@ -86,7 +101,7 @@ function inferirUnidade(nome: string, categoria: CategoriaProduto, semMargem: bo
   if (semMargem || categoria === 'MAO_DE_OBRA' || categoria === 'PROJETO') return 'SERVICO';
   if (/\bKIT\b/.test(n)) return 'KIT';
   if (categoria === 'CABO') return 'M';
-  if (/ELETRODUTO|\bELETROD\b|ELETROCALHA|PERFILADO/.test(n)) return 'BARRA';
+  if (/^(ELETRODUTO|ELETROD\b|ELETROCALHA|PERFILADO)/.test(n)) return 'BARRA';
   return 'UN';
 }
 
@@ -211,6 +226,11 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
       importar = 'N';
       situacao.push(`INVÁLIDA: ${invalida.join(', ')}`);
     }
+    const suspeito = SUSPEITOS.find(([padrao]) => padrao.test(normalizar(nome)));
+    if (suspeito && importar === 'S') {
+      importar = '?';
+      situacao.push(`CONFIRA: ${suspeito[1]}`);
+    }
     if (unidadeTexto && !daPlanilha) situacao.push(`unidade "${unidadeTexto}" não reconhecida: escolha na lista`);
     if (!palavra) situacao.push('categoria não reconhecida: confira');
 
@@ -245,19 +265,19 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
       }
     }
   };
-  marcarRepetidos((l) => normalizar(l.nome), 'NOME');
+  marcarRepetidos((l) => chaveDoNome(l.nome), 'NOME');
   marcarRepetidos((l) => l.codigo, 'CÓDIGO');
 
   // Já no catálogo (itens ativos): mesmo código ou mesmo nome
   const ativos = await prisma.produto.findMany({ where: { ativo: true }, select: { nome: true, codigoFornecedor: true } });
   const porCodigo = new Map(ativos.filter((p) => p.codigoFornecedor).map((p) => [p.codigoFornecedor!, p.nome]));
-  const porNome = new Set(ativos.map((p) => normalizar(p.nome)));
+  const porNome = new Set(ativos.map((p) => chaveDoNome(p.nome)));
   for (const l of linhas) {
     if (l.importar === 'N') continue;
     if (porCodigo.has(l.codigo)) {
       l.importar = 'N';
       l.situacao.push(`JÁ NO CATÁLOGO com este código: ${porCodigo.get(l.codigo)}`);
-    } else if (porNome.has(normalizar(l.nome))) {
+    } else if (porNome.has(chaveDoNome(l.nome))) {
       l.importar = 'N';
       l.situacao.push('JÁ NO CATÁLOGO com este nome');
     }
@@ -390,12 +410,12 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     }
   };
   repetidos((i) => i.codigo, 'Código');
-  repetidos((i) => normalizar(i.nome), 'Nome');
+  repetidos((i) => chaveDoNome(i.nome), 'Nome');
   const ativos = await prisma.produto.findMany({ where: { ativo: true }, select: { nome: true, codigoFornecedor: true } });
   for (const i of itens) {
     const mesmoCodigo = ativos.find((p) => p.codigoFornecedor === i.codigo);
     if (mesmoCodigo) erros.push(`linha ${i.linha}: o código ${i.codigo} já é de "${mesmoCodigo.nome}" no catálogo`);
-    else if (ativos.some((p) => normalizar(p.nome) === normalizar(i.nome))) erros.push(`linha ${i.linha}: "${i.nome}" já existe no catálogo`);
+    else if (ativos.some((p) => chaveDoNome(p.nome) === chaveDoNome(i.nome))) erros.push(`linha ${i.linha}: "${i.nome}" já existe no catálogo`);
   }
 
   if (erros.length) {
