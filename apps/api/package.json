@@ -19,6 +19,7 @@
     "sharepoint:conferir": "tsx scripts/sharepoint-conferir.ts",
     "db:seed:base": "tsx prisma/seed-base.ts",
     "db:marcar-producao": "tsx scripts/marcar-producao.ts",
+    "db:conferir-producao": "tsx scripts/conferir-producao.ts",
     "db:migrate:deploy": "prisma migrate deploy",
     "usuario": "tsx scripts/usuario.ts"
   },

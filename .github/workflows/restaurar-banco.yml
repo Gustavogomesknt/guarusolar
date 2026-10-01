@@ -1,0 +1,135 @@
+# Restaurar um backup do banco (README, "Backup e restauração do banco").
+#
+# destino "teste" (padrão): restaura num Postgres descartável, criado só para esta execução e
+#   apagado no fim. Prova que o backup abre, que a BACKUP_SENHA está certa e que os dados
+#   voltam. Roda sozinho todo dia 2 (testa o backup mensal) e sob demanda.
+# destino "banco-novo": restaura de verdade no banco do segredo RESTAURAR_DESTINO_URL (um
+#   projeto novo do Supabase, criado na hora da emergência). Recusa banco que já tenha tabelas:
+#   nunca escreve por cima de dados.
+name: Restaurar backup
+
+on:
+  schedule:
+    - cron: '0 9 2 * *'
+  workflow_dispatch:
+    inputs:
+      destino:
+        description: 'teste = banco descartável; banco-novo = RESTAURAR_DESTINO_URL (emergência)'
+        type: choice
+        options: [teste, banco-novo]
+        default: teste
+      execucao:
+        description: 'Número da execução do "Backup do banco" (vazio = o backup mais recente)'
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  restaurar:
+    runs-on: ubuntu-latest
+    services:
+      descartavel:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: descartavel
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DESTINO: ${{ inputs.destino || 'teste' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Baixar e abrir o backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXECUCAO: ${{ inputs.execucao }}
+          BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          set -euo pipefail
+          if [ -z "$EXECUCAO" ]; then
+            EXECUCAO=$(gh run list -R "$GITHUB_REPOSITORY" --workflow backup-banco.yml --status success --limit 1 --json databaseId -q '.[0].databaseId')
+          fi
+          if [ -z "$EXECUCAO" ]; then echo "::error::Nenhum backup bem-sucedido encontrado."; exit 1; fi
+          gh run download "$EXECUCAO" -R "$GITHUB_REPOSITORY" --dir baixado
+          cifrado=$(find baixado -name '*.dump.gpg' | head -1)
+          if [ -z "$cifrado" ]; then echo "::error::A execução $EXECUCAO não tem arquivo de backup (expirou?)."; exit 1; fi
+          echo "Backup: $(basename "$cifrado") (execução $EXECUCAO)"
+          if ! gpg --batch --pinentry-mode loopback --passphrase "$BACKUP_SENHA" --decrypt -o backup.dump "$cifrado" 2>gpg.log; then
+            cat gpg.log
+            echo "::error::Não foi possível abrir o backup: a BACKUP_SENHA não é a mesma usada para criá-lo."
+            exit 1
+          fi
+          echo "BACKUP_NOME=$(basename "$cifrado")" >> "$GITHUB_ENV"
+
+      - name: Escolher o destino
+        env:
+          URL_NOVO: ${{ secrets.RESTAURAR_DESTINO_URL }}
+        run: |
+          set -euo pipefail
+          if [ "$DESTINO" = "teste" ]; then
+            url="postgresql://postgres:descartavel@localhost:5432/postgres"
+          else
+            if [ -z "$URL_NOVO" ]; then echo "::error::Falta o segredo RESTAURAR_DESTINO_URL (Session pooler do banco novo)."; exit 1; fi
+            url="${URL_NOVO%%\?*}"
+          fi
+          echo "::add-mask::$url"
+          echo "URL=$url" >> "$GITHUB_ENV"
+
+      - name: Restaurar
+        run: |
+          set -euo pipefail
+          pg() { docker run --rm --network host -e URL="$URL" -v "$PWD:/w" -w /w postgres:17 "$@"; }
+          tabelas=$(pg sh -c 'psql "$URL" -tAc "select count(*) from pg_tables where schemaname = '\''public'\''"')
+          if [ "$tabelas" != "0" ]; then
+            echo "::error::O banco de destino já tem $tabelas tabela(s). A restauração só escreve em banco vazio."
+            exit 1
+          fi
+          # o schema public já existe em todo banco novo: recriá-lo derrubaria a restauração
+          pg sh -c 'pg_restore --list backup.dump | grep -v -E "SCHEMA - public|COMMENT - SCHEMA public" > lista.txt'
+          pg sh -c 'pg_restore --no-owner --no-privileges --exit-on-error --single-transaction -L lista.txt --dbname "$URL" backup.dump'
+          echo "Restaurado."
+
+      - name: Conferir o que voltou
+        run: |
+          set -euo pipefail
+          sql() { docker run --rm --network host -e URL="$URL" postgres:17 psql "$URL" -tA -c "$1"; }
+          {
+            echo "## Restauração: $DESTINO"
+            echo "Backup: \`$BACKUP_NOME\`"
+            echo
+            echo "| Tabela | Linhas |"
+            echo "| --- | --- |"
+            for t in $(sql "select tablename from pg_tables where schemaname = 'public' order by 1"); do
+              echo "| $t | $(sql "select count(*) from \"$t\"") |"
+            done
+          } > resumo.md
+          erros=0
+          # 1. o backup veio do banco de produção? (o de desenvolvimento não tem a marca)
+          ambiente=$(sql 'select coalesce((select nome from "AmbienteDoBanco" where id = 1), '\''sem marca'\'')')
+          echo "- Marca do banco: **$ambiente**" >> resumo.md
+          if [ "$ambiente" != "producao" ]; then
+            echo "::error::O backup NÃO veio do banco de produção (marca: $ambiente). Confira o segredo PRODUCAO_DATABASE_URL."
+            erros=1
+          fi
+          # 2. todas as migrations do código estão no backup?
+          no_codigo=$(find apps/api/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)
+          no_backup=$(sql 'select count(*) from "_prisma_migrations" where finished_at is not null and rolled_back_at is null')
+          echo "- Migrations: **$no_backup** no backup, **$no_codigo** no código" >> resumo.md
+          if [ "$no_backup" -lt "$no_codigo" ]; then
+            echo "::warning::O backup tem $no_backup migrations e o código, $no_codigo (backup anterior à última publicação?)."
+          fi
+          # 3. sequência dos códigos e usuários
+          seq=$(sql 'select coalesce(string_agg(prefixo || '\''-'\'' || ano || '\'': '\'' || ultimo, '\'', '\'' order by prefixo), '\''nenhum código emitido ainda'\'') from "SequenciaCodigo"')
+          echo "- Último código emitido: **$seq**" >> resumo.md
+          usuarios=$(sql 'select count(*) from "Usuario" where ativo')
+          echo "- Usuários ativos: **$usuarios**" >> resumo.md
+          if [ "$usuarios" -lt 1 ]; then echo "::error::Nenhum usuário ativo no backup."; erros=1; fi
+          cat resumo.md >> "$GITHUB_STEP_SUMMARY"
+          cat resumo.md
+          exit $erros
+
+      - name: Apagar o arquivo aberto
+        if: always()
+        run: rm -f backup.dump lista.txt

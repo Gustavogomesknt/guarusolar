@@ -55,6 +55,8 @@ apps/api/                      API (Express + Prisma)
                                (recusa com NODE_ENV=production e em banco marcado como produção)
   scripts/usuario.ts           npm run usuario -- criar|nova-senha|trocar-email|desativar|listar: reais,
                                com senha temporária (troca obrigatória no primeiro acesso)
+  scripts/conferir-producao.ts npm run db:conferir-producao: erro se o banco não tem a marca
+                               (Publicar roda antes das migrations); /saude informa `producao`
   scripts/marcar-producao.ts   npm run db:marcar-producao: grava a marca de produção NO banco
                                (tabela AmbienteDoBanco; lib/ambienteDoBanco.ts confere)
   prisma/limpar.ts             apaga os dados de operação (npm run db:limpar)
@@ -194,7 +196,9 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
 Dockerfile, render.yaml        produção na Render, plano gratuito (README, "Publicar em produção");
                                a Render compila a imagem. Publicação só pelo Actions (autoDeploy off)
 .github/workflows/             verificação (build a cada push), publicar (manual: migrations, deploy
-                               hook da Render, confere a versão no /saude), backup do banco
+                               hook da Render, confere versão e producao:true no /saude), backup do
+                               banco (diário 14 dias, mensal 90) e restaurar backup (teste mensal
+                               num banco descartável; emergência só em banco vazio)
 ```
 
 O que depende de navegador ou React (fetch, localStorage, componentes, CSS) vai em

@@ -13,6 +13,7 @@ import { rotasFotos } from './rotas/fotos';
 import { conferirArmazenamentoAoIniciar } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
+import { bancoDeProducao } from './lib/ambienteDoBanco';
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
 
@@ -40,16 +41,18 @@ app.use(express.json({ limit: '2mb' }));
 /**
  * Saúde, usada pela Render para liberar uma versão nova: só responde 200 se alcança o banco.
  * Uma versão que não fala com o banco não recebe tráfego (a anterior continua atendendo).
+ * `producao`: o banco tem a marca de produção (db:marcar-producao). Confere, sem expor o
+ * endereço, que a hospedagem aponta para o banco certo; o workflow Publicar exige true.
  */
 app.get('/saude', async (_req, res) => {
   // RENDER_GIT_COMMIT: a Render informa o commit publicado (o workflow Publicar confere por ela)
   const versao = process.env.VERSAO ?? process.env.RENDER_GIT_COMMIT ?? 'desenvolvimento';
   try {
-    await Promise.race([
-      prisma.$queryRaw`SELECT 1`,
-      new Promise((_ok, falhar) => setTimeout(() => falhar(new Error('tempo esgotado')), 3000)),
+    const producao = await Promise.race([
+      bancoDeProducao(prisma),
+      new Promise<never>((_ok, falhar) => setTimeout(() => falhar(new Error('tempo esgotado')), 3000)),
     ]);
-    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', versao, hora: new Date().toISOString() });
+    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
     res.status(503).set('Cache-Control', 'no-store').json({ ok: false, banco: 'inacessível', versao });
@@ -77,3 +80,13 @@ app.use(tratadorDeErros);
 
 const porta = Number(process.env.PORT ?? 3333);
 app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localhost:${porta}`));
+
+// Produção ligada num banco sem a marca de produção = string de conexão errada (ex.: a de
+// desenvolvimento). Não derruba a API, mas grita no log; o /saude mostra producao: false.
+if (process.env.NODE_ENV === 'production') {
+  bancoDeProducao(prisma)
+    .then((marcado) => {
+      if (!marcado) console.error('[banco] ATENÇÃO: NODE_ENV=production, mas o banco NÃO tem a marca de produção. Confira DATABASE_URL.');
+    })
+    .catch(() => {});
+}

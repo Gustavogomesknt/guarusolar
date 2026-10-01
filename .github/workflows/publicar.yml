@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.12'
           cache: npm
@@ -32,7 +32,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PRODUCAO_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.PRODUCAO_DATABASE_URL }}
-        run: npm run db:migrate:deploy
+        # antes de tudo: o segredo aponta MESMO para o banco de produção? (marca no banco)
+        run: |
+          npm run db:conferir-producao
+          npm run db:migrate:deploy
 
       - name: Publicar na Render
         env:
@@ -51,6 +54,11 @@ jobs:
             versao=$(echo "$resposta" | jq -r '.versao // empty' 2>/dev/null || true)
             if [ "$versao" = "$ESPERADA" ]; then
               echo "No ar: $resposta"
+              # o banco em uso tem a marca de produção? (senão, a DATABASE_URL da Render está errada)
+              if [ "$(echo "$resposta" | jq -r '.producao')" != "true" ]; then
+                echo "::error::A versão está no ar, mas ligada num banco SEM a marca de produção. Confira DATABASE_URL e DIRECT_URL na Render (Environment)."
+                exit 1
+              fi
               exit 0
             fi
             echo "Ainda não (no ar: ${versao:-sem resposta}); nova conferência em 15 s"

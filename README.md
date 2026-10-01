@@ -437,9 +437,44 @@ de cada mês (`guarusolar-mensal-...`) fica 90 dias. Segredos: `PRODUCAO_DATABAS
 **Rotina mensal (manual):** no começo de cada mês, baixe o backup `guarusolar-mensal-...` (Actions ›
 Backup do banco › a execução do dia 1º › Artifacts) e guarde fora do GitHub (OneDrive da empresa
 ou outro local). O arquivo já vem criptografado. Assim um problema na conta do GitHub não leva
-os backups junto. Para restaurar: baixe o artefato, `gpg --decrypt arquivo.dump.gpg > arquivo.dump` e
-`pg_restore --no-owner --dbname "<url do banco de destino>" arquivo.dump` (de preferência num
-projeto novo, para conferir antes de trocar).
+os backups junto.
+
+**Restaurar** (workflow **Restaurar backup**, `.github/workflows/restaurar-banco.yml`): baixa o
+backup, abre com a `BACKUP_SENHA`, restaura e confere tabela por tabela (o resumo aparece na
+página da execução). Só escreve em banco **vazio**: nunca por cima de dados.
+
+- **Teste** (`destino: teste`, o padrão): restaura num Postgres descartável, que existe só durante
+  a execução. Roda sozinho todo dia 2 (testa o backup mensal); falha = e-mail do GitHub. Também
+  confere que o backup veio do banco de produção (marca `producao`) e que tem todas as migrations.
+- **Emergência** (`destino: banco-novo`):
+  1. Supabase › New project (São Paulo), senha nova; copie a Session pooler (5432).
+  2. GitHub › Settings › Secrets › Actions: `RESTAURAR_DESTINO_URL` = essa string.
+  3. Actions › Restaurar backup › Run workflow › `banco-novo` (e o número da execução do backup,
+     se não for o mais recente). Confira o resumo.
+  4. Render › Environment: `DATABASE_URL` e `DIRECT_URL` = a string nova; troque também o segredo
+     `PRODUCAO_DATABASE_URL` no GitHub. O `/saude` deve mostrar `"producao":true`.
+  5. Apague o segredo `RESTAURAR_DESTINO_URL`.
+
+O que volta: todas as tabelas do sistema com os dados, o histórico de migrations, a marca de
+produção e a `SequenciaCodigo` (o próximo orçamento continua a numeração). Não voltam: as fotos
+(estão fora do banco) e o que foi gravado depois do backup.
+
+**Sem o GitHub** (com a cópia mensal guardada fora dele): precisa do `gpg` (vem com o Git para
+Windows) e das ferramentas do PostgreSQL 17 (`pg_restore`). O schema `public` já existe em todo
+banco novo, então ele sai da lista antes de restaurar (sem isso o `pg_restore` para no primeiro
+comando):
+
+```bash
+gpg --decrypt -o backup.dump guarusolar-mensal-....dump.gpg       # pede a BACKUP_SENHA
+pg_restore --list backup.dump | grep -v -E "SCHEMA - public|COMMENT - SCHEMA public" > lista.txt
+pg_restore --no-owner --no-privileges --exit-on-error --single-transaction -L lista.txt --dbname "<session pooler do banco novo, sem ?parâmetros>" backup.dump
+```
+
+Depois, apague o `backup.dump` (é o banco inteiro sem criptografia).
+
+**Conferir qual banco a produção usa** (sem expor o endereço): `https://<servico>.onrender.com/saude`
+mostra `"producao": true` só quando o banco tem a marca de produção. O workflow Publicar recusa
+publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro banco.
 
 ## Próximos passos
 
