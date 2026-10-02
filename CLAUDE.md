@@ -18,14 +18,23 @@ orçamento → aprovação → projeto → agenda das equipes → execução com
 
 | Papel | Onde usa | O que enxerga |
 | --- | --- | --- |
-| `COMERCIAL` | executável no PC do escritório | clientes, catálogo, orçamentos, PDF, WhatsApp |
-| `GESTOR` | executável no PC do escritório | agenda das equipes, validação das fotos, projetos |
+| `COMERCIAL` | navegador no PC do escritório (site) | clientes, catálogo, orçamentos, PDF, WhatsApp |
+| `GESTOR` | navegador no PC do escritório (site) | agenda das equipes, validação das fotos, projetos |
 | `TECNICO` | navegador do próprio celular (PWA, sem instalar) | **somente** a agenda dele e o envio de fotos |
 | `ADMIN` | ambos | tudo |
 
-Decisão fechada com o cliente: **escritório usa executável** (Electron ou Tauri empacotando o
-front React) e **técnicos usam o site no celular**, porque usam aparelhos próprios e não devem
+Decisão fechada com o cliente: **o sistema é só web**. O escritório usa o site no navegador do
+PC e os **técnicos usam o site no celular** (PWA), porque usam aparelhos próprios e não devem
 instalar nada. Os dois falam com a **mesma API e o mesmo banco**.
+
+**Não haverá executável do escritório** (antes previsto com Electron ou Tauri), decidido pelo
+cliente: na web a atualização é automática (cada publicação vale na próxima abertura), não há
+instalação nos PCs e todos usam sempre a mesma versão.
+
+**Sem executável (não aplicável):** um app empacotado abriria os arquivos por `file://`, o que
+exigiria trocar o roteador por HashRouter e liberar CORS para a API em outra origem. Na versão
+web, o escritório é servido pela própria API (mesma origem): `createBrowserRouter` continua
+e não há CORS no navegador.
 
 ## Stack
 
@@ -350,12 +359,13 @@ Próximos passos, nesta ordem:
 3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
 4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
    teste no celular com HTTPS).
-5. Empacotar o front do escritório como **executável Windows**.
-6. ~~Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph~~ (feito e testado
+5. ~~Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph~~ (feito e testado
    contra um simulador do Graph; falta o administrador criar o aplicativo e rodar
    `npm run sharepoint:conferir` com as credenciais reais).
-7. Atualização em **tempo real** da fila de validação.
-8. Comparativo **orçado × realizado** por projeto.
+6. Atualização em **tempo real** da fila de validação.
+7. Comparativo **orçado × realizado** por projeto.
+
+(O executável do escritório saiu dos próximos passos: o sistema fica só na web. Ver "Quem usa".)
 
 ## Dívida técnica (resolver antes da produção)
 

@@ -3,7 +3,8 @@
 Monorepo (npm workspaces) com o backend em Node.js + TypeScript + PostgreSQL (Prisma),
 em `apps/api`, que atende os dois aplicativos:
 
-- **Escritório (executável Windows)** — comercial, catálogo, orçamentos, agenda e validação.
+- **Escritório (site, no navegador do PC)** — comercial, catálogo, orçamentos, agenda, validação e
+  projetos.
 - **Técnicos (site no celular, sem instalar nada)** — apenas a própria agenda e o envio das fotos.
 
 Os dois falam com **a mesma API e o mesmo banco**, e é isso que faz o serviço concluído na rua
@@ -542,11 +543,19 @@ publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro b
 
 1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo, agenda,
    validação e projetos).
-2. Empacotar o front em executável Windows (Electron ou Tauri).
-3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
+2. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).
-4. ~~Geração do PDF do orçamento~~ (feito, no layout novo; faltam o logo, o prazo e a garantia
+3. ~~Geração do PDF do orçamento~~ (feito, no layout novo; faltam o logo, o prazo e a garantia
    em `apps/api/src/conteudo/proposta.ts`).
-5. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
+4. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
    conferir com `npm run sharepoint:conferir`).
-6. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).
+5. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).
+
+**Decisão: sem executável do escritório.** O sistema fica só na versão web (o empacotamento em
+Electron ou Tauri saiu dos planos): atualização automática a cada publicação, nenhuma instalação
+nos PCs e a mesma versão para todos.
+
+**Sem executável (não aplicável):** um app empacotado abriria os arquivos por `file://`, o que
+exigiria trocar o roteador por HashRouter e liberar CORS para a API em outra origem. Na versão
+web, o escritório é servido pela própria API (mesma origem): `createBrowserRouter` continua
+e não há CORS no navegador.
