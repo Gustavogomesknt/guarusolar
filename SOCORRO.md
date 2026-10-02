@@ -113,8 +113,26 @@ restauração precisa do desenvolvedor.
 
 ## 6. Esqueci a senha de alguém / preciso criar um usuário
 
-Por enquanto não há tela para isso: é feito por comando, num computador com a pasta do projeto
-(**[QUAL COMPUTADOR: ex. o do Gustavo]**).
+**Pela tela (caminho normal).** Precisa de alguém com o papel **Administrador**.
+
+1. Entre no sistema → menu **Administração › Usuários**.
+2. Conforme o caso:
+   - **Esqueceu a senha:** na linha da pessoa, **Nova senha**.
+   - **Pessoa nova:** **Novo usuário** → nome, e-mail (é o login), papel e, para técnico, a
+     equipe → **Criar e gerar senha**.
+   - **Mudou de função:** **Editar** → troque o papel ou a equipe → **Salvar**. A pessoa precisa
+     entrar de novo.
+   - **Saiu da empresa:** **Desativar** (pede confirmação). Ela sai do sistema na hora; nada é
+     apagado e dá para **Reativar** depois.
+3. A senha aparece **uma vez só**: clique em **Copiar** e mande à pessoa por mensagem
+   particular. Se perder, gere outra com **Nova senha**. No primeiro acesso, o sistema pede
+   para a pessoa criar a própria senha.
+
+O sistema não deixa o Administrador desativar a si mesmo nem tirar o próprio acesso, e sempre
+sobra pelo menos um Administrador ativo.
+
+**Alternativa por comando** (se nenhum Administrador conseguir entrar). Precisa de um computador
+com a pasta do projeto (**[QUAL COMPUTADOR: ex. o do Gustavo]**):
 
 1. Abra o **PowerShell** dentro da pasta do projeto (`guarusolar-api`).
 2. Ligue a janela no banco de produção (o endereço é o do Supabase, item 5 passo 1; a senha
@@ -126,15 +144,12 @@ Por enquanto não há tela para isso: é feito por comando, num computador com a
    ```powershell
    npm run usuario -- listar
    npm run usuario -- nova-senha --email pessoa@guarusolar.com.br
-   npm run usuario -- criar --nome "Nome Sobrenome" --email pessoa@guarusolar.com.br --papel COMERCIAL
-   npm run usuario -- criar --nome "Nome" --email tecnico@guarusolar.com.br --papel TECNICO --equipe "Equipe A"
+   npm run usuario -- criar --nome "Nome Sobrenome" --email pessoa@guarusolar.com.br --papel ADMIN
    npm run usuario -- desativar --email pessoa@guarusolar.com.br
    ```
-   Papéis: `COMERCIAL`, `GESTOR`, `TECNICO` (precisa de `--equipe`), `ADMIN`. A primeira linha
-   da resposta deve dizer **Banco: PRODUÇÃO**.
-4. A senha mostrada é **temporária**: passe à pessoa por mensagem particular. No primeiro
-   acesso, o sistema pede para ela criar a própria.
-5. **Feche a janela** do PowerShell ao terminar.
+   Papéis: `ADMIN`, `COMERCIAL`, `GESTOR`, `TECNICO` (precisa de `--equipe "Equipe A"`). A
+   primeira linha da resposta deve dizer **Banco: PRODUÇÃO**.
+4. **Feche a janela** do PowerShell ao terminar.
 
 ## 7. Quem contatar
 

@@ -54,6 +54,9 @@ model Usuario {
   senhaHash       String
   /// senha gerada por um administrador (npm run usuario): a pessoa troca no primeiro acesso
   senhaTemporaria Boolean  @default(false)
+  /// muda ao desativar, trocar papel/equipe ou gerar senha nova: o login antigo (token com
+  /// outra versão) deixa de valer na hora (lib/auth.ts, conferirSessao)
+  sessaoVersao Int @default(0)
   papel           Papel
   telefone        String?
   ativo           Boolean  @default(true)

@@ -114,6 +114,11 @@ packages/web/               o que os dois fronts usam no navegador
   cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
   Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
   com a taxa.
+- **Usuários pela tela (só Administrador):** menu Administração › Usuários. Criar (com senha
+  temporária mostrada uma vez, trocada no primeiro acesso), nova senha, trocar papel e equipe,
+  desativar e reativar (nada é apagado). Desativar ou mudar o acesso derruba o login da pessoa na
+  hora. O Administrador não pode se desativar nem se rebaixar, e sempre sobra um Administrador
+  ativo. O comando `npm run usuario` continua como alternativa (ver SOCORRO.md).
 - **Busca por palavras em todo o sistema** (catálogo, itens do gerador, clientes, orçamentos e
   projetos): cada palavra digitada precisa aparecer, em qualquer ordem e em qualquer campo, sem
   diferença de acento ou maiúscula ("disjuntor 20" acha "DISJ JNG 1X20A"; "acacias" acha

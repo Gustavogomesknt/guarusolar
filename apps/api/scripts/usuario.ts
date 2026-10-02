@@ -8,23 +8,19 @@
  *   npm run usuario -- trocar-email --email errado@x.com --novo certo@guarusolar.com.br
  *   npm run usuario -- listar
  *
+ * Mesmo efeito da tela Usuários (só ADMIN), que é o caminho normal; este comando é a alternativa.
  * A senha gerada aparece UMA vez, aqui no terminal: passe à pessoa por um canal seguro. Ela é
  * temporária: no primeiro acesso o sistema obriga a criar uma senha pessoal.
  */
 import 'dotenv/config';
-import { randomInt } from 'node:crypto';
+import { gerarSenhaTemporaria } from '../src/lib/senhaTemporaria';
 import { PrismaClient, type Papel } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
 
 const PAPEIS: Papel[] = ['ADMIN', 'COMERCIAL', 'GESTOR', 'TECNICO'];
 
-/** Ex.: "kx7m-p9qt-4hzr": 12 caracteres sem letras que se confundem (0/o, 1/l/i). */
-function senhaTemporaria() {
-  const letras = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const grupo = () => Array.from({ length: 4 }, () => letras[randomInt(letras.length)]).join('');
-  return `${grupo()}-${grupo()}-${grupo()}`;
-}
+const senhaTemporaria = gerarSenhaTemporaria;
 
 function opcoes(argumentos: string[]) {
   const resultado: Record<string, string> = {};
@@ -63,7 +59,7 @@ async function main() {
       const email = o.email?.trim().toLowerCase();
       if (!email) throw new Error('Use: nova-senha --email email');
       const senha = senhaTemporaria();
-      await prisma.usuario.update({ where: { email }, data: { senhaHash: await bcrypt.hash(senha, 10), senhaTemporaria: true } });
+      await prisma.usuario.update({ where: { email }, data: { senhaHash: await bcrypt.hash(senha, 10), senhaTemporaria: true, sessaoVersao: { increment: 1 } } });
       console.log(`Nova senha temporária de ${email}: ${senha}\n(trocada pela pessoa no próximo acesso)`);
     } else if (comando === 'trocar-email') {
       const email = o.email?.trim().toLowerCase();
@@ -76,7 +72,7 @@ async function main() {
     } else if (comando === 'desativar') {
       const email = o.email?.trim().toLowerCase();
       if (!email) throw new Error('Use: desativar --email email');
-      await prisma.usuario.update({ where: { email }, data: { ativo: false } });
+      await prisma.usuario.update({ where: { email }, data: { ativo: false, sessaoVersao: { increment: 1 } } });
       console.log(`${email} desativado: não entra mais (nada é apagado).`);
     } else if (comando === 'listar') {
       const usuarios = await prisma.usuario.findMany({ orderBy: [{ ativo: 'desc' }, { papel: 'asc' }, { nome: 'asc' }] });

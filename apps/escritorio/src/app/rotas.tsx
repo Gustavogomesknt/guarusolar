@@ -19,6 +19,7 @@ const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').th
 const PaginaAgenda = lazy(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
 const ListaProjetos = lazy(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
 const FichaProjeto = lazy(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
+const PaginaUsuarios = lazy(() => import('@/paginas/usuarios/PaginaUsuarios').then((m) => ({ default: m.PaginaUsuarios })));
 const PaginaValidacao = lazy(() =>
   import('@/paginas/validacao/PaginaValidacao').then((m) => ({ default: m.PaginaValidacao })),
 );
@@ -65,6 +66,10 @@ export const roteador = createBrowserRouter(
           <Route element={<RotaProtegida papeis={['GESTOR']} />}>
             <Route path="agenda" element={<PaginaAgenda />} />
             <Route path="validacao" element={<PaginaValidacao />} />
+          </Route>
+          {/* Administração: papeis vazio = só ADMIN */}
+          <Route element={<RotaProtegida papeis={[]} />}>
+            <Route path="usuarios" element={<PaginaUsuarios />} />
           </Route>
         </Route>
       </Route>

@@ -152,6 +152,10 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                motivo, aprovar com confirmação; ao resolver, a fila muda na hora
                                (setQueryData) e o próximo abre. fila.ts fica separado para o
                                contador do menu (app/ContadorValidacao) não puxar a tela
+  src/paginas/usuarios/        usuários (/usuarios, só ADMIN; menu Administração): criar com senha
+                               temporária mostrada UMA vez, nova senha, papel e equipe, ativar e
+                               desativar. API em rotas/usuarios.ts (não se desativa nem se rebaixa;
+                               sempre sobra um ADMIN ativo). npm run usuario é a alternativa
   src/paginas/projetos/        projetos (/projetos, COMERCIAL consulta, GESTOR age): lista com
                                filtros por situação (padrão "Em andamento") e "Próximo passo";
                                ficha com etapas, cliente e local (cópia do orçamento), orçamento
@@ -439,6 +443,11 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
   armazenamento.ts): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
   persistente no plano gratuito). Não contorne isso.
+- **Sessão confere o banco** (`autenticar` em `lib/auth.ts`): o token leva `versao`
+  (`Usuario.sessaoVersao`); desativar, trocar papel ou equipe e gerar senha nova somam 1 e o login
+  antigo cai na hora. A conferência fica 1 minuto em memória por usuário (cada ida ao banco custa
+  ~120 ms); quem muda usuário chama `esquecerSessao(id)`. Com mais de uma instância da API, a
+  mudança feita em outra pode levar até 1 minuto.
 - **Busca por palavras** (`lib/busca.ts`, `filtroDeBusca`): toda busca nova usa ela, nunca
   `contains` direto no nome. Produto, Cliente, Orcamento e Projeto têm `textoBusca`, coluna
   GERADA pelo banco (`texto_de_busca`: minúsculas, sem acento, sem pontuação); não escreva nela

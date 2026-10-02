@@ -50,7 +50,7 @@ rotasAuth.post(
     if (usuario.papel === 'TECNICO' && !appTecnicoLiberado()) throw new ErroHttp(403, AVISO_APP_TECNICO_BLOQUEADO);
 
     const dados = { id: usuario.id, nome: usuario.nome, papel: usuario.papel, equipeId: usuario.equipeId };
-    res.json({ token: gerarToken(dados), usuario: { ...dados, senhaTemporaria: usuario.senhaTemporaria } });
+    res.json({ token: gerarToken({ ...dados, versao: usuario.sessaoVersao }), usuario: { ...dados, senhaTemporaria: usuario.senhaTemporaria } });
   }),
 );
 
@@ -111,6 +111,6 @@ rotasAuth.post(
     registrarNoLog('senha_trocada', { email: usuario.email, origem });
 
     const dados = { id: usuario.id, nome: usuario.nome, papel: usuario.papel, equipeId: usuario.equipeId };
-    res.json({ token: gerarToken(dados), usuario: { ...dados, senhaTemporaria: false } });
+    res.json({ token: gerarToken({ ...dados, versao: usuario.sessaoVersao }), usuario: { ...dados, senhaTemporaria: false } });
   }),
 );

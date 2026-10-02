@@ -7,7 +7,7 @@ import { Logo } from "@/components/Logo";
 import { Selo } from "@/components/Selo";
 import { MENU, type ItemMenu } from "./menu";
 
-const GRUPOS: ItemMenu["grupo"][] = ["Comercial", "Operação"];
+const GRUPOS: ItemMenu["grupo"][] = ["Comercial", "Operação", "Administração"];
 import { NOME_DO_PAPEL, podeAcessar } from "./permissoes";
 
 export function Layout() {

@@ -6,6 +6,7 @@ import {
   FolderKanban,
   KanbanSquare,
   Package,
+  UserCog,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -23,7 +24,7 @@ export type ItemMenu = {
   /** número ao lado do item (ex.: serviços aguardando validação) */
   contador?: ComponentType;
   /** seção do menu: o comercial vende, a operação executa */
-  grupo: 'Comercial' | 'Operação';
+  grupo: 'Comercial' | 'Operação' | 'Administração';
 };
 
 // A ordem segue os próximos passos do CLAUDE.md. Ao criar uma tela, marque disponivel: true
@@ -38,4 +39,6 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação', contador: ContadorValidacao },
   // comercial consulta ("quando vão instalar?"); só o gestor edita e cancela
   { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Operação' },
+  // papeis vazio: só o ADMIN (que acessa tudo)
+  { rotulo: 'Usuários', caminho: '/usuarios', icone: UserCog, papeis: [], disponivel: true, grupo: 'Administração' },
 ];

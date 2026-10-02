@@ -1,6 +1,7 @@
 import type {
   CategoriaProduto,
   CondicaoPagamento,
+  Papel,
   StatusAgendamento,
   StatusOrcamento,
   StatusProjeto,
@@ -337,3 +338,24 @@ export type FichaDoProjeto = {
     usuario: { nome: string } | null;
   }[];
 };
+
+// ---------------------------------------------------------------------------------------------
+// Usuários (tela só do ADMIN)
+// ---------------------------------------------------------------------------------------------
+
+export type UsuarioNaLista = {
+  id: string;
+  nome: string;
+  email: string;
+  papel: Papel;
+  equipeId: string | null;
+  ativo: boolean;
+  /** ainda não trocou a senha temporária */
+  senhaTemporaria: boolean;
+  criadoEm: string;
+};
+
+export type ListaDeUsuarios = { usuarios: UsuarioNaLista[]; equipes: { id: string; nome: string }[] };
+
+/** Resposta de criar e de nova senha: a senha aparece SÓ aqui, uma vez. */
+export type UsuarioComSenha = { usuario: UsuarioNaLista; senhaTemporaria: string };

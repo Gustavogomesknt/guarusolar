@@ -1,6 +1,6 @@
 import type { Papel } from '@guarusolar/compartilhado';
 
-/** Papéis que usam o executável do escritório. O técnico usa o site no celular. */
+/** Papéis que usam o escritório (site no PC). O técnico usa o app no celular. */
 export const PAPEIS_DO_ESCRITORIO = ['ADMIN', 'COMERCIAL', 'GESTOR'] as const satisfies readonly Papel[];
 
 /**
