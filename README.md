@@ -10,6 +10,10 @@ em `apps/api`, que atende os dois aplicativos:
 Os dois falam com **a mesma API e o mesmo banco**, e é isso que faz o serviço concluído na rua
 aparecer no escritório em seguida.
 
+> **Algo deu errado e o desenvolvedor não está disponível?** Veja o [SOCORRO.md](SOCORRO.md):
+> passo a passo, sem jargão, para o sistema fora do ar, erros, banco pausado, voltar versão,
+> restaurar backup e senhas de usuários.
+
 ## Como rodar
 
 Requer Node.js 22.12 ou mais recente. Todos os comandos rodam a partir da raiz:
