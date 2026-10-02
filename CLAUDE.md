@@ -372,7 +372,7 @@ Próximos passos, nesta ordem:
 5. ~~Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph~~ (feito e testado
    contra um simulador do Graph; falta o administrador criar o aplicativo e rodar
    `npm run sharepoint:conferir` com as credenciais reais).
-6. Atualização em **tempo real** da fila de validação.
+6. ~~Atualização em **tempo real** da fila de validação~~ (feito: versão da operação a cada 20 s).
 7. Comparativo **orçado × realizado** por projeto.
 
 (O executável do escritório saiu dos próximos passos: o sistema fica só na web. Ver "Quem usa".)
@@ -471,6 +471,15 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Criar orçamento é idempotente** (`idCriacao`, UUID gerado pelo gerador ao abrir "novo"): se a
   resposta do POST se perder e o vendedor salvar de novo, a API acha o mesmo `idCriacao` e atualiza
   aquele orçamento (200) em vez de criar outro. Formulário novo de criação = UUID novo.
+- **Fila de validação quase em tempo real** (`app/AcompanhamentoOperacao.tsx`, só GESTOR/ADMIN):
+  pergunta `GET /api/validacao/versao` a cada 20 s (também com a aba em segundo plano) e, quando a
+  versão muda, recarrega validação, agenda e projetos; título da aba "(2) …" e aviso de chegada
+  sem som, uma vez por envio, fora da tela de Validação. Para após 30 min sem uso do sistema.
+  A versão fica em MEMÓRIA na API (`lib/versaoDaOperacao.ts`): rota nova que mude agendamento,
+  validação ou crie projeto chama `operacaoMudou()` depois de gravar. Decisão: nada de Supabase
+  Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)
+  nem WebSocket (cai a cada publicação e sono da Render; o polling seria a reserva de qualquer jeito).
+  Com mais de uma instância da API, a versão precisa ir para o banco.
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.

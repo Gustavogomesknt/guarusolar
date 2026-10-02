@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, WifiOff } from 'lucide-react';
 import { tempoDesde } from '@guarusolar/compartilhado';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import type { ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { DetalheValidacao } from './DetalheValidacao';
-import { useFilaDeValidacao } from './fila';
+import { useFilaDeValidacao, useSemConexao } from './fila';
 
 /**
  * Validação dos serviços (/validacao, GESTOR e ADMIN). À esquerda a fila (aguardando primeiro,
@@ -16,6 +16,7 @@ import { useFilaDeValidacao } from './fila';
 export function PaginaValidacao() {
   const [parametros, setParametros] = useSearchParams();
   const fila = useFilaDeValidacao();
+  const semConexao = useSemConexao();
   const servicos = fila.data ?? [];
   const aguardando = servicos.filter((s) => s.status === 'AGUARDANDO_VALIDACAO');
   const devolvidos = servicos.filter((s) => s.status === 'DEVOLVIDO');
@@ -49,6 +50,12 @@ export function PaginaValidacao() {
                 ? 'Nenhum serviço aguardando'
                 : `${aguardando.length} ${aguardando.length === 1 ? 'serviço aguardando' : 'serviços aguardando'}`}
           </p>
+          {semConexao && (
+            <p role="status" className="flex items-center gap-1.5 text-[13px] text-destaque-texto">
+              <WifiOff className="size-3.5 shrink-0" aria-hidden />
+              Sem conexão. A fila pode estar desatualizada.
+            </p>
+          )}
         </div>
 
         {fila.isPending && (

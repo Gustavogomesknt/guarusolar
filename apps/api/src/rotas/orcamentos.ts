@@ -4,6 +4,7 @@ import { type Cliente, Prisma, type StatusOrcamento, type Unidade } from '@prism
 import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
+import { operacaoMudou } from '../lib/versaoDaOperacao';
 import { autenticar, autorizar } from '../lib/auth';
 import {
   calcularOrcamento,
@@ -439,6 +440,8 @@ rotasOrcamentos.patch(
     const atualizado = await prisma.$transaction((tx) =>
       mudarStatus(tx, orcamento, status, req.usuario!.id, observacao),
     );
+    // aprovado vira projeto na faixa "A agendar" da agenda
+    if (status === 'APROVADO') operacaoMudou();
     res.json(atualizado);
   }),
 );

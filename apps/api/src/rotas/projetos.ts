@@ -5,6 +5,7 @@ import { STATUS_PROJETO, TIPOS_EVENTO_PROJETO } from '@guarusolar/compartilhado'
 import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
+import { operacaoMudou } from '../lib/versaoDaOperacao';
 import { autenticar, autorizar } from '../lib/auth';
 import { registrarEvento } from '../lib/eventosProjeto';
 
@@ -189,6 +190,7 @@ rotasProjetos.patch(
       }
       return p;
     });
+    operacaoMudou();
     res.json(projeto);
   }),
 );
@@ -227,6 +229,7 @@ rotasProjetos.post(
       await registrarEvento(tx, { projetoId: atual.id, tipo: 'PROJETO_CANCELADO', descricao: `Projeto cancelado: ${motivo}${junto}`, usuarioId: req.usuario!.id });
       return p;
     });
+    operacaoMudou();
     res.json(projeto);
   }),
 );

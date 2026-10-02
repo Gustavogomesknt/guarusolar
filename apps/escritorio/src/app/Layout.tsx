@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
 import { Selo } from "@/components/Selo";
 import { MENU, type ItemMenu } from "./menu";
+import { AcompanhamentoOperacao } from "./AcompanhamentoOperacao";
 
 const GRUPOS: ItemMenu["grupo"][] = ["Comercial", "Operação", "Administração"];
 import { NOME_DO_PAPEL, podeAcessar } from "./permissoes";
@@ -18,6 +19,8 @@ export function Layout() {
 
   return (
     <div className="flex min-h-svh">
+      {/* fila de validação quase em tempo real, título da aba e aviso de chegada */}
+      {podeAcessar(usuario.papel, ["GESTOR"]) && <AcompanhamentoOperacao />}
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
         <Logo claro className="px-5 py-6" />
 

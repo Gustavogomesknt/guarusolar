@@ -6,6 +6,7 @@ import { periodoDoServico, registrarEvento, rotuloDoServico } from '../lib/event
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
+import { operacaoMudou, versaoDaOperacao } from '../lib/versaoDaOperacao';
 import path from 'node:path';
 import {
   ArmazenamentoIndisponivel,
@@ -151,6 +152,7 @@ rotasAgenda.post(
       return criado;
     });
 
+    operacaoMudou();
     res.status(201).json(agendamento);
   }),
 );
@@ -209,6 +211,7 @@ rotasAgenda.patch(
       }
       return ag;
     });
+    operacaoMudou();
     res.json(atualizado);
   }),
 );
@@ -256,6 +259,11 @@ rotasValidacao.get(
     );
   }),
 );
+
+// Versão da operação (sem banco): o escritório pergunta a cada 20 s e só baixa a fila quando muda
+rotasValidacao.get('/versao', (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ versao: versaoDaOperacao() });
+});
 
 rotasValidacao.get(
   '/:id',
@@ -336,6 +344,7 @@ rotasValidacao.post(
       return ag;
     });
 
+    operacaoMudou();
     res.json(atualizado);
   }),
 );
@@ -389,6 +398,7 @@ rotasValidacao.post(
     });
 
     // TODO: disparar aviso ao técnico (push do PWA ou WhatsApp)
+    operacaoMudou();
     res.json(atualizado);
   }),
 );
@@ -621,6 +631,8 @@ rotasTecnico.post(
       );
     }
 
+    // primeira foto: o serviço passou a "Em execução" (agenda e projetos mostram a situação)
+    if (servico.status === 'AGENDADO') operacaoMudou();
     res.status(201).json(foto);
   }),
 );
@@ -707,6 +719,7 @@ rotasTecnico.post(
       return ag;
     });
 
+    operacaoMudou();
     res.json(atualizado);
   }),
 );

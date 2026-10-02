@@ -90,6 +90,7 @@ packages/web/               o que os dois fronts usam no navegador
 | POST | `/api/agenda` | gestor | agendar serviço (409 se a equipe já tem serviço no período) |
 | PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas) ou cancelar (`status: CANCELADO`) |
 | GET | `/api/validacao/fila` | gestor | aguardando validação (mais antigos primeiro) e, depois, os devolvidos |
+| GET | `/api/validacao/versao` | gestor | versão da operação, sem banco: muda quando a fila, a agenda ou a situação de um serviço muda (o escritório pergunta a cada 20 s) |
 | GET | `/api/validacao/:id` | gestor | serviço com fotos na ordem do checklist, materiais, técnico e equipe |
 | POST | `/api/validacao/:id/aprovar` | gestor | conclui serviço e projeto; foto marcada para refazer exige `confirmarFotosMarcadas` |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
@@ -565,7 +566,8 @@ publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro b
    em `apps/api/src/conteudo/proposta.ts`).
 4. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
    conferir com `npm run sharepoint:conferir`).
-5. Atualização em tempo real da fila de validação (Supabase Realtime ou WebSocket).
+5. ~~Atualização em tempo real da fila de validação~~ (feito: polling leve da versão da operação a
+   cada 20 s; Supabase Realtime e WebSocket descartados, ver CLAUDE.md).
 
 **Decisão: sem executável do escritório.** O sistema fica só na versão web (o empacotamento em
 Electron ou Tauri saiu dos planos): atualização automática a cada publicação, nenhuma instalação
