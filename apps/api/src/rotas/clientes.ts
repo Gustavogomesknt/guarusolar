@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -45,19 +46,10 @@ rotasClientes.get(
   '/',
   rota(async (req, res) => {
     const { q = '', incluirInativos, limite } = req.query as Record<string, string | undefined>;
-    const termo = q.trim();
-    const digitos = somenteDigitos(termo);
     const where: Prisma.ClienteWhereInput = {
       ...(incluirInativos === 'true' ? {} : { ativo: true }),
-      ...(termo
-        ? {
-            OR: [
-              { nome: { contains: termo, mode: 'insensitive' } },
-              // sem dígitos no termo, "contém vazio" casaria com todos os clientes
-              ...(digitos ? [{ documento: { contains: digitos } }, { whatsapp: { contains: digitos } }] : []),
-            ],
-          }
-        : {}),
+      // por palavras, em nome, documento e WhatsApp ("maria 9999", "012.345"): lib/busca.ts
+      ...filtroDeBusca(q, (p) => [{ textoBusca: { contains: p } }]),
     };
     const take = Math.min(Math.max(Number(limite) || 20, 1), 200);
     const clientes = await prisma.cliente.findMany({

@@ -196,7 +196,7 @@ export function PainelItem({
                 <Input
                   {...ariaDoCampo('item-codigo', errors.codigoFornecedor?.message)}
                   {...register('codigoFornecedor')}
-                  placeholder="Ex.: 113 (opcional; também acha o item na busca)"
+                  placeholder="Ex.: 113 (opcional; digitado inteiro, acha o item na busca)"
                   className="h-11 rounded-[10px] font-mono"
                 />
               </Campo>

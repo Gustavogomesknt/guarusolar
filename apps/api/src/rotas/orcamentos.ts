@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { type Cliente, Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
+import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -169,14 +170,8 @@ rotasOrcamentos.get(
       ...(de || ate
         ? { criadoEm: { ...(de ? { gte: new Date(de) } : {}), ...(ate ? { lte: new Date(ate) } : {}) } }
         : {}),
-      ...(q
-        ? {
-            OR: [
-              { codigo: { contains: q, mode: 'insensitive' } },
-              { cliente: { nome: { contains: q, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
+      // por palavras: código, cliente e cidade da proposta, ou o nome atual do cadastro
+      ...filtroDeBusca(q, (p) => [{ textoBusca: { contains: p } }, { cliente: { textoBusca: { contains: p } } }]),
     };
 
     const orcamentos = await prisma.orcamento.findMany({

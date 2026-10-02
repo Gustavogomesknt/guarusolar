@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -47,15 +48,12 @@ rotasProdutos.get(
         // sem incluirInativos, só itens ativos: é assim que desativados somem dos novos orçamentos
         ...(incluirInativos === 'true' ? {} : { ativo: true }),
         ...(categoria ? { categoria: categoria as never } : {}),
-        // a busca acha pelo nome ou pelo código do fornecedor ("113")
-        ...(q
-          ? {
-              OR: [
-                { nome: { contains: q, mode: 'insensitive' as const } },
-                { codigoFornecedor: { startsWith: q.trim(), mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
+        // por palavras no nome ("disjuntor 20"); o código do fornecedor só casa quando a palavra
+        // digitada É o código ("113"): número curto, como o "1" de "unidut 1", não puxa códigos
+        ...filtroDeBusca(q, (p) => [
+          { textoBusca: { contains: p } },
+          ...(p.includes(' ') ? [] : [{ codigoFornecedor: { equals: p, mode: 'insensitive' as const } }]),
+        ]),
       },
       orderBy: [{ categoria: 'asc' }, { nome: 'asc' }],
       include: { _count: { select: { itensOrcamento: true } } },

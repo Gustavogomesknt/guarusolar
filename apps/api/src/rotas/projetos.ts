@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma, StatusProjeto } from '@prisma/client';
 import { STATUS_PROJETO, TIPOS_EVENTO_PROJETO } from '@guarusolar/compartilhado';
+import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -30,17 +31,13 @@ rotasProjetos.get(
       })
       .parse(req.query);
 
-    const busca: Prisma.ProjetoWhereInput = q
-      ? {
-          OR: [
-            { codigo: { contains: q, mode: 'insensitive' } },
-            { cliente: { nome: { contains: q, mode: 'insensitive' } } },
-            { orcamento: { clienteNome: { contains: q, mode: 'insensitive' } } },
-            { orcamento: { clienteCidade: { contains: q, mode: 'insensitive' } } },
-            { orcamento: { codigo: { contains: q, mode: 'insensitive' } } },
-          ],
-        }
-      : {};
+    // por palavras: código do projeto; código, cliente e cidade do orçamento; nome atual do cliente
+    const busca: Prisma.ProjetoWhereInput =
+      filtroDeBusca(q, (p) => [
+        { textoBusca: { contains: p } },
+        { orcamento: { textoBusca: { contains: p } } },
+        { cliente: { textoBusca: { contains: p } } },
+      ]) ?? {};
     const semCancelados: Prisma.ProjetoWhereInput = incluirCancelados === 'true' ? {} : { status: { not: 'CANCELADO' } };
     const daSituacao: Prisma.ProjetoWhereInput =
       situacao === 'EM_ANDAMENTO' ? { status: { in: EM_ANDAMENTO } } : situacao === 'TODOS' ? semCancelados : { status: situacao };

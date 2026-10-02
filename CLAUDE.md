@@ -439,6 +439,14 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
   armazenamento.ts): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
   persistente no plano gratuito). Não contorne isso.
+- **Busca por palavras** (`lib/busca.ts`, `filtroDeBusca`): toda busca nova usa ela, nunca
+  `contains` direto no nome. Produto, Cliente, Orcamento e Projeto têm `textoBusca`, coluna
+  GERADA pelo banco (`texto_de_busca`: minúsculas, sem acento, sem pontuação); não escreva nela
+  e, se um campo novo precisar ser pesquisável, mude a expressão numa migration (DROP e ADD da
+  coluna). Abreviação = palavra do item com 4+ letras que começa a palavra digitada; sem
+  dicionário de apelidos (decisão). Código do fornecedor só casa digitado inteiro. Sem índice:
+  20 mil itens respondem em 1 a 17 ms; `pg_trgm` quebraria a restauração do backup (no Supabase a
+  extensão fica fora do schema `public`).
 - **Toda mudança na obra grava um `EventoProjeto`** (`registrarEvento` em `lib/eventosProjeto.ts`)
   na MESMA transação: aprovação, agendar/remarcar/cancelar serviço, primeira foto, envio,
   aprovar/devolver, editar e cancelar o projeto. Rota nova que mude projeto ou agendamento também

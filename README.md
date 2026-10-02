@@ -110,6 +110,12 @@ packages/web/               o que os dois fronts usam no navegador
   cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
   Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
   com a taxa.
+- **Busca por palavras em todo o sistema** (catálogo, itens do gerador, clientes, orçamentos e
+  projetos): cada palavra digitada precisa aparecer, em qualquer ordem e em qualquer campo, sem
+  diferença de acento ou maiúscula ("disjuntor 20" acha "DISJ JNG 1X20A"; "acacias" acha
+  "Acácias"). Abreviações do catálogo funcionam quando são o começo da palavra (DISJ, ELETROD,
+  TERM); não há dicionário de apelidos (DUTO ou CX por extenso não são reconhecidos). O código do
+  fornecedor acha o item quando digitado inteiro ("110").
 - **Projetos: a obra do começo ao fim.** A tela Projetos lista as obras por situação (padrão:
   em andamento) e a ficha mostra etapas, cliente e local, orçamento de origem, serviços, fotos e o
   histórico. O comercial consulta ("quando vão instalar?"), sem fotos nem ações; o gestor edita

@@ -108,6 +108,9 @@ model Cliente {
   uf          String?    @db.Char(2)
   observacoes String?
   ativo       Boolean    @default(true)
+  /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
+  /// nunca escrever nela. Ver lib/busca.ts
+  textoBusca String? @default(dbgenerated())
   criadoEm    DateTime   @default(now())
   editadoEm   DateTime   @updatedAt
 
@@ -163,6 +166,9 @@ model Produto {
   /// não descreve índice parcial; ver CLAUDE.md antes de gerar migration com o diff)
   codigoFornecedor String?
   ativo            Boolean          @default(true)
+  /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
+  /// nunca escrever nela. Ver lib/busca.ts
+  textoBusca String? @default(dbgenerated())
   criadoEm         DateTime         @default(now())
   editadoEm        DateTime         @updatedAt
 
@@ -268,6 +274,9 @@ model Orcamento {
   aprovadoEm          DateTime?
   recusadoEm          DateTime?
   motivoRecusa        String?
+  /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
+  /// nunca escrever nela. Ver lib/busca.ts
+  textoBusca String? @default(dbgenerated())
   criadoEm            DateTime    @default(now())
   editadoEm           DateTime    @updatedAt
 
@@ -341,6 +350,9 @@ model Projeto {
   /// cancelado pelo gestor antes de a execução começar (o cliente desistiu)
   canceladoEm        DateTime?
   motivoCancelamento String?
+  /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
+  /// nunca escrever nela. Ver lib/busca.ts
+  textoBusca String? @default(dbgenerated())
   criadoEm           DateTime      @default(now())
   editadoEm          DateTime      @updatedAt
 
