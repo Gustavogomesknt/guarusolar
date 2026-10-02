@@ -7,7 +7,7 @@ import { recusarEmProducao } from '../src/lib/ambienteDoBanco';
  * Limpa os dados de operação para começar os cadastros reais: `npm run db:limpar`.
  *
  * APAGA (de verdade, sem volta): itens de orçamento, histórico de status, materiais
- * utilizados, fotos, agendamentos, projetos, orçamentos e clientes; e zera a numeração
+ * utilizados, fotos, histórico dos projetos, agendamentos, projetos, orçamentos e clientes; e zera a numeração
  * dos códigos (o próximo orçamento volta a ser GS-<ano>-0001 e o projeto PRJ-<ano>-0001).
  *
  * MANTÉM: usuários, equipes, checklist de fotos e produtos do catálogo.
@@ -63,11 +63,13 @@ async function main() {
     }
 
     // tudo numa transação, na ordem das dependências: ou apaga tudo, ou nada
-    const [itens, historico, materiais, fotos, agend, proj, orc, cli, sequencias] = await prisma.$transaction([
+    const [itens, historico, materiais, fotos, , agend, proj, orc, cli, sequencias] = await prisma.$transaction([
       prisma.itemOrcamento.deleteMany(),
       prisma.historicoStatus.deleteMany(),
       prisma.materialUtilizado.deleteMany(),
       prisma.fotoServico.deleteMany(),
+      // o histórico do projeto aponta para agendamentos e projetos: sai antes deles
+      prisma.eventoProjeto.deleteMany(),
       prisma.agendamento.deleteMany(),
       prisma.projeto.deleteMany(),
       prisma.orcamento.deleteMany(),

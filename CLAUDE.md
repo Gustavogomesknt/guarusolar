@@ -143,6 +143,12 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                motivo, aprovar com confirmação; ao resolver, a fila muda na hora
                                (setQueryData) e o próximo abre. fila.ts fica separado para o
                                contador do menu (app/ContadorValidacao) não puxar a tela
+  src/paginas/projetos/        projetos (/projetos, COMERCIAL consulta, GESTOR age): lista com
+                               filtros por situação (padrão "Em andamento") e "Próximo passo";
+                               ficha com etapas, cliente e local (cópia do orçamento), orçamento
+                               de origem, serviços, fotos (só gestor), potência e observações,
+                               histórico e "Cancelar projeto" (só antes da execução). Agendar e
+                               validar continuam na Agenda e na Validação: a ficha só leva até lá
   src/components/CampoBusca    autocomplete acessível (combobox ARIA), usado nas buscas
   src/app/menu.ts              itens do menu, os papéis de cada um, o grupo (Comercial ou
                                Operação) e o `contador` opcional (número ao lado do item)
@@ -327,7 +333,8 @@ Base do front do escritório: tema, cliente HTTP, sessão, login e rotas protegi
 Orçamentos no escritório: lista com indicadores e mudança de status, gerador para criar e
 editar (cliente, itens, condições, salvar, WhatsApp) e modo leitura para aprovados.
 Pipeline, clientes e catálogo prontos. Operação: agenda das equipes (semana; as visões
-Dia e Mês aparecem desativadas) e validação dos serviços pelo gestor. Falta a tela de projetos.
+Dia e Mês aparecem desativadas), validação dos serviços pelo gestor e projetos (lista e ficha
+da obra, com histórico).
 App do técnico (`apps/tecnico`, PWA): login só para TECNICO, agenda, serviço com checklist de
 fotos (câmera, redução no aparelho, data e local), observações, teste e envio para validação;
 fila offline das fotos, abre sem sinal, versão nova com "Atualizar", instalação na tela
@@ -338,8 +345,8 @@ o usuário combina com o Gustavo como expor o ambiente.
 Próximos passos, nesta ordem:
 
 1. ~~Front do escritório: **gerador de orçamentos**~~ (feito).
-2. ~~Demais telas do escritório: lista, pipeline, catálogo, clientes~~ (feito, e também agenda
-   e validação; falta a tela de **projetos** do gestor).
+2. ~~Demais telas do escritório: lista, pipeline, catálogo, clientes~~ (feito, e também agenda,
+   validação e projetos).
 3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
 4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
    teste no celular com HTTPS).
@@ -422,6 +429,10 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
   armazenamento.ts): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
   persistente no plano gratuito). Não contorne isso.
+- **Toda mudança na obra grava um `EventoProjeto`** (`registrarEvento` em `lib/eventosProjeto.ts`)
+  na MESMA transação: aprovação, agendar/remarcar/cancelar serviço, primeira foto, envio,
+  aprovar/devolver, editar e cancelar o projeto. Rota nova que mude projeto ou agendamento também
+  registra. Eventos `reconstruido` vieram da migration (datas que existiam antes da tabela).
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.

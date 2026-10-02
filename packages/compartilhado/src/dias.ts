@@ -58,10 +58,11 @@ export const nomeCurto = (dia: Dia) => SEMANA[diaDaSemana(dia)];
 /** terça, 29/09 */
 export const nomeLongo = (dia: Dia) => `${SEMANA_LONGA[diaDaSemana(dia)]}, ${diaMes(dia)}`;
 
-/** "28 set a 3 out 2026" */
+/** "28 set a 3 out 2026"; serviço de um dia só: "29 set 2026" */
 export function intervaloEscrito(inicio: Dia, fim: Dia) {
   const a = partes(inicio);
   const b = partes(fim);
+  if (inicio === fim) return `${b.d} ${MESES[b.mes]} ${b.ano}`;
   const esquerda = a.mes === b.mes ? `${a.d}` : `${a.d} ${MESES[a.mes]}${a.ano !== b.ano ? ` ${a.ano}` : ''}`;
   return `${esquerda} a ${b.d} ${MESES[b.mes]} ${b.ano}`;
 }

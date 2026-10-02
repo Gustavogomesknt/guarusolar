@@ -109,6 +109,13 @@ packages/web/               o que os dois fronts usam no navegador
   cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
   Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
   com a taxa.
+- **Projetos: a obra do começo ao fim.** A tela Projetos lista as obras por situação (padrão:
+  em andamento) e a ficha mostra etapas, cliente e local, orçamento de origem, serviços, fotos e o
+  histórico. O comercial consulta ("quando vão instalar?"), sem fotos nem ações; o gestor edita
+  potência e observações internas e pode cancelar a obra antes de a execução começar (os
+  serviços agendados são cancelados junto; nada é apagado). Agendar e validar seguem na Agenda e
+  na Validação. O histórico é gravado a cada mudança desde esta versão; o anterior foi
+  reconstruído pelas datas que existiam e aparece marcado como "Reconstruído".
 - **Catálogo para solar e carregador veicular.** Categorias: painel solar, inversor, estrutura,
   carregador veicular, proteção e aterramento, quadros e caixas, cabos e fios, conectores e
   terminais, eletrodutos e fixação, mão de obra, projeto e documentação, outros. Unidades: un, pç,
@@ -533,8 +540,8 @@ publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro b
 
 ## Próximos passos
 
-1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo, agenda e
-   validação); falta a tela de projetos do gestor.
+1. ~~Front do escritório~~ (feito: orçamentos, pipeline, clientes, catálogo, agenda,
+   validação e projetos).
 2. Empacotar o front em executável Windows (Electron ou Tauri).
 3. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).
