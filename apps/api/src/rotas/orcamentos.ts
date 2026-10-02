@@ -47,6 +47,9 @@ const orcamentoSchema = z.object({
   // o vendedor pediu para trocar a cópia gravada do cliente pelos dados atuais do cadastro
   atualizarDadosCliente: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
+  // gerado pela tela ao abrir um orçamento novo: o mesmo "criar" repetido (resposta perdida numa
+  // queda de internet) atualiza o orçamento já criado em vez de criar outro
+  idCriacao: z.string().uuid().optional(),
 });
 
 /**
@@ -270,6 +273,14 @@ rotasOrcamentos.post(
   '/',
   rota(async (req, res) => {
     const dados = orcamentoSchema.parse(req.body);
+    // repetição do mesmo "criar" (a resposta se perdeu): grava sobre o orçamento já criado
+    if (dados.idCriacao) {
+      const jaCriado = await prisma.orcamento.findUnique({ where: { idCriacao: dados.idCriacao }, select: { id: true } });
+      if (jaCriado) {
+        const { orcamento, totais } = await atualizarOrcamento(jaCriado.id, dados);
+        return res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+      }
+    }
     const cliente = await clienteDoOrcamento(dados.clienteId);
     const itens = await prepararItens(dados.itens);
     const totais = calcularOrcamento({
@@ -289,6 +300,7 @@ rotasOrcamentos.post(
       tx.orcamento.create({
         data: {
           codigo: await gerarCodigoOrcamento(tx),
+          idCriacao: dados.idCriacao,
           clienteId: dados.clienteId,
           ...copiaDoCliente(cliente),
           vendedorId: req.usuario!.id,
@@ -317,65 +329,69 @@ rotasOrcamentos.post(
   }),
 );
 
+/** Grava a edição de um orçamento (PUT e o "criar" repetido com o mesmo idCriacao). */
+async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSchema>) {
+  const atual = await prisma.orcamento.findUnique({
+    where: { id: id },
+    include: { itens: { orderBy: { ordem: 'asc' } } },
+  });
+  if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
+  if (atual.status === 'APROVADO') {
+    throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
+  }
+
+  // itens que já estavam no orçamento mantêm a cópia gravada (regra 2); o cliente também:
+  // a cópia só muda ao trocar de cliente ou quando o vendedor pede "usar dados atuais do cadastro"
+  const copiarCliente = dados.clienteId !== atual.clienteId || dados.atualizarDadosCliente || atual.clienteNome == null;
+  const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId)) : {};
+  const itens = await prepararItens(dados.itens, atual.itens);
+  const totais = calcularOrcamento({
+    itens: itens.map((i) => i._calculo),
+    descontoTipo: dados.descontoTipo,
+    descontoValor: dados.descontoValor,
+    condicaoPagamento: dados.condicaoPagamento,
+    descontoAVistaPct: dados.descontoAVistaPct,
+    entradaPct: dados.entradaPct,
+    parcelas: dados.parcelas,
+    debito: dados.pagamentoDebito,
+    absorverTaxaCartao: dados.absorverTaxaCartao,
+  });
+
+  // troca os itens em bloco: se algo falhar, nada é gravado
+  const orcamento = await prisma.$transaction(async (tx) => {
+    await tx.itemOrcamento.deleteMany({ where: { orcamentoId: id } });
+    return tx.orcamento.update({
+      where: { id: id },
+      data: {
+        clienteId: dados.clienteId,
+        ...novaCopia,
+        validade: dados.validade,
+        descontoTipo: dados.descontoTipo,
+        descontoValor: dados.descontoValor,
+        condicaoPagamento: dados.condicaoPagamento,
+        descontoAVistaPct: dados.descontoAVistaPct,
+        entradaPct: dados.entradaPct,
+        parcelas: dados.parcelas,
+        bancoFinanciamento: dados.bancoFinanciamento,
+        observacoes: dados.observacoes,
+        descricaoServico: dados.descricaoServico || null,
+        detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
+        subtotal: totais.subtotal,
+        descontoAplicado: totais.descontoAplicado,
+        valorTotal: totais.valorTotal,
+        ...pagamentoGravado(dados.condicaoPagamento, totais),
+        itens: { create: itens.map(({ _calculo, ...item }) => item) },
+      },
+      include: { itens: true, cliente: true },
+    });
+  });
+  return { orcamento, totais };
+}
+
 rotasOrcamentos.put(
   '/:id',
   rota(async (req, res) => {
-    const dados = orcamentoSchema.parse(req.body);
-    const atual = await prisma.orcamento.findUnique({
-      where: { id: req.params.id },
-      include: { itens: { orderBy: { ordem: 'asc' } } },
-    });
-    if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
-    if (atual.status === 'APROVADO') {
-      throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
-    }
-
-    // itens que já estavam no orçamento mantêm a cópia gravada (regra 2); o cliente também:
-    // a cópia só muda ao trocar de cliente ou quando o vendedor pede "usar dados atuais do cadastro"
-    const copiarCliente = dados.clienteId !== atual.clienteId || dados.atualizarDadosCliente || atual.clienteNome == null;
-    const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId)) : {};
-    const itens = await prepararItens(dados.itens, atual.itens);
-    const totais = calcularOrcamento({
-      itens: itens.map((i) => i._calculo),
-      descontoTipo: dados.descontoTipo,
-      descontoValor: dados.descontoValor,
-      condicaoPagamento: dados.condicaoPagamento,
-      descontoAVistaPct: dados.descontoAVistaPct,
-      entradaPct: dados.entradaPct,
-      parcelas: dados.parcelas,
-      debito: dados.pagamentoDebito,
-      absorverTaxaCartao: dados.absorverTaxaCartao,
-    });
-
-    // troca os itens em bloco: se algo falhar, nada é gravado
-    const orcamento = await prisma.$transaction(async (tx) => {
-      await tx.itemOrcamento.deleteMany({ where: { orcamentoId: req.params.id } });
-      return tx.orcamento.update({
-        where: { id: req.params.id },
-        data: {
-          clienteId: dados.clienteId,
-          ...novaCopia,
-          validade: dados.validade,
-          descontoTipo: dados.descontoTipo,
-          descontoValor: dados.descontoValor,
-          condicaoPagamento: dados.condicaoPagamento,
-          descontoAVistaPct: dados.descontoAVistaPct,
-          entradaPct: dados.entradaPct,
-          parcelas: dados.parcelas,
-          bancoFinanciamento: dados.bancoFinanciamento,
-          observacoes: dados.observacoes,
-          descricaoServico: dados.descricaoServico || null,
-          detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
-          subtotal: totais.subtotal,
-          descontoAplicado: totais.descontoAplicado,
-          valorTotal: totais.valorTotal,
-          ...pagamentoGravado(dados.condicaoPagamento, totais),
-          itens: { create: itens.map(({ _calculo, ...item }) => item) },
-        },
-        include: { itens: true, cliente: true },
-      });
-    });
-
+    const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body));
     res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
   }),
 );
@@ -476,7 +492,10 @@ rotasOrcamentos.post(
     const mensagem = [
       `Olá, ${primeiroNome}! Tudo bem?`,
       '',
-      `Segue o orçamento ${orcamento.codigo} da Guarusolar para o seu sistema de energia solar:`,
+      // serve para solar e para carregador: o serviço vem do próprio orçamento, quando preenchido
+      orcamento.descricaoServico
+        ? `Segue a proposta ${orcamento.codigo} da Guarusolar para ${orcamento.descricaoServico.charAt(0).toLowerCase()}${orcamento.descricaoServico.slice(1)}:`
+        : `Segue a proposta ${orcamento.codigo} da Guarusolar:`,
       '',
       // valores gravados ao salvar; nada é recalculado para a mensagem
       // com cartão, o total com a taxa repassada; sem cartão (ou orçamento antigo), o valor da proposta
@@ -484,7 +503,9 @@ rotasOrcamentos.post(
       `• Pagamento: ${orcamento.resumoPagamento ?? '[CONDIÇÃO DE PAGAMENTO]'}`,
       `• Validade: ${formatarData(orcamento.validade)}`,
       '',
-      `Orçamento completo em PDF: ${linkDoPdf(orcamento)}`,
+      `Proposta completa em PDF: ${linkDoPdf(orcamento)}`,
+      // o servidor gratuito pode estar "dormindo": a primeira abertura leva até 1 minuto
+      '(se o link demorar a abrir, aguarde alguns segundos)',
       '',
       'Qualquer dúvida, estou à disposição!',
       `${req.usuario!.nome} · Guarusolar`,

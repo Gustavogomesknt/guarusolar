@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
 import { intervalo, opcoesDePeriodo, SeletorPeriodo, type Periodo } from './periodo';
+import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
@@ -359,7 +360,7 @@ function Linha({
         {formatarData(o.validade)}
       </span>
       <span role="cell" className="text-right font-mono text-sm">
-        {formatarBRL(Number(o.valorTotal))}
+        <ValorDaProposta valorTotal={o.valorTotal} valorTotalCliente={o.valorTotalCliente} className="items-end" />
       </span>
       <span role="cell">
         <MenuStatus orcamento={o} pedir={pedir} pendente={pendente} />

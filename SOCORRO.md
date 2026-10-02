@@ -48,7 +48,9 @@ Primeiro, a mensagem na tela:
 | "E-mail ou senha inválidos" | senha ou e-mail errado | conferir; se esqueceu a senha, item 6 |
 | "Muitas tentativas de entrar. Tente de novo em …" | depois de vários erros, o login trava por alguns minutos (proteção) | esperar o tempo indicado |
 | "Seu usuário não tem acesso a esta função" | a pessoa não tem permissão para aquela tela | normal; não é defeito |
-| "O servidor encontrou um problema" | erro no servidor | ver os logs (abaixo) |
+| "Não foi possível falar com o banco de dados agora" | o sistema está no ar, mas o banco não respondeu | esperar 1 minuto e tentar de novo; se continuar, item 3 |
+| "Este registro não foi encontrado" | outra pessoa alterou ou mudou aquele registro ao mesmo tempo | recarregar a tela (F5) |
+| "O servidor encontrou um problema. Tente de novo em instantes…" | erro inesperado no servidor | tentar de novo; se repetir, ver os logs (abaixo) |
 
 **Ver os logs:** painel da Render → serviço **guarusolar** → **Logs**. Use a busca do próprio
 painel. O que procurar:

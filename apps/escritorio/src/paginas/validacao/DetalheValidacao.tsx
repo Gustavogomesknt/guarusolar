@@ -187,8 +187,11 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
           <dd className="font-medium">{dados.enviadoEm ? formatarDataHora(dados.enviadoEm) : '—'}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">Orçamento de origem</dt>
-          <dd>
+          <dt className="text-muted-foreground">Projeto e orçamento</dt>
+          <dd className="flex flex-wrap gap-x-2">
+            <Link to={`/projetos/${dados.projetoId}`} className="font-mono font-medium text-primary hover:underline">
+              {dados.projeto.codigo}
+            </Link>
             <Link to={`/orcamentos/${dados.projeto.orcamento.id}`} className="font-mono font-medium text-primary hover:underline">
               {dados.projeto.orcamento.codigo}
             </Link>

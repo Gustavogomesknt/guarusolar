@@ -62,6 +62,9 @@ export function GeradorOrcamento({
   const { control, formState, getValues, reset, setError, clearErrors } = formulario;
   const clienteConsultas = useQueryClient();
   const [salvo, setSalvo] = useState<OrcamentoSalvo | null>(inicial?.salvo ?? null);
+  // identifica este orçamento novo: se a resposta do "criar" se perder (queda de internet), o
+  // novo clique em Salvar atualiza o mesmo orçamento em vez de criar outro (API: idCriacao)
+  const idCriacao = useRef(crypto.randomUUID());
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const somenteLeitura = salvo?.status === 'APROVADO';
@@ -107,7 +110,7 @@ export function GeradorOrcamento({
     mutationFn: (dados: FormularioOrcamento) =>
       salvo
         ? api.put<OrcamentoSalvo>(`/api/orcamentos/${salvo.id}`, paraApi(dados))
-        : api.post<OrcamentoSalvo>('/api/orcamentos', paraApi(dados)),
+        : api.post<OrcamentoSalvo>('/api/orcamentos', { ...paraApi(dados), idCriacao: idCriacao.current }),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: (resposta, dados) => {
       const eraNovo = salvo === null;
@@ -257,7 +260,7 @@ export function GeradorOrcamento({
           {/* fieldset desabilitado trava todos os campos e botões no modo leitura */}
           <fieldset disabled={somenteLeitura} className={`flex min-w-0 flex-col gap-5 ${ESTILO_SOMENTE_LEITURA}`}>
             <legend className="sr-only">Cliente e itens</legend>
-            <CartaoCliente gravado={salvo} />
+            <CartaoCliente gravado={salvo} somenteLeitura={somenteLeitura} />
             <CartaoItens subtotal={totais.subtotal} />
           </fieldset>
           <ResumoOrcamento

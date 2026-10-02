@@ -100,7 +100,8 @@ apps/api/                      API (Express + Prisma)
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
                                login sempre; gestor vê todas, técnico só da equipe (outra: 404),
                                comercial não (403). Não existe pasta pública de arquivos
-  src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central
+  src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central; erros do Prisma viram
+                               mensagem para o usuário (banco fora do ar = 503, P2025 = 404, P2002 = 409)
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
   src/lib/zod-pt.ts            mensagens padrão do Zod em português (importado no server.ts)
   src/lib/pdf-orcamento.ts     proposta A4 (pdfmake), só com dados gravados: página 1 = proposta,
@@ -422,7 +423,9 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma
   --script` numa pasta `AAAAMMDDHHMMSS_nome` (hora UTC) e aplique com `prisma migrate deploy`.
   Revise o SQL antes de aplicar. O diff sempre repete um `ALTER ... "tokenPdf" SET DEFAULT`
-  com a mesma expressão (falso positivo do Prisma com `dbgenerated`): é inofensivo.
+  com a mesma expressão (falso positivo do Prisma com `dbgenerated`): é inofensivo. Ao apagar
+  essa linha, troque a vírgula do `ADD COLUMN` anterior por ponto e vírgula (o SQL fica quebrado
+  e o deploy falha; depois de falhar: `prisma migrate resolve --rolled-back <pasta>`).
   Pare a API antes: no Windows ela trava a DLL do Prisma e o `prisma generate` falha.
 - **Parar servidores no Windows:** encerrar só o processo da porta deixa órfãos o `tsx watch` e o
   `npm run` que o iniciaram (acumularam 21 processos e 1 GB numa sessão). Pare pelo processo
@@ -460,6 +463,9 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   na MESMA transação: aprovação, agendar/remarcar/cancelar serviço, primeira foto, envio,
   aprovar/devolver, editar e cancelar o projeto. Rota nova que mude projeto ou agendamento também
   registra. Eventos `reconstruido` vieram da migration (datas que existiam antes da tabela).
+- **Criar orçamento é idempotente** (`idCriacao`, UUID gerado pelo gerador ao abrir "novo"): se a
+  resposta do POST se perder e o vendedor salvar de novo, a API acha o mesmo `idCriacao` e atualiza
+  aquele orçamento (200) em vez de criar outro. Formulário novo de criação = UUID novo.
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.

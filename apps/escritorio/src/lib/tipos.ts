@@ -80,6 +80,7 @@ export type FichaDoCliente = Cliente & {
     criadoEm: string;
     validade: string;
     valorTotal: string;
+    valorTotalCliente: string | null;
     /** o projeto (obra) que o orçamento aprovado gerou */
     projeto: { id: string; codigo: string; status: StatusProjeto } | null;
   }[];
@@ -93,6 +94,8 @@ export type OrcamentoNaLista = {
   criadoEm: string;
   validade: string;
   valorTotal: string;
+  /** com a taxa do cartão repassada; null sem cartão */
+  valorTotalCliente: string | null;
   enviadoEm: string | null;
   aprovadoEm: string | null;
   recusadoEm: string | null;
@@ -230,6 +233,7 @@ export type ServicoEmValidacao = {
   motivoDevolucao: string | null;
   equipe: { nome: string };
   tecnicoResponsavel: { nome: string; telefone: string | null } | null;
+  projetoId: string;
   projeto: {
     codigo: string;
     cliente: Cliente;

@@ -75,6 +75,21 @@ export function PaginaAgenda() {
     if (selecionadoId && pendentes.data && !selecionado) setSelecionadoId(null);
   }, [selecionadoId, selecionado, pendentes.data]);
 
+  // /agenda?projeto=<id> (ficha e lista de Projetos): já chega com o projeto escolhido na faixa
+  const projetoNaUrl = parametros.get('projeto');
+  useEffect(() => {
+    if (!projetoNaUrl || !pendentes.data) return;
+    if (pendentes.data.some((p) => p.id === projetoNaUrl)) setSelecionadoId(projetoNaUrl);
+    setParametros(
+      (atuais) => {
+        const novos = new URLSearchParams(atuais);
+        novos.delete('projeto');
+        return novos;
+      },
+      { replace: true },
+    );
+  }, [projetoNaUrl, pendentes.data, setParametros]);
+
   // Esc desfaz a seleção (quando nenhum diálogo está aberto; o diálogo trata o próprio Esc)
   useEffect(() => {
     if (!selecionado || agendando || servicoAberto) return;

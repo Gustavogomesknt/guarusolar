@@ -14,7 +14,7 @@ import { copiaDoSalvo, diferencasDoCadastro, type DadosClienteDocumento, type Fo
 
 const MINIMO_BUSCA = 2;
 
-export function CartaoCliente({ gravado }: { gravado: OrcamentoSalvo | null }) {
+export function CartaoCliente({ gravado, somenteLeitura = false }: { gravado: OrcamentoSalvo | null; somenteLeitura?: boolean }) {
   const {
     control,
     setValue,
@@ -59,6 +59,7 @@ export function CartaoCliente({ gravado }: { gravado: OrcamentoSalvo | null }) {
         <OrigemDosDados
           cliente={cliente}
           gravado={gravado}
+          somenteLeitura={somenteLeitura}
           atualizar={atualizar}
           onAtualizar={(sim) => setValue('atualizarDadosCliente', sim, { shouldDirty: true })}
           onTrocar={() => selecionar(null)}
@@ -125,12 +126,14 @@ export function CartaoCliente({ gravado }: { gravado: OrcamentoSalvo | null }) {
 function OrigemDosDados({
   cliente,
   gravado,
+  somenteLeitura,
   atualizar,
   onAtualizar,
   onTrocar,
 }: {
   cliente: Cliente;
   gravado: OrcamentoSalvo | null;
+  somenteLeitura: boolean;
   atualizar: boolean;
   onAtualizar: (sim: boolean) => void;
   onTrocar: () => void;
@@ -174,7 +177,8 @@ function OrigemDosDados({
         origem={`Dados gravados no orçamento${quando}. É o que sai no PDF e no WhatsApp, mesmo que o cadastro mude.`}
         onTrocar={onTrocar}
       />
-      {mudou.length > 0 && (
+      {/* aprovado não muda: o aviso e a troca da cópia só valem para orçamento editável */}
+      {mudou.length > 0 && !somenteLeitura && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destaque/40 bg-destaque-suave px-4 py-3 text-[13px] text-destaque-texto">
           <span className="flex items-start gap-2">
             <History className="mt-0.5 size-4 shrink-0" aria-hidden />

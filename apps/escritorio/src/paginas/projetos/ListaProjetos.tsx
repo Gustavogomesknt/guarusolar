@@ -14,11 +14,11 @@ import {
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import type { ListaDeProjetos, ProjetoNaLista } from '@/lib/tipos';
-import { formatarBRL } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { SeloProjeto } from './SeloProjeto';
+import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 type Filtro = 'EM_ANDAMENTO' | StatusProjeto;
 const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'CONCLUIDO'];
@@ -157,7 +157,7 @@ export function ListaProjetos() {
                     {[p.clienteCidade, p.clienteUf].filter(Boolean).join('/') || '—'}
                   </span>
                   <span role="cell" className="text-right font-mono text-sm">
-                    {formatarBRL(Number(p.valorTotal))}
+                    <ValorDaProposta valorTotal={p.valorTotal} valorTotalCliente={p.valorTotalCliente} className="items-end" />
                   </span>
                   <span role="cell">
                     <SeloProjeto status={p.status} />
@@ -186,7 +186,7 @@ function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor:
     ) : null;
   switch (p.status) {
     case 'AGUARDANDO_AGENDAMENTO':
-      return gestor ? atalho('/agenda', 'Agendar') : <span className="text-muted-foreground">Aguardando data</span>;
+      return gestor ? atalho(`/agenda?projeto=${p.id}`, 'Agendar') : <span className="text-muted-foreground">Aguardando data</span>;
     case 'AGENDADO':
       return s ? (
         <span className="flex flex-col">

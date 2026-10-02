@@ -5,12 +5,13 @@ import { FilePlus2, Loader2, Pencil } from 'lucide-react';
 import { formatarData, ROTULO_STATUS_PROJETO } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { FichaDoCliente } from '@/lib/tipos';
-import { formatarBRL, mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
+import { mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { Selo } from '@/components/Selo';
 import { DialogCliente } from '@/components/DialogCliente';
 import { SeloStatus } from '@/paginas/orcamentos/MenuStatus';
 import { useAtivacaoDeCliente } from './ativarCliente';
+import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 export function FichaCliente() {
   const { id = '' } = useParams();
@@ -148,7 +149,7 @@ export function FichaCliente() {
                     {formatarData(o.validade)}
                   </span>
                   <span role="cell" className="text-right font-mono text-sm">
-                    {formatarBRL(Number(o.valorTotal))}
+                    <ValorDaProposta valorTotal={o.valorTotal} valorTotalCliente={o.valorTotalCliente} className="items-end" />
                   </span>
                   <span role="cell" className="flex flex-wrap items-center gap-2">
                     <SeloStatus status={o.status} />

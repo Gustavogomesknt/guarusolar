@@ -20,6 +20,7 @@ import { CORES_STATUS } from './coresStatus';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
 import { intervalo, SeletorPeriodo, type Periodo } from './periodo';
+import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 /*
  * Pipeline (Kanban) de orçamentos: uma coluna por status, com a mesma listagem da API
@@ -273,7 +274,11 @@ function Cartao({ orcamento: o, pedir, pendente }: { orcamento: OrcamentoNaLista
         <p className="truncate text-sm font-semibold">{o.cliente.nome}</p>
         {cidade && <p className="truncate text-xs text-muted-foreground">{cidade}</p>}
       </div>
-      <p className="font-titulo text-xl leading-tight font-bold tracking-[-0.01em]">{formatarBRL(Number(o.valorTotal))}</p>
+      <ValorDaProposta
+        valorTotal={o.valorTotal}
+        valorTotalCliente={o.valorTotalCliente}
+        classeValor="font-titulo text-xl leading-tight font-bold tracking-[-0.01em]"
+      />
       <p className="text-xs text-muted-foreground">{contexto(o)}</p>
 
       {negociando && (

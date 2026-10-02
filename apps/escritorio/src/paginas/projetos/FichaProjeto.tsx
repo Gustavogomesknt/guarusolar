@@ -140,7 +140,7 @@ function AcaoPrincipal({ projeto: p, atual }: { projeto: Ficha; atual: Servico |
       </Link>
     </Button>
   );
-  if (p.status === 'AGUARDANDO_AGENDAMENTO') return botao('/agenda', 'Agendar na agenda');
+  if (p.status === 'AGUARDANDO_AGENDAMENTO') return botao(`/agenda?projeto=${p.id}`, 'Agendar na agenda');
   if (p.status === 'AGENDADO' && atual) return botao(agendaDaSemana(atual), 'Ver ou remarcar na agenda');
   if ((p.status === 'AGUARDANDO_VALIDACAO' || atual?.status === 'DEVOLVIDO') && atual) {
     return botao(`/validacao?servico=${atual.id}`, 'Abrir na validação');

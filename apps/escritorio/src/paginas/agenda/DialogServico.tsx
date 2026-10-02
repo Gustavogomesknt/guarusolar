@@ -82,7 +82,11 @@ export function DialogServico({
           </span>
           <DialogTitle>{servico.projeto.cliente.nome}</DialogTitle>
           <DialogDescription>
-            {[cidade, servico.projeto.codigo].filter(Boolean).join(' · ')} ·{' '}
+            {cidade && `${cidade} · `}
+            <Link to={`/projetos/${servico.projetoId}`} className="text-primary underline-offset-2 hover:underline">
+              {servico.projeto.codigo}
+            </Link>{' '}
+            ·{' '}
             <Link to={`/orcamentos/${servico.projeto.orcamento.id}`} className="text-primary underline-offset-2 hover:underline">
               {servico.projeto.orcamento.codigo}
             </Link>

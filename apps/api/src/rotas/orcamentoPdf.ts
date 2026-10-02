@@ -18,22 +18,29 @@ function tokenConfere(recebido: string, gravado: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Página simples para quem abre um link inválido no navegador ou no celular. */
-function linkInvalido(res: Response) {
+/** Página simples para o cliente final (navegador ou celular), em vez de texto técnico. */
+function paginaParaOCliente(res: Response, status: number, titulo: string, texto: string) {
   res
-    .status(404)
+    .status(status)
     .type('html')
     .set('Cache-Control', 'no-store')
     .send(
       '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>Orçamento não encontrado · Guarusolar</title></head>' +
+        `<title>${titulo} · Guarusolar</title></head>` +
         '<body style="font-family:system-ui,sans-serif;background:#F4F6FA;color:#10243D;margin:0;padding:48px 20px">' +
         '<main style="max-width:420px;margin:0 auto;background:#fff;border:1px solid #D9E0EA;border-radius:14px;padding:28px">' +
-        '<h1 style="margin:0 0 8px;font-size:20px">Não foi possível abrir este orçamento</h1>' +
-        '<p style="margin:0;color:#5A6675;line-height:1.5">O link está incompleto ou não é mais válido. ' +
-        'Peça ao seu vendedor da Guarusolar que envie o orçamento novamente.</p></main></body></html>',
+        `<h1 style="margin:0 0 8px;font-size:20px">${titulo}</h1>` +
+        `<p style="margin:0;color:#5A6675;line-height:1.5">${texto}</p></main></body></html>`,
     );
 }
+
+const linkInvalido = (res: Response) =>
+  paginaParaOCliente(
+    res,
+    404,
+    'Não foi possível abrir este orçamento',
+    'O link está incompleto ou não é mais válido. Peça ao seu vendedor da Guarusolar que envie o orçamento novamente.',
+  );
 
 rotasOrcamentoPdf.get(
   '/:id/pdf',
@@ -53,7 +60,19 @@ rotasOrcamentoPdf.get(
     // mesma resposta para orçamento inexistente e token errado: não revela quais ids existem
     if (!orcamento || !tokenConfere(token, orcamento.tokenPdf)) return linkInvalido(res);
 
-    const pdf = await gerarPdfOrcamento(orcamento);
+    let pdf: Buffer;
+    try {
+      pdf = await gerarPdfOrcamento(orcamento);
+    } catch (erro) {
+      // o erro completo vai para o log; o cliente vê uma página, não o texto técnico
+      console.error(`[pdf] falha ao gerar ${orcamento.codigo}:`, erro);
+      return paginaParaOCliente(
+        res,
+        500,
+        'A proposta não pôde ser aberta agora',
+        'Tente de novo em alguns minutos. Se continuar, avise o seu vendedor da Guarusolar.',
+      );
+    }
     res
       .status(200)
       .type('application/pdf')

@@ -208,6 +208,8 @@ enum CondicaoPagamento {
 model Orcamento {
   id         String          @id @default(uuid())
   codigo     String          @unique // GS-2026-0148
+  /// gerado pela tela ao criar: o mesmo "criar" repetido (queda de internet) não duplica
+  idCriacao  String?         @unique
   clienteId  String
   cliente    Cliente         @relation(fields: [clienteId], references: [id])
   vendedorId String
