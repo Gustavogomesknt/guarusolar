@@ -10,7 +10,7 @@ import type { ServicoNaAgenda } from '@/lib/tipos';
 import { enderecoEscrito, linkDoMapa, linkDoWhatsApp } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
-import { SeloStatus } from '@/components/SeloStatus';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { useFila } from '@/fotos/useFotos';
 import { ConviteInstalacao } from '@/components/ConviteInstalacao';
 
@@ -205,7 +205,7 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
           <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
             {tipo.rotulo}
           </span>
-          <SeloStatus status={servico.status} />
+          <SituacaoServico status={servico.status} />
           {atrasado ? (
             <span className="text-xs text-destaque-texto">
               {inicio === fim ? `era para ${nomeLongo(inicio)}` : `de ${nomeLongo(inicio)} a ${nomeLongo(fim)}`}

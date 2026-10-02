@@ -67,7 +67,8 @@ type DadosItem = z.infer<typeof esquema>;
 function valoresDoItem(item: Produto | null): DadosItem {
   return {
     nome: item?.nome ?? '',
-    categoria: item?.categoria ?? 'PAINEL_SOLAR',
+    // o catálogo da Guarusolar é quase todo elétrico e de carregador: "Outros" obriga a escolher
+    categoria: item?.categoria ?? 'OUTROS',
     unidade: item?.unidade ?? 'UN',
     precoCusto: item ? formatarDecimal(Number(item.precoCusto)) : '',
     precoVenda: item ? formatarDecimal(Number(item.precoVenda)) : '',

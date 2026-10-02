@@ -10,7 +10,7 @@ import type { ServicoDetalhe } from '@/lib/tipos';
 import { enderecoEscrito } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
-import { SeloStatus } from '@/components/SeloStatus';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { BlocoFoto, FotosExtras, type EstadoBloco } from '@/components/BlocoFoto';
 import { useFotos } from '@/fotos/useFotos';
 import type { Posicao } from '@/fotos/metadados';
@@ -246,7 +246,7 @@ export function Servico() {
             <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
               {tipo.rotulo}
             </span>
-            <SeloStatus status={s.status} />
+            <SituacaoServico status={s.status} />
             <span className="rounded-full bg-[#EDF1F6] px-2.5 py-1 text-xs text-[#3A4A5E]">
               {quando(diaDaApi(s.dataInicio), diaDaApi(s.dataFim))}
             </span>

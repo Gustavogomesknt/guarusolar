@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ErroApi } from '@guarusolar/web/api';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import type { AgendamentoNaAgenda, EquipeNaAgenda } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,12 @@ export function DialogServico({
           <div>
             <dt className="text-xs text-muted-foreground">Quando</dt>
             <dd className="font-medium">{inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-xs text-muted-foreground">Situação</dt>
+            <dd className="mt-0.5">
+              <SituacaoServico status={servico.status} />
+            </dd>
           </div>
         </dl>
 

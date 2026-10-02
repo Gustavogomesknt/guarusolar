@@ -4,7 +4,7 @@ import { FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { calcularOrcamento, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
+import { calcularOrcamento, formatarHora, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
 import { api, ErroApi, tokenSalvo, urlDaApi } from '@guarusolar/web/api';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import type { Cliente } from '@/lib/tipos';
@@ -34,7 +34,6 @@ import {
   type ProblemaFormulario,
 } from './formulario';
 
-const horaCurta =(data: Date) => data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 export type OrcamentoInicial = {
   valores: FormularioOrcamento;
@@ -183,7 +182,7 @@ export function GeradorOrcamento({
       ? alterado
         ? 'Alterações não salvas'
         : salvoEm
-          ? `Salvo às ${horaCurta(salvoEm)}`
+          ? `Salvo às ${formatarHora(salvoEm)}`
           : 'Sem alterações'
       : alterado
         ? 'Ainda não salvo'

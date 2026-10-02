@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { CORES_STATUS } from './coresStatus';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
+import { textoDoErro } from '@/lib/consultas';
 import { deMesAnterior, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 
@@ -75,6 +76,7 @@ export function Pipeline() {
   const consulta = useQuery({
     queryKey: ['orcamentos', 'lista', parametros],
     queryFn: ({ signal }) => api.get<OrcamentoNaLista[]>(`/api/orcamentos?${parametros}`, { signal }),
+    meta: { erroNaTela: true },
   });
 
   const porStatus = useMemo(() => {
@@ -128,6 +130,10 @@ export function Pipeline() {
       {consulta.isPending ? (
         <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden /> Carregando orçamentos…
+        </p>
+      ) : consulta.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Não foi possível carregar os orçamentos. {textoDoErro(consulta.error)}
         </p>
       ) : (
         <div className="relative flex gap-4 overflow-x-auto pb-2">

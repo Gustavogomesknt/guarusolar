@@ -124,7 +124,8 @@ apps/api/                      API (Express + Prisma)
 apps/escritorio/               front do escritório (Vite + React + Tailwind v4 + shadcn/ui)
   src/estilos/tema.css         importa o Tailwind e o tema de packages/web
   src/main.tsx                 configurarApi({ chaveToken }) antes de renderizar
-  src/lib/consultas.ts         React Query com aviso global de erro (toast)
+  src/lib/consultas.ts         React Query com aviso global de erro (toast); consulta cuja tela mostra o
+                               erro no quadro leva meta { erroNaTela: true } e textoDoErro (sem aviso repetido)
   src/app/rotas.tsx            roteador de dados (createBrowserRouter, necessário para o
                                useBlocker); cada tela fica dentro de <RotaProtegida papeis={...}>
   src/paginas/orcamentos/      lista (/orcamentos: indicadores, filtros, status em 1 clique)
@@ -207,7 +208,6 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
   src/components/ConviteInstalacao  "Coloque o app na tela inicial": botão Instalar no Android
                                (beforeinstallprompt), passo a passo do Compartilhar no iPhone;
                                some se já instalado; "Agora não" vale por 7 dias
-  src/components/SeloStatus    status como texto com bolinha (o selo preenchido é do tipo)
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
   src/calculo.ts               totais, desconto e condições de pagamento; calcularCartao
@@ -226,6 +226,8 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
                                faz o Tailwind de cada app gerar as classes escritas no pacote
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
+  src/SituacaoServico.tsx      situação do serviço IGUAL em todas as telas (bolinha + texto; "Refazer
+                               fotos" vira selo laranja). O selo preenchido é só do TIPO de serviço
   src/FormularioTrocaSenha.tsx troca da própria senha (escritório /conta/senha, técnico /senha);
                                a RotaProtegida leva quem tem senha temporária direto para ela
   src/ImagemProtegida.tsx      <img> de foto de serviço: busca com o token no cabeçalho (o navegador

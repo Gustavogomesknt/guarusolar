@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, X } from 'lucide-react';
 import { TIPOS_SERVICO } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import type { AgendamentoNaAgenda, EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   intervaloEscrito,
   nomeCurto,
   nomeLongo,
+  ROTULO_STATUS_AGENDAMENTO,
   numeroDaSemana,
   segundaDaSemana,
   somarDias,
@@ -366,7 +368,7 @@ function LinhaEquipe({
             // com um projeto selecionado a grade serve para escolher dia livre: serviços ficam só de consulta
             disabled={selecionado !== null}
             onClick={() => onAbrirServico(servico)}
-            aria-label={`${tipo.rotulo}: ${servico.projeto.cliente.nome}, ${equipe.nome}, ${quando}. Abrir detalhes`}
+            aria-label={`${tipo.rotulo}: ${servico.projeto.cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}. Abrir detalhes`}
             style={{ gridColumn: `${coluna + 2} / span ${largura}`, gridRow: 1 }}
             className={cn(
               'relative z-10 m-1.5 flex min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] border-l-4 px-3 py-2 text-left',
@@ -381,6 +383,8 @@ function LinhaEquipe({
             <span className="w-full truncate text-xs opacity-80">
               {[cidade, servico.projeto.orcamento.codigo].filter(Boolean).join(' · ')}
             </span>
+            {/* a cor do bloco é do tipo; a situação tem a mesma aparência de todas as telas */}
+            <SituacaoServico status={servico.status} className="mt-0.5 text-[11px]" />
           </button>
         );
       })}

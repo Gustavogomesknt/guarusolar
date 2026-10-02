@@ -7,16 +7,16 @@ import {
   formatarData,
   formatarDataHora,
   formatarHora,
-  intervaloEscrito,
-  ROTULO_STATUS_AGENDAMENTO,
   ROTULO_TIPO_SERVICO,
   segundaDaSemana,
   type TipoEventoProjeto,
 } from '@guarusolar/compartilhado';
 import { api, ErroApi, urlDaApi, urlDaFoto } from '@guarusolar/web/api';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { useSessao } from '@guarusolar/web/sessao';
 import type { FichaDoProjeto, FotoDoProjeto } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { formatarBRL, formatarDecimal, lerNumero, mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,15 @@ type Ficha = FichaDoProjeto;
 type Servico = Ficha['agendamentos'][number];
 
 const dia = (iso: string) => iso.slice(0, 10);
-const periodo = (s: Pick<Servico, 'dataInicio' | 'dataFim'>) => intervaloEscrito(dia(s.dataInicio), dia(s.dataFim));
+// dia do serviço (AAAA-MM-DD, sem fuso) no mesmo formato numérico das outras datas da ficha
+const diaBr = (d: string) => d.split('-').reverse().join('/');
+const periodo = (s: Pick<Servico, 'dataInicio' | 'dataFim'>) => {
+  const inicio = dia(s.dataInicio);
+  const fim = dia(s.dataFim);
+  if (inicio === fim) return diaBr(inicio);
+  // 29/09 a 01/10/2026; o ano aparece duas vezes só se mudar
+  return `${inicio.slice(0, 4) === fim.slice(0, 4) ? diaBr(inicio).slice(0, 5) : diaBr(inicio)} a ${diaBr(fim)}`;
+};
 const agendaDaSemana = (s: Servico) => `/agenda?semana=${segundaDaSemana(dia(s.dataInicio))}`;
 
 /**
@@ -47,6 +55,7 @@ export function FichaProjeto() {
 
   const ficha = useQuery({
     queryKey: ['projetos', 'ficha', id],
+    meta: { erroNaTela: true },
     queryFn: ({ signal }) => api.get<Ficha>(`/api/projetos/${id}`, { signal }),
   });
 
@@ -62,6 +71,9 @@ export function FichaProjeto() {
     return (
       <div className="flex flex-col items-start gap-3">
         <h1 className="text-2xl font-bold">{naoExiste ? 'Projeto não encontrado' : 'Não foi possível abrir o projeto'}</h1>
+        <p className="text-sm text-muted-foreground">
+          {naoExiste ? 'O link pode estar errado ou o projeto não existe mais.' : textoDoErro(ficha.error)}
+        </p>
         <Button asChild variant="outline" className="h-11 rounded-[10px]">
           <Link to="/projetos">Voltar para a lista</Link>
         </Button>
@@ -332,7 +344,7 @@ function Servicos({ projeto: p, gestor }: { projeto: Ficha; gestor: boolean }) {
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                <Selo className="self-start">{ROTULO_STATUS_AGENDAMENTO[s.status]}</Selo>
+                <SituacaoServico status={s.status} className="self-start" />
                 <span className="text-[13px] text-muted-foreground">
                   {s._count.fotos} {s._count.fotos === 1 ? 'foto' : 'fotos'}
                   {s.enviadoEm && ` · enviado em ${formatarDataHora(s.enviadoEm)}`}

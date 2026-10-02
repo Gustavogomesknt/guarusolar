@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { calcularOrcamento } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { Cliente, OrcamentoCompleto } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { Button } from '@/components/ui/button';
 import { GeradorOrcamento, type OrcamentoInicial } from './GeradorOrcamento';
 import { entradaDoCalculo, salvoDoOrcamento, valoresDoOrcamento } from './formulario';
@@ -44,6 +45,7 @@ export function PaginaOrcamento() {
 
   const consulta = useQuery({
     queryKey: ['orcamentos', 'detalhe', id],
+    meta: { erroNaTela: true },
     queryFn: ({ signal }) => api.get<OrcamentoCompleto>(`/api/orcamentos/${id}`, { signal }),
     enabled: !emEdicaoLocal,
     // Sem cache: o gerador só lê os valores ao montar, então abrir sempre busca a versão
@@ -87,7 +89,7 @@ export function PaginaOrcamento() {
       <div className="flex flex-col items-start gap-3">
         <h1 className="text-2xl font-bold">{naoExiste ? 'Orçamento não encontrado' : 'Não foi possível abrir o orçamento'}</h1>
         <p className="text-sm text-muted-foreground">
-          {naoExiste ? 'O link pode estar errado ou o orçamento não existe mais.' : consulta.error.message}
+          {naoExiste ? 'O link pode estar errado ou o orçamento não existe mais.' : textoDoErro(consulta.error)}
         </p>
         <Button asChild variant="outline" className="h-11 rounded-[10px]">
           <Link to="/orcamentos">Voltar para a lista</Link>

@@ -5,6 +5,7 @@ import { AlertTriangle, ImageOff, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatarDataHora, formatarHora, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
 import { api, ErroApi, urlDaFoto } from '@guarusolar/web/api';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import type { FotoEmValidacao, ServicoEmValidacao, ServicoNaFila } from '@/lib/tipos';
@@ -154,18 +155,11 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
             {cliente.nome}
           </h2>
         </div>
-        <span
-          className={cn(
-            'rounded-full px-3 py-1.5 text-[13px] font-semibold',
-            devolvido ? 'bg-[#F8E0DD] text-[#A3231B]' : 'bg-[#FDEBD6] text-[#8A4B07]',
-          )}
-        >
-          {devolvido ? 'Devolvido ao técnico' : 'Aguardando validação'}
-        </span>
+        <SituacaoServico status={dados.status} className="text-[13px]" />
       </div>
 
       {devolvido && (
-        <p className="flex gap-2 rounded-xl border border-[#F0C2BD] bg-[#FDF3F2] px-4 py-3 text-sm text-[#7A1C15]">
+        <p className="flex gap-2 rounded-xl border border-destaque bg-destaque-suave px-4 py-3 text-sm text-destaque-texto">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             Aguardando nova foto do técnico.

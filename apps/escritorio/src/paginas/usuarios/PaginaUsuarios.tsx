@@ -6,6 +6,7 @@ import { PAPEIS, type Papel } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import type { ListaDeUsuarios, UsuarioComSenha, UsuarioNaLista } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { NOME_DO_PAPEL } from '@/app/permissoes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,11 @@ export function PaginaUsuarios() {
   const [senha, setSenha] = useState<UsuarioComSenha | null>(null);
   const [confirmando, setConfirmando] = useState<UsuarioNaLista | null>(null);
 
-  const lista = useQuery({ queryKey: CHAVE, queryFn: ({ signal }) => api.get<ListaDeUsuarios>('/api/usuarios', { signal }) });
+  const lista = useQuery({
+    queryKey: CHAVE,
+    queryFn: ({ signal }) => api.get<ListaDeUsuarios>('/api/usuarios', { signal }),
+    meta: { erroNaTela: true },
+  });
   const equipes = lista.data?.equipes ?? [];
   const nomeDaEquipe = (id: string | null) => equipes.find((e) => e.id === id)?.nome ?? id ?? '—';
   const atualizar = () => consultas.invalidateQueries({ queryKey: CHAVE });
@@ -83,7 +88,7 @@ export function PaginaUsuarios() {
             </p>
           ) : lista.isError ? (
             <p role="alert" className="px-5 py-8 text-sm text-destructive">
-              Não foi possível carregar os usuários.
+              Não foi possível carregar os usuários. {textoDoErro(lista.error)}
             </p>
           ) : (
             <div role="rowgroup">

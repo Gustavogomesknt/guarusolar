@@ -5,6 +5,7 @@ import { FilePlus2, Loader2, Pencil } from 'lucide-react';
 import { formatarData, ROTULO_STATUS_PROJETO } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { FichaDoCliente } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { mascararCep, mascararDocumento, mascararTelefone } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { Selo } from '@/components/Selo';
@@ -21,6 +22,7 @@ export function FichaCliente() {
 
   const ficha = useQuery({
     queryKey: ['clientes', 'ficha', id],
+    meta: { erroNaTela: true },
     queryFn: ({ signal }) => api.get<FichaDoCliente>(`/api/clientes/${id}`, { signal }),
   });
 
@@ -36,6 +38,9 @@ export function FichaCliente() {
     return (
       <div className="flex flex-col items-start gap-3">
         <h1 className="text-2xl font-bold">{naoExiste ? 'Cliente não encontrado' : 'Não foi possível abrir o cliente'}</h1>
+        <p className="text-sm text-muted-foreground">
+          {naoExiste ? 'O link pode estar errado ou o cliente não existe mais.' : textoDoErro(ficha.error)}
+        </p>
         <Button asChild variant="outline" className="h-11 rounded-[10px]">
           <Link to="/clientes">Voltar para a lista</Link>
         </Button>

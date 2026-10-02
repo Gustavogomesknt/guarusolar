@@ -14,6 +14,7 @@ import {
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import type { ListaDeProjetos, ProjetoNaLista } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
@@ -49,6 +50,7 @@ export function ListaProjetos() {
   const lista = useQuery({
     queryKey: ['projetos', 'lista', parametros],
     queryFn: ({ signal }) => api.get<ListaDeProjetos>(`/api/projetos?${parametros}`, { signal }),
+    meta: { erroNaTela: true },
     placeholderData: (anterior) => anterior,
   });
   const contagem = lista.data?.contagem;
@@ -127,7 +129,7 @@ export function ListaProjetos() {
             </p>
           ) : lista.isError ? (
             <p role="alert" className="px-5 py-8 text-sm text-destructive">
-              Não foi possível carregar os projetos.
+              Não foi possível carregar os projetos. {textoDoErro(lista.error)}
             </p>
           ) : lista.data.itens.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-5 py-12 text-center text-sm text-muted-foreground">

@@ -11,6 +11,7 @@ import {
 } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { OrcamentoNaLista, ResumoOrcamentos } from '@/lib/tipos';
+import { textoDoErro } from '@/lib/consultas';
 import { formatarBRL } from '@/lib/formatar';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
@@ -43,6 +44,7 @@ export function ListaOrcamentos() {
   const todos = useQuery({
     queryKey: ['orcamentos', 'lista', filtrosBase.toString()],
     queryFn: ({ signal }) => api.get<OrcamentoNaLista[]>(`/api/orcamentos?${filtrosBase}`, { signal }),
+    meta: { erroNaTela: true },
   });
   // Com o filtro de status: a tabela
   const comStatus = useMemo(() => {
@@ -53,6 +55,7 @@ export function ListaOrcamentos() {
   const lista = useQuery({
     queryKey: ['orcamentos', 'lista', comStatus],
     queryFn: ({ signal }) => api.get<OrcamentoNaLista[]>(`/api/orcamentos?${comStatus}`, { signal }),
+    meta: { erroNaTela: true },
   });
 
   const contagem = (s: FiltroStatus) =>
@@ -120,7 +123,7 @@ export function ListaOrcamentos() {
       <Tabela
         orcamentos={lista.data}
         carregando={lista.isPending}
-        erro={lista.isError}
+        erro={lista.isError ? textoDoErro(lista.error) : null}
         totalSemFiltroDeStatus={todos.data?.length ?? null}
         filtrando={filtrando}
         onVerTodos={() => setPeriodo('TUDO')}
@@ -222,7 +225,7 @@ function Tabela({
 }: {
   orcamentos: OrcamentoNaLista[] | undefined;
   carregando: boolean;
-  erro: boolean;
+  erro: string | null;
   totalSemFiltroDeStatus: number | null;
   filtrando: boolean;
   onVerTodos: () => void;
@@ -267,7 +270,7 @@ function Tabela({
       )}
       {erro && !carregando && (
         <p role="alert" className="px-5 py-10 text-center text-sm text-destructive">
-          Não foi possível carregar os orçamentos.
+          Não foi possível carregar os orçamentos. {erro}
         </p>
       )}
       {nenhumAinda && (

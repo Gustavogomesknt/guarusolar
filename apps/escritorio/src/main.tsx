@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 
-// Fontes empacotadas no app: o executável precisa funcionar sem internet.
+// Fontes empacotadas no app (não dependem do Google Fonts): carregam junto com o site, do mesmo servidor.
 import '@fontsource-variable/bricolage-grotesque';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';

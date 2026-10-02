@@ -8,6 +8,10 @@ declare module '@tanstack/react-query' {
       /** O formulário mostra o erro nos campos; não precisa de aviso global. */
       erroTratadoNoFormulario?: boolean;
     };
+    queryMeta: {
+      /** A tela mostra o erro no próprio quadro (com textoDoErro); sem aviso flutuante repetido. */
+      erroNaTela?: boolean;
+    };
   }
 }
 
@@ -20,8 +24,16 @@ function avisarErro(erro: unknown) {
   toast.error('Algo deu errado. Tente novamente.');
 }
 
+/** Motivo do erro para mostrar na tela (as mensagens da API já são escritas para o usuário). */
+export const textoDoErro = (erro: unknown) =>
+  erro instanceof ErroApi ? erro.message : 'Algo deu errado. Tente novamente.';
+
 export const clienteConsultas = new QueryClient({
-  queryCache: new QueryCache({ onError: avisarErro }),
+  queryCache: new QueryCache({
+    onError: (erro, consulta) => {
+      if (!consulta.meta?.erroNaTela) avisarErro(erro);
+    },
+  }),
   mutationCache: new MutationCache({
     onError: (erro, _variaveis, _contexto, mutacao) => {
       if (!mutacao.meta?.erroTratadoNoFormulario) avisarErro(erro);

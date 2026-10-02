@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { tempoDesde } from '@guarusolar/compartilhado';
+import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import type { ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { DetalheValidacao } from './DetalheValidacao';
@@ -106,7 +107,7 @@ function ItemDaFila({ servico, aberto, onAbrir }: { servico: ServicoNaFila; aber
       <span className="flex items-center justify-between gap-2 text-xs">
         <span className="font-mono text-muted-foreground">{servico.projeto.codigo}</span>
         {devolvido ? (
-          <span className="font-semibold text-[#8A4B07]">Devolvido</span>
+          <SituacaoServico status={servico.status} className="py-0.5 text-[11px]" />
         ) : (
           <span className="text-muted-foreground">{servico.enviadoEm ? tempoDesde(servico.enviadoEm) : ''}</span>
         )}
