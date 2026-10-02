@@ -80,7 +80,7 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/produtos?q=` | comercial | autocomplete do catálogo |
 | POST/PUT | `/api/produtos` | comercial | CRUD do catálogo |
 | PATCH | `/api/produtos/:id/ativo` | comercial | ativar/desativar item |
-| GET | `/api/orcamentos` | comercial | lista com filtros |
+| GET | `/api/orcamentos` | comercial | lista com filtros (`status`, `q`, `de`/`ate`; com `abertosSempre=true`, em aberto ignoram o período e decididos usam a data da decisão) |
 | GET | `/api/orcamentos/resumo` | comercial | indicadores do mês |
 | POST/PUT | `/api/orcamentos` | comercial | criar/editar (totais no servidor) |
 | PATCH | `/api/orcamentos/:id/status` | comercial | mudança em 1 clique |
@@ -360,7 +360,8 @@ pasta de armazenamento não são removidos.
   nem sobe. Ao escolher o serviço de hospedagem, confira a versão do Node e fixe 22 ou mais nova.
 - **Fuso horário:** períodos e datas seguem sempre `America/Sao_Paulo`, calculados em
   `packages/compartilhado/src/datas.ts`, e não o fuso do servidor nem o do computador do
-  escritório. Isso vale para os indicadores do mês, o filtro de período da lista, o ano nos
+  escritório. Isso vale para os indicadores do mês, o filtro de período da lista e do pipeline
+  (em aberto aparecem em qualquer período; aprovados e recusados, pelo mês da decisão), o ano nos
   códigos (GS-2026-0148), a validade padrão e as datas exibidas, no PDF e no WhatsApp. Pode
   hospedar a API em servidor configurado em UTC sem ajustes.
 - **Banco:** PostgreSQL gerenciado (plano gratuito do Supabase, Neon ou similar). Use

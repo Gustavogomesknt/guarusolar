@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
-import { intervalo, opcoesDePeriodo, SeletorPeriodo, type Periodo } from './periodo';
+import { opcoesDePeriodo, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
@@ -34,11 +34,8 @@ export function ListaOrcamentos() {
   const mudancaDeStatus = useMudancaDeStatus();
 
   const filtrosBase = useMemo(() => {
-    const p = new URLSearchParams();
+    const p = parametrosDoPeriodo(periodo);
     if (buscaAtrasada) p.set('q', buscaAtrasada);
-    const { de, ate } = intervalo(periodo);
-    if (de) p.set('de', de);
-    if (ate) p.set('ate', ate);
     return p;
   }, [buscaAtrasada, periodo]);
 
@@ -126,6 +123,7 @@ export function ListaOrcamentos() {
         erro={lista.isError}
         totalSemFiltroDeStatus={todos.data?.length ?? null}
         filtrando={filtrando}
+        onVerTodos={() => setPeriodo('TUDO')}
         onLimparFiltros={() => {
           setStatus('TODOS');
           setBusca('');
@@ -217,6 +215,7 @@ function Tabela({
   erro,
   totalSemFiltroDeStatus,
   filtrando,
+  onVerTodos,
   onLimparFiltros,
   pedir,
   pendenteId,
@@ -226,6 +225,7 @@ function Tabela({
   erro: boolean;
   totalSemFiltroDeStatus: number | null;
   filtrando: boolean;
+  onVerTodos: () => void;
   onLimparFiltros: () => void;
   pedir: PedirMudanca;
   pendenteId: string | null;
@@ -271,18 +271,24 @@ function Tabela({
         </p>
       )}
       {nenhumAinda && (
+        // nada em aberto e nada decidido no período (pode haver decididos em outros meses)
         <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
           <FileText className="size-8 text-destaque" aria-hidden />
-          <p className="font-titulo text-lg font-bold">Nenhum orçamento este mês</p>
+          <p className="font-titulo text-lg font-bold">Nenhum orçamento neste período</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Os orçamentos criados aparecem aqui, com o status de cada negociação.
+            Os orçamentos em aberto aparecem sempre; aprovados e recusados, pelo mês da decisão.
           </p>
-          <Button asChild className="mt-1 h-11 rounded-[10px]">
-            <Link to="/orcamentos/novo">
-              <Plus aria-hidden />
-              Criar o primeiro orçamento
-            </Link>
-          </Button>
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
+            <Button asChild className="h-11 rounded-[10px]">
+              <Link to="/orcamentos/novo">
+                <Plus aria-hidden />
+                Novo orçamento
+              </Link>
+            </Button>
+            <Button variant="outline" className="h-11 rounded-[10px]" onClick={onVerTodos}>
+              Ver todos os períodos
+            </Button>
+          </div>
         </div>
       )}
       {filtrando && orcamentos?.length === 0 && (

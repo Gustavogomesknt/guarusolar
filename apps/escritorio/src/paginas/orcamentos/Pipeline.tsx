@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { CORES_STATUS } from './coresStatus';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
-import { intervalo, SeletorPeriodo, type Periodo } from './periodo';
+import { deMesAnterior, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 /*
@@ -50,10 +50,13 @@ const diaMes = (iso: string) => formatarData(iso).slice(0, 5);
 function contexto(o: OrcamentoNaLista) {
   switch (o.status) {
     case 'RASCUNHO':
-      return `Criado ${ha(o.criadoEm)}`;
+      return deMesAnterior(o.criadoEm) ? `Criado em ${diaMes(o.criadoEm)}` : `Criado ${ha(o.criadoEm)}`;
     case 'ENVIADO':
-    case 'EM_NEGOCIACAO':
-      return o.enviadoEm ? `Enviado ${ha(o.enviadoEm)}` : `Criado ${ha(o.criadoEm)}`;
+    case 'EM_NEGOCIACAO': {
+      const enviado = o.enviadoEm ? `Enviado ${ha(o.enviadoEm)}` : `Criado ${ha(o.criadoEm)}`;
+      // aparece em qualquer período: a data de criação mostra que é negociação antiga
+      return deMesAnterior(o.criadoEm) ? `Criado em ${diaMes(o.criadoEm)} · ${enviado.toLowerCase()}` : enviado;
+    }
     case 'APROVADO':
       return o.aprovadoEm ? `Aprovado em ${diaMes(o.aprovadoEm)}` : 'Aprovado';
     case 'RECUSADO':
@@ -66,13 +69,7 @@ export function Pipeline() {
   const mudanca = useMudancaDeStatus();
   const [arrastando, setArrastando] = useState<DadosArrasto | null>(null);
 
-  const parametros = useMemo(() => {
-    const p = new URLSearchParams();
-    const { de, ate } = intervalo(periodo);
-    if (de) p.set('de', de);
-    if (ate) p.set('ate', ate);
-    return p.toString();
-  }, [periodo]);
+  const parametros = useMemo(() => parametrosDoPeriodo(periodo).toString(), [periodo]);
 
   // mesma chave da lista: as duas telas compartilham o cache e a atualização otimista
   const consulta = useQuery({
@@ -124,8 +121,8 @@ export function Pipeline() {
       </header>
 
       <p id="instrucoes-pipeline" className="-mt-2 text-[13px] text-muted-foreground">
-        Arraste o cartão para outra coluna ou use o menu do status no próprio cartão (também pelo
-        teclado). Colunas que não aceitam o cartão ficam apagadas durante o arrasto.
+        Em aberto aparecem sempre; o período vale para aprovados e recusados. Arraste o cartão para
+        outra coluna ou use o menu do status no próprio cartão (também pelo teclado).
       </p>
 
       {consulta.isPending ? (

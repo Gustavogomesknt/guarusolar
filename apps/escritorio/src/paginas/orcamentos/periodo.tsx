@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import { FUSO_EMPRESA, inicioDoDia, inicioDoMes, partesNoFuso } from '@guarusolar/compartilhado';
 
 /*
- * Período de criação usado na lista e no pipeline de orçamentos.
+ * Período da lista e do pipeline de orçamentos. Vale para os DECIDIDOS (aprovado e recusado,
+ * pela data da decisão); os em aberto aparecem sempre (parâmetro abertosSempre da API).
+ * Ver parametrosDoPeriodo.
  * Os limites são calculados no fuso da empresa (America/Sao_Paulo), qualquer que seja o
  * fuso do computador.
  */
@@ -44,11 +46,27 @@ export function intervalo(periodo: Periodo): { de?: string; ate?: string } {
   }
 }
 
+/** Parâmetros da API para o período: em aberto sempre, decididos pelo período. */
+export function parametrosDoPeriodo(periodo: Periodo): URLSearchParams {
+  const p = new URLSearchParams();
+  const { de, ate } = intervalo(periodo);
+  if (de) p.set('de', de);
+  if (ate) p.set('ate', ate);
+  if (de || ate) p.set('abertosSempre', 'true');
+  return p;
+}
+
+/** O orçamento em aberto é de um mês anterior ao atual (negociação que atravessou o mês). */
+export const deMesAnterior = (criadoEm: string) => new Date(criadoEm) < inicioDoMes(0);
+
 /** Seletor "Período" com as mesmas opções na lista e no pipeline. */
 export function SeletorPeriodo({ valor, onChange }: { valor: Periodo; onChange: (p: Periodo) => void }) {
   const opcoes = useMemo(opcoesDePeriodo, []);
   return (
-    <label className="flex h-10 items-center gap-2 rounded-[10px] border border-input bg-card pr-2.5 pl-3 text-[13px] text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30">
+    <label
+      title="Aprovados e recusados no período. Os em aberto aparecem sempre."
+      className="flex h-10 items-center gap-2 rounded-[10px] border border-input bg-card pr-2.5 pl-3 text-[13px] text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30"
+    >
       Período
       <select
         value={valor}

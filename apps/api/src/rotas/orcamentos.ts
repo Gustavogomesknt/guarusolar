@@ -165,14 +165,31 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
 rotasOrcamentos.get(
   '/',
   rota(async (req, res) => {
-    const { status, clienteId, de, ate, q } = req.query as Record<string, string>;
+    const { status, clienteId, de, ate, q, abertosSempre } = req.query as Record<string, string>;
+    const periodo = de || ate ? { ...(de ? { gte: new Date(de) } : {}), ...(ate ? { lte: new Date(ate) } : {}) } : null;
+
+    // abertosSempre (lista e pipeline): negociação em aberto não tem mês, aparece em qualquer
+    // período; aprovado e recusado entram pelo período da DECISÃO (como o "valor aprovado no
+    // mês"), para a negociação antiga fechada hoje não sumir da tela ao ser fechada.
+    // Decisão sem data gravada (registros antigos) usa a criação.
+    const filtroDoPeriodo: Prisma.OrcamentoWhereInput = !periodo
+      ? {}
+      : abertosSempre !== 'true'
+        ? { criadoEm: periodo }
+        : {
+            OR: [
+              { status: { in: ['RASCUNHO', 'ENVIADO', 'EM_NEGOCIACAO'] } },
+              { status: 'APROVADO', aprovadoEm: periodo },
+              { status: 'APROVADO', aprovadoEm: null, criadoEm: periodo },
+              { status: 'RECUSADO', recusadoEm: periodo },
+              { status: 'RECUSADO', recusadoEm: null, criadoEm: periodo },
+            ],
+          };
 
     const where: Prisma.OrcamentoWhereInput = {
       ...(status ? { status: status as StatusOrcamento } : {}),
       ...(clienteId ? { clienteId } : {}),
-      ...(de || ate
-        ? { criadoEm: { ...(de ? { gte: new Date(de) } : {}), ...(ate ? { lte: new Date(ate) } : {}) } }
-        : {}),
+      ...filtroDoPeriodo,
       // por palavras: código, cliente e cidade da proposta, ou o nome atual do cadastro
       ...filtroDeBusca(q, (p) => [{ textoBusca: { contains: p } }, { cliente: { textoBusca: { contains: p } } }]),
     };

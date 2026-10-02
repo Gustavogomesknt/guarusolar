@@ -130,7 +130,10 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
   src/paginas/orcamentos/      lista (/orcamentos: indicadores, filtros, status em 1 clique)
                                e gerador (/orcamentos/:id, com "novo" para criar): prévia com
                                calcularOrcamento, salvar via POST/PUT, WhatsApp; APROVADO
-                               abre só para leitura
+                               abre só para leitura. PERÍODO da lista e do pipeline (periodo.tsx,
+                               API abertosSempre): em aberto (rascunho, enviado, em negociação)
+                               aparecem SEMPRE, negociação não tem mês (decisão da Guarusolar);
+                               aprovado e recusado entram pelo mês da DECISÃO (aprovadoEm/recusadoEm)
   src/paginas/orcamentos/Pipeline.tsx  Kanban (/pipeline): arrastar e soltar com
                                @atlaskit/pragmatic-drag-and-drop respeitando TRANSICOES_STATUS;
                                o menu de status do cartão é a alternativa por teclado
