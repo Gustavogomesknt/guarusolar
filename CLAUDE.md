@@ -413,7 +413,8 @@ Todos a partir da raiz do repositório:
 ```bash
 npm install                                  # instala todos os workspaces
 cp apps/api/.env.example apps/api/.env       # ajustar DATABASE_URL, DIRECT_URL e JWT_SECRET
-npm run db:migrate       # cria as tabelas
+npm run db:migrate:deploy  # aplica as migrations que existem (não pergunta nada, não apaga dados)
+npm run db:migrate       # só para CRIAR migration (migrate dev: pode propor reiniciar o banco)
 npm run db:seed          # base (catálogo, equipes, checklist) + usuários de teste
 npm run db:seed:base     # só a base (produção)
 npm run usuario -- listar  # usuários reais: criar | nova-senha | desativar | listar
@@ -443,10 +444,17 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   Sem terminal interativo, o `migrate dev` não roda: gere com `prisma migrate diff
   --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma
   --script` numa pasta `AAAAMMDDHHMMSS_nome` (hora UTC) e aplique com `prisma migrate deploy`.
-  Revise o SQL antes de aplicar. O diff sempre repete um `ALTER ... "tokenPdf" SET DEFAULT`
-  com a mesma expressão (falso positivo do Prisma com `dbgenerated`): é inofensivo. Ao apagar
-  essa linha, troque a vírgula do `ADD COLUMN` anterior por ponto e vírgula (o SQL fica quebrado
-  e o deploy falha; depois de falhar: `prisma migrate resolve --rolled-back <pasta>`).
+  Revise o SQL antes de aplicar. Depois de uma aplicação que falhou: `prisma migrate resolve
+  --rolled-back <pasta>`.
+  **Para APLICAR migrations que já existem use `npm run db:migrate:deploy`** (é o que o Publicar
+  roda): não pergunta nada e nunca reinicia o banco. `npm run db:migrate` é o `migrate dev`, só
+  para CRIAR migration: ele compara tudo e, se achar divergência ou arquivo de migration
+  alterado, propõe REINICIAR o banco (apaga os dados; em 06/10/2026 o banco de desenvolvimento
+  foi zerado assim). Nunca edite uma migration já aplicada; `.gitattributes` mantém os `.sql` em
+  LF para a assinatura não mudar entre computadores.
+  `dbgenerated(...)` tem de ser escrito EXATAMENTE como o Postgres guarda a expressão (veja em
+  `information_schema.columns.column_default`), senão o diff repete um `ALTER ... SET DEFAULT`
+  para sempre e o `migrate dev` pede nome de migration à toa (era o caso do `tokenPdf`).
   Pare a API antes: no Windows ela trava a DLL do Prisma e o `prisma generate` falha.
 - **Parar servidores no Windows:** encerrar só o processo da porta deixa órfãos o `tsx watch` e o
   `npm run` que o iniciaram (acumularam 21 processos e 1 GB numa sessão). Pare pelo processo

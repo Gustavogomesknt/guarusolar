@@ -21,7 +21,7 @@ Requer Node.js 22.12 ou mais recente. Todos os comandos rodam a partir da raiz:
 ```bash
 npm install                                # instala todos os workspaces
 cp apps/api/.env.example apps/api/.env     # ajuste DATABASE_URL, DIRECT_URL e JWT_SECRET
-npm run db:migrate                         # cria as tabelas
+npm run db:migrate:deploy                  # cria as tabelas (aplica as migrations; não apaga dados)
 npm run db:seed                            # base (catálogo, equipes, checklist) + usuários de teste
 npm run usuario -- listar                  # usuários reais: criar, nova-senha, desativar, listar
 npm run dev:api                            # http://localhost:3333

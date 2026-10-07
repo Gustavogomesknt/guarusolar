@@ -253,7 +253,7 @@ model Orcamento {
 
   // chave do link público do PDF (/api/orcamentos/:id/pdf?token=...), enviado ao cliente
   // pelo WhatsApp; 64 caracteres hexadecimais aleatórios gerados pelo próprio Postgres
-  tokenPdf String @unique @default(dbgenerated("replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')"))
+  tokenPdf String @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)"))
 
   validade            DateTime
   observacoes         String?

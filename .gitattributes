@@ -1,0 +1,3 @@
+# O Prisma confere a assinatura de cada migration: o arquivo tem de ser byte a byte o mesmo em
+# qualquer computador (Windows trocaria LF por CRLF e o migrate dev pediria para reiniciar o banco).
+apps/api/prisma/migrations/**/*.sql text eol=lf
