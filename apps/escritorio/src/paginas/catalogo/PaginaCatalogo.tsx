@@ -189,7 +189,9 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
     : item.usadoEmOrcamentos > 0
       ? `Usado em ${item.usadoEmOrcamentos} ${item.usadoEmOrcamentos === 1 ? 'orçamento' : 'orçamentos'}`
       : 'Ainda não usado em orçamentos';
-  const margemAtencao = item.margemPercentual < MARGEM_BAIXA;
+  // custo em branco: sem margem para mostrar (traço), e sem o destaque de margem baixa
+  const semCusto = item.precoCusto === null || item.margemPercentual === null;
+  const margemAtencao = !semCusto && item.margemPercentual! < MARGEM_BAIXA;
 
   return (
     <div
@@ -212,16 +214,33 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
           {apoio}
         </span>
       </span>
-      <span role="cell" className={cn(inativo && 'opacity-60')}>
-        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground/80">
+      <span role="cell" className={cn('min-w-0', inativo && 'opacity-60')}>
+        {/* nome longo ("Proteção e aterramento") não quebra a etiqueta em duas linhas */}
+        <span
+          title={ROTULO_CATEGORIA[item.categoria]}
+          className="inline-block max-w-full truncate rounded-full bg-muted px-2.5 py-1 align-middle text-xs font-medium text-foreground/80"
+        >
           {ROTULO_CATEGORIA[item.categoria]}
         </span>
       </span>
       <span role="cell" className={cn('text-sm text-foreground/80', inativo && 'opacity-60')}>
         {ROTULO_UNIDADE[item.unidade]}
       </span>
-      <span role="cell" className={cn('text-right font-mono text-sm text-foreground/80', inativo && 'opacity-60')}>
-        {formatarBRL(Number(item.precoCusto))}
+      <span
+        role="cell"
+        className={cn('text-right font-mono text-sm text-foreground/80', inativo && 'opacity-60')}
+        title={semCusto ? 'Sem custo cadastrado' : undefined}
+      >
+        {semCusto ? (
+          <>
+            <span aria-hidden className="text-muted-foreground">
+              —
+            </span>
+            <span className="sr-only">Sem custo cadastrado</span>
+          </>
+        ) : (
+          formatarBRL(Number(item.precoCusto))
+        )}
       </span>
       <span role="cell" className={cn('text-right font-mono text-sm font-medium', inativo && 'opacity-60')}>
         {formatarBRL(Number(item.precoVenda))}
@@ -229,10 +248,21 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
       <span
         role="cell"
         className={cn('text-right font-mono text-sm', margemAtencao ? 'text-destaque-texto' : 'text-foreground/80', inativo && 'opacity-60')}
-        title={`Lucro bruto de ${formatarBRL(item.lucroBruto)} por unidade`}
+        title={semCusto ? 'Sem custo cadastrado: não há margem para mostrar' : `Lucro bruto de ${formatarBRL(item.lucroBruto ?? 0)} por unidade`}
       >
-        {item.margemPercentual.toLocaleString('pt-BR')}%
-        <span className="sr-only">, lucro bruto de {formatarBRL(item.lucroBruto)} por unidade</span>
+        {semCusto ? (
+          <>
+            <span aria-hidden className="text-muted-foreground">
+              —
+            </span>
+            <span className="sr-only">Sem margem: custo não cadastrado</span>
+          </>
+        ) : (
+          <>
+            {item.margemPercentual!.toLocaleString('pt-BR')}%
+            <span className="sr-only">, lucro bruto de {formatarBRL(item.lucroBruto ?? 0)} por unidade</span>
+          </>
+        )}
       </span>
       <span role="cell" className="flex items-center">
         <Switch

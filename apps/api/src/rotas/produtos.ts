@@ -21,7 +21,12 @@ const produtoSchema = z.object({
     .max(30, 'Use até 30 caracteres')
     .nullish()
     .transform((v) => v || null),
-  precoCusto: z.number().nonnegative(),
+  // em branco (null ou ausente) = custo desconhecido; zero = custo zero de verdade
+  precoCusto: z
+    .number()
+    .nonnegative()
+    .nullish()
+    .transform((v) => v ?? null),
   precoVenda: z.number().positive(),
   // texto vazio vira null (sem descrição no PDF)
   descricaoTecnica: z
@@ -34,9 +39,10 @@ const produtoSchema = z.object({
 });
 
 // mesma conta do painel de edição (@guarusolar/compartilhado)
-const comMargem = <T extends { precoCusto: Prisma.Decimal; precoVenda: Prisma.Decimal }>(p: T) => ({
+const comMargem = <T extends { precoCusto: Prisma.Decimal | null; precoVenda: Prisma.Decimal }>(p: T) => ({
   ...p,
-  ...calcularMargem(Number(p.precoCusto), Number(p.precoVenda)),
+  // sem custo cadastrado, margem e lucro voltam null (a tela mostra "—", não 100%)
+  ...calcularMargem(p.precoCusto === null ? null : Number(p.precoCusto), Number(p.precoVenda)),
 });
 
 rotasProdutos.get(

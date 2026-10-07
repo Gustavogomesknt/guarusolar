@@ -144,21 +144,20 @@ packages/web/               o que os dois fronts usam no navegador
 
 ## Importar o catálogo de uma planilha
 
-Planilha `.xlsx` com as colunas COD, PRODUTO e VALOR (custo); UNIDADE é opcional. Em duas etapas,
-no banco do `.env` (desenvolvimento), para revisar antes de levar à produção:
+Planilha `.xlsx` com as colunas COD, PRODUTO e VALOR; UNIDADE é opcional. **O VALOR é o preço de
+venda** (confirmado pela Guarusolar): entra como está, sem margem, e o custo fica em branco. Em
+duas etapas, no banco do `.env` (desenvolvimento), para revisar antes de levar à produção:
 
 ```powershell
-npm run produtos:importar -- revisar materiais.xlsx --margem 30
-# ou por categoria:  --margem "PROTECAO=35,CABO=25,*=30"
+npm run produtos:importar -- revisar materiais.xlsx
 ```
 
 Gera `materiais-revisao.xlsx` (nada é gravado) com, por linha: categoria e unidade sugeridas por
-palavra-chave (listas de escolha), margem, preço de venda (fórmula: muda ao mexer na margem),
-IMPORTAR (S, N ou ?) e a situação. Linhas inválidas saem N; **nomes ou códigos repetidos na
-planilha saem "?"** para você decidir (para manter os dois, mude o nome de um); o que já está no
-catálogo sai N. Margem sobre a venda, como o catálogo calcula: venda = custo ÷ (1 − margem).
-Serviços (ART, instalação, indicação, mão de obra) entram sem margem: venda = custo. Revise no
-Excel e grave:
+palavra-chave (listas de escolha), o preço de venda, IMPORTAR (S, N ou ?) e a situação. Linhas
+inválidas saem N; **nomes ou códigos repetidos na planilha saem "?"** para você decidir (para
+manter os dois, mude o nome de um); o que já está no catálogo sai N. A linha "MARGEM ALEATORIA"
+sai "?": marque N (a margem agora é um campo do orçamento). Uma revisão gerada pelo formato
+antigo (com as colunas CUSTO e MARGEM %) é recusada: gere de novo. Revise no Excel e grave:
 
 ```powershell
 npm run produtos:importar -- gravar materiais-revisao.xlsx

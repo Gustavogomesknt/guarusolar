@@ -1,20 +1,21 @@
 /*
  * Importação do catálogo a partir de planilha (.xlsx), em DUAS etapas: nada é gravado sem revisão.
  *
- *   1. npm run produtos:importar -- revisar materiais.xlsx [--margem 30 | --margem "PROTECAO=35,CABO=25,*=30"]
- *      Lê COD, PRODUTO e VALOR (custo) e, se houver, UNIDADE. Gera materiais-revisao.xlsx com
- *      categoria e unidade inferidas por palavra-chave (listas de escolha no Excel), margem, preço de
- *      venda (fórmula, muda ao mexer na margem), a coluna IMPORTAR (S, N ou ?) e a SITUAÇÃO de cada
- *      linha. Linha inválida sai N; nome repetido na planilha sai "?" para você decidir; o que já
- *      está no catálogo sai N. Não grava nada.
- *   2. Revise no Excel: categoria, unidade, margem e IMPORTAR (troque todo "?" por S ou N; para
+ *   1. npm run produtos:importar -- revisar materiais.xlsx
+ *      Lê COD, PRODUTO e VALOR e, se houver, UNIDADE. Gera materiais-revisao.xlsx com categoria e
+ *      unidade inferidas por palavra-chave (listas de escolha no Excel), o preço de VENDA, a coluna
+ *      IMPORTAR (S, N ou ?) e a SITUAÇÃO de cada linha. Linha inválida sai N; nome repetido na
+ *      planilha sai "?" para você decidir; o que já está no catálogo sai N. Não grava nada.
+ *   2. Revise no Excel: categoria, unidade, venda e IMPORTAR (troque todo "?" por S ou N; para
  *      importar dois itens de mesmo nome, mude o nome de um deles).
  *   3. npm run produtos:importar -- gravar materiais-revisao.xlsx
  *      Confere tudo de novo (inclusive contra o catálogo), mostra o resumo e só grava depois de
  *      você digitar IMPORTAR. Grava tudo ou nada (uma transação).
  *
- * Margem = sobre a VENDA, como o catálogo calcula: venda = custo ÷ (1 − margem). Itens de serviço
- * (mão de obra, projeto/ART, indicação) entram SEM margem: venda = custo.
+ * O VALOR da planilha da Guarusolar é o PREÇO DE VENDA (confirmado pelo cliente), não o custo:
+ * entra como está, sem aplicar margem, e o CUSTO fica EM BRANCO (desconhecido; o catálogo mostra
+ * "—" na margem). O lucro da Guarusolar é a margem em reais de cada orçamento, não uma margem
+ * por item. Planilha de revisão do formato antigo (com MARGEM %) é recusada: gere de novo.
  * O banco é o da DATABASE_URL (o .env: desenvolvimento). O banco aparece antes de gravar.
  */
 import 'dotenv/config';
@@ -30,12 +31,12 @@ import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
 // é Cabo e "caixa de passagem" é Eletroduto e fixação). Nomes comparados sem acento, em maiúsculas.
 // ---------------------------------------------------------------------------------------------
 
-type Regra = { categoria: CategoriaProduto; padroes: RegExp[]; semMargem?: boolean };
+type Regra = { categoria: CategoriaProduto; padroes: RegExp[]; servico?: boolean };
 const REGRAS: Regra[] = [
-  { categoria: 'PROJETO', semMargem: true, padroes: [/\bART\b/, /\bTRT\b/, /DIAGRAMA/, /UNIFILAR/, /HOMOLOG/, /\bPROJETO\b/, /\bLAUDO\b/] },
-  { categoria: 'MAO_DE_OBRA', semMargem: true, padroes: [/INSTALACAO/, /MAO DE OBRA/, /\bVISITA\b/, /\bTECNICOS?\b/, /\bSERVICO\b/] },
-  // comissão de quem indicou o cliente: repasse, sem margem
-  { categoria: 'OUTROS', semMargem: true, padroes: [/INDICACAO/] },
+  { categoria: 'PROJETO', servico: true, padroes: [/\bART\b/, /\bTRT\b/, /DIAGRAMA/, /UNIFILAR/, /HOMOLOG/, /\bPROJETO\b/, /\bLAUDO\b/] },
+  { categoria: 'MAO_DE_OBRA', servico: true, padroes: [/INSTALACAO/, /MAO DE OBRA/, /\bVISITA\b/, /\bTECNICOS?\b/, /\bSERVICO\b/] },
+  // comissão de quem indicou o cliente: repasse, tratado como serviço
+  { categoria: 'OUTROS', servico: true, padroes: [/INDICACAO/] },
   { categoria: 'CARREGADOR', padroes: [/CARREGADOR/, /WALL ?BOX/, /\bEVSE\b/, /TOMADA VEICULAR/] },
   { categoria: 'INVERSOR', padroes: [/INVERSOR/, /\bMICRO ?INV/] },
   // "módulo" sozinho também é módulo de tomada: só com solar/fotovoltaico ou potência
@@ -65,7 +66,7 @@ const REGRAS: Regra[] = [
 
 /** Linhas que não parecem material nem serviço vendável: saem "?" para o usuário decidir. */
 const SUSPEITOS: [RegExp, string][] = [
-  [/\bMARGEM\b/, 'não parece um material (margem?)'],
+  [/\bMARGEM\b/, 'não é material: a margem agora é um campo do orçamento (marque N)'],
   [/SERRA COPO|\bBROCA\b|FERRAMENTA/, 'parece ferramenta da equipe, não item vendido'],
 ];
 
@@ -74,15 +75,15 @@ const normalizar = (s: string) =>
 /** Para achar repetidos: sem acento, pontuação nem espaços ("DISJ. IDR" = "DISJ IDR"). */
 const chaveDoNome = (s: string) => normalizar(s).replace(/[^A-Z0-9]/g, '');
 
-function inferirCategoria(nome: string): { categoria: CategoriaProduto; palavra: string; semMargem: boolean } {
+function inferirCategoria(nome: string): { categoria: CategoriaProduto; palavra: string; servico: boolean } {
   const n = normalizar(nome);
   for (const regra of REGRAS) {
     for (const padrao of regra.padroes) {
       const achou = n.match(padrao);
-      if (achou) return { categoria: regra.categoria, palavra: achou[0].trim(), semMargem: Boolean(regra.semMargem) };
+      if (achou) return { categoria: regra.categoria, palavra: achou[0].trim(), servico: Boolean(regra.servico) };
     }
   }
-  return { categoria: 'OUTROS', palavra: '', semMargem: false };
+  return { categoria: 'OUTROS', palavra: '', servico: false };
 }
 
 /** Unidade escrita na planilha (UN, PC, PÇ, M, MT, BARRA, BR, ROLO, RL, KIT, SERV...). */
@@ -96,37 +97,14 @@ function unidadeDoTexto(texto: string): Unidade | null {
   return mapa[t] ?? null;
 }
 
-function inferirUnidade(nome: string, categoria: CategoriaProduto, semMargem: boolean): Unidade {
+function inferirUnidade(nome: string, categoria: CategoriaProduto, servico: boolean): Unidade {
   const n = normalizar(nome);
-  if (semMargem || categoria === 'MAO_DE_OBRA' || categoria === 'PROJETO') return 'SERVICO';
+  if (servico || categoria === 'MAO_DE_OBRA' || categoria === 'PROJETO') return 'SERVICO';
   if (/\bKIT\b/.test(n)) return 'KIT';
   if (categoria === 'CABO') return 'M';
   if (/^(ELETRODUTO|ELETROD\b|ELETROCALHA|PERFILADO)/.test(n)) return 'BARRA';
   return 'UN';
 }
-
-// ---------------------------------------------------------------------------------------------
-// Margem: "30" (todas) ou "PROTECAO=35,CABO=25,*=30" (por categoria; * = as demais)
-// ---------------------------------------------------------------------------------------------
-
-function lerMargens(texto: string | undefined): (c: CategoriaProduto) => number | null {
-  if (!texto) return () => null;
-  const partes = texto.split(',').map((p) => p.trim()).filter(Boolean);
-  const porCategoria = new Map<string, number>();
-  let padrao: number | null = null;
-  for (const parte of partes) {
-    const [chave, valor] = parte.includes('=') ? parte.split('=') : ['*', parte];
-    const pct = Number(String(valor).replace(',', '.'));
-    if (!(pct >= 0 && pct < 100)) throw new Error(`Margem inválida: "${parte}" (use de 0 a 99).`);
-    const c = chave.trim().toUpperCase();
-    if (c === '*') padrao = pct;
-    else if ((CATEGORIAS_PRODUTO as readonly string[]).includes(c)) porCategoria.set(c, pct);
-    else throw new Error(`Categoria desconhecida na margem: "${chave}". Use: ${CATEGORIAS_PRODUTO.join(', ')} ou *.`);
-  }
-  return (c) => porCategoria.get(c) ?? padrao;
-}
-
-const vendaPelaMargem = (custo: number, margemPct: number) => Math.round((custo / (1 - margemPct / 100)) * 100) / 100;
 
 // ---------------------------------------------------------------------------------------------
 // Leitura de células
@@ -169,9 +147,9 @@ function acharColunas(folha: ExcelJS.Worksheet, nomes: Record<string, RegExp>) {
       const t = normalizar(textoDaCelula(celula.value));
       for (const [chave, padrao] of Object.entries(nomes)) if (!(chave in achadas) && padrao.test(t)) achadas[chave] = c;
     });
-    if (['codigo', 'nome', 'custo'].every((k) => k in achadas)) return { cabecalho: r, colunas: achadas };
+    if (['codigo', 'nome', 'venda'].every((k) => k in achadas)) return { cabecalho: r, colunas: achadas };
   }
-  throw new Error('Não achei o cabeçalho: a planilha precisa das colunas COD, PRODUTO e VALOR (custo).');
+  throw new Error('Não achei o cabeçalho: a planilha precisa das colunas COD, PRODUTO e VALOR (preço de venda).');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -182,25 +160,26 @@ type LinhaRevisao = {
   linha: number;
   codigo: string;
   nome: string;
-  custo: number;
+  /** o VALOR da planilha: preço de venda */
+  venda: number;
   categoria: CategoriaProduto;
   palavra: string;
   unidade: Unidade;
   origemUnidade: 'planilha' | 'inferida';
-  margem: number | null;
   importar: 'S' | 'N' | '?';
   situacao: string[];
 };
 
-const COLUNAS_REVISAO = ['LINHA', 'CÓDIGO', 'NOME', 'CUSTO', 'CATEGORIA', 'PALAVRA QUE DEFINIU', 'UNIDADE', 'UNIDADE VEIO DE', 'MARGEM %', 'VENDA', 'IMPORTAR', 'SITUAÇÃO'];
+const COLUNAS_REVISAO = ['LINHA', 'CÓDIGO', 'NOME', 'VENDA', 'CATEGORIA', 'PALAVRA QUE DEFINIU', 'UNIDADE', 'UNIDADE VEIO DE', 'IMPORTAR', 'SITUAÇÃO'];
+/** colunas que só a revisão do formato antigo tinha (valor tratado como custo, com margem) */
+const COLUNAS_ANTIGAS = ['CUSTO', 'MARGEM %'];
 
-async function revisar(arquivo: string, margemTexto: string | undefined, prisma: PrismaClient) {
-  const margemDe = lerMargens(margemTexto);
+async function revisar(arquivo: string, prisma: PrismaClient) {
   const folha = await lerPlanilha(arquivo);
   const { cabecalho, colunas } = acharColunas(folha, {
     codigo: /^COD/,
     nome: /^(PRODUTO|NOME|DESCRI|MATERIAL)/,
-    custo: /^(VALOR|CUSTO|PRECO)/,
+    venda: /^(VALOR|VENDA|PRECO)/,
     unidade: /^(UN|UND|UNID|UNIDADE)$/,
   });
 
@@ -209,11 +188,11 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
     const row = folha.getRow(r);
     const codigo = textoDaCelula(row.getCell(colunas.codigo).value).replace(/\.0+$/, '');
     const nome = textoDaCelula(row.getCell(colunas.nome).value);
-    const custoBruto = row.getCell(colunas.custo).value;
+    const vendaBruta = row.getCell(colunas.venda).value;
     const unidadeTexto = colunas.unidade ? textoDaCelula(row.getCell(colunas.unidade).value) : '';
-    if (!codigo && !nome && textoDaCelula(custoBruto) === '') continue; // linha em branco
-    const custo = numeroDaCelula(custoBruto);
-    const { categoria, palavra, semMargem } = inferirCategoria(nome);
+    if (!codigo && !nome && textoDaCelula(vendaBruta) === '') continue; // linha em branco
+    const venda = numeroDaCelula(vendaBruta);
+    const { categoria, palavra, servico } = inferirCategoria(nome);
     const daPlanilha = unidadeTexto ? unidadeDoTexto(unidadeTexto) : null;
     const situacao: string[] = [];
     let importar: LinhaRevisao['importar'] = 'S';
@@ -221,7 +200,7 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
     const invalida: string[] = [];
     if (!/[0-9A-Za-z]/.test(codigo)) invalida.push(`código "${codigo}"`);
     if (nome.length < 3 || /^(N\/?A|-+|\.+)$/i.test(nome)) invalida.push(`nome "${nome}"`);
-    if (!(custo > 0)) invalida.push(`custo "${textoDaCelula(custoBruto)}"`);
+    if (!(venda > 0)) invalida.push(`valor "${textoDaCelula(vendaBruta)}"`);
     if (invalida.length) {
       importar = 'N';
       situacao.push(`INVÁLIDA: ${invalida.join(', ')}`);
@@ -238,12 +217,11 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
       linha: r,
       codigo,
       nome,
-      custo,
+      venda,
       categoria,
       palavra,
-      unidade: daPlanilha ?? inferirUnidade(nome, categoria, semMargem),
+      unidade: daPlanilha ?? inferirUnidade(nome, categoria, servico),
       origemUnidade: daPlanilha ? 'planilha' : 'inferida',
-      margem: semMargem || categoria === 'MAO_DE_OBRA' || categoria === 'PROJETO' ? 0 : margemDe(categoria),
       importar,
       situacao,
     });
@@ -260,7 +238,7 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
       if (grupo.length < 2) continue;
       for (const l of grupo) {
         l.importar = '?';
-        const outras = grupo.filter((x) => x !== l).map((x) => `linha ${x.linha} (cód. ${x.codigo}, ${formatar(x.custo)})`);
+        const outras = grupo.filter((x) => x !== l).map((x) => `linha ${x.linha} (cód. ${x.codigo}, ${formatar(x.venda)})`);
         l.situacao.push(`${oQue} repetido: ${outras.join('; ')}. Decida S ou N; para manter os dois, mude um nome`);
       }
     }
@@ -285,7 +263,7 @@ async function revisar(arquivo: string, margemTexto: string | undefined, prisma:
 
   const destino = arquivo.replace(/\.xlsx$/i, '') + '-revisao.xlsx';
   await gravarRevisao(destino, linhas);
-  mostrarResumoDaRevisao(linhas, destino, Boolean(margemTexto));
+  mostrarResumoDaRevisao(linhas, destino);
 }
 
 const formatar = (v: number) => (Number.isFinite(v) ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—');
@@ -295,7 +273,7 @@ async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
   const folha = livro.addWorksheet('Revisão', { views: [{ state: 'frozen', ySplit: 1 }] });
   folha.addRow(COLUNAS_REVISAO);
   folha.getRow(1).font = { bold: true };
-  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 12, 10, 70].map((width) => ({ width }));
+  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 70].map((width) => ({ width }));
 
   // listas de escolha (códigos) e a legenda com o nome de cada um
   const listas = livro.addWorksheet('Listas');
@@ -311,13 +289,11 @@ async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
 
   linhas.forEach((l, i) => {
     const r = i + 2;
-    folha.addRow([l.linha, l.codigo, l.nome, Number.isFinite(l.custo) ? l.custo : null, l.categoria, l.palavra, l.unidade, l.origemUnidade, l.margem, null, l.importar, l.situacao.join(' | ')]);
+    folha.addRow([l.linha, l.codigo, l.nome, Number.isFinite(l.venda) ? l.venda : null, l.categoria, l.palavra, l.unidade, l.origemUnidade, l.importar, l.situacao.join(' | ')]);
     folha.getCell(`D${r}`).numFmt = '"R$" #,##0.00';
-    folha.getCell(`J${r}`).value = { formula: `IF(OR(D${r}="",I${r}=""),"",ROUND(D${r}/(1-I${r}/100),2))` };
-    folha.getCell(`J${r}`).numFmt = '"R$" #,##0.00';
     folha.getCell(`E${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: [`Listas!$A$2:$A$${CATEGORIAS_PRODUTO.length + 1}`] };
     folha.getCell(`G${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: [`Listas!$D$2:$D$${UNIDADES.length + 1}`] };
-    folha.getCell(`K${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: ['"S,N,?"'] };
+    folha.getCell(`I${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: ['"S,N,?"'] };
     if (l.importar !== 'S') {
       const cor = l.importar === '?' ? 'FFFFF2CC' : 'FFF4F6FA';
       folha.getRow(r).eachCell((celula) => (celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } }));
@@ -326,7 +302,7 @@ async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
   await livro.xlsx.writeFile(destino);
 }
 
-function mostrarResumoDaRevisao(linhas: LinhaRevisao[], destino: string, comMargem: boolean) {
+function mostrarResumoDaRevisao(linhas: LinhaRevisao[], destino: string) {
   const conta = (f: (l: LinhaRevisao) => boolean) => linhas.filter(f).length;
   console.log(`\n${linhas.length} linhas lidas: ${conta((l) => l.importar === 'S')} para importar, ${conta((l) => l.importar === '?')} para você decidir, ${conta((l) => l.importar === 'N')} fora.\n`);
   console.log('Por categoria (S e ?):');
@@ -337,9 +313,9 @@ function mostrarResumoDaRevisao(linhas: LinhaRevisao[], destino: string, comMarg
   const problemas = linhas.filter((l) => l.importar !== 'S' || l.situacao.length);
   if (problemas.length) {
     console.log('\nLinhas que pedem atenção:');
-    for (const l of problemas) console.log(`  [${l.importar}] linha ${l.linha} · cód. ${l.codigo || '—'} · ${l.nome || '—'} · ${formatar(l.custo)}\n        ${l.situacao.join('\n        ')}`);
+    for (const l of problemas) console.log(`  [${l.importar}] linha ${l.linha} · cód. ${l.codigo || '—'} · ${l.nome || '—'} · ${formatar(l.venda)}\n        ${l.situacao.join('\n        ')}`);
   }
-  if (!comMargem) console.log('\nSem --margem: a coluna MARGEM % ficou vazia nos itens com margem. Preencha na revisão ou rode de novo com --margem.');
+  console.log('\nO VALOR da planilha entra como PREÇO DE VENDA, sem margem; o custo fica em branco.');
   console.log(`\nRevisão gravada em: ${destino}\nNada foi gravado no banco. Revise e rode: npm run produtos:importar -- gravar "${destino}"`);
 }
 
@@ -358,9 +334,17 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     if (!achada) throw new Error(`Esta não parece a planilha de revisão: falta a coluna ${nome}.`);
     return achada;
   };
+  const titulos: string[] = [];
+  cab.eachCell((celula) => void titulos.push(textoDaCelula(celula.value)));
+  if (COLUNAS_ANTIGAS.some((n) => titulos.includes(n))) {
+    throw new Error(
+      'Esta revisão é do formato antigo, que tratava o valor da planilha como custo e aplicava margem. ' +
+        'Os valores são PREÇO DE VENDA: gere a revisão de novo com "revisar" (nada foi gravado).',
+    );
+  }
   const col = Object.fromEntries(COLUNAS_REVISAO.map((n) => [n, coluna(n)]));
 
-  type Item = { linha: number; codigo: string; nome: string; custo: number; categoria: CategoriaProduto; unidade: Unidade; margem: number; venda: number };
+  type Item = { linha: number; codigo: string; nome: string; categoria: CategoriaProduto; unidade: Unidade; venda: number };
   const itens: Item[] = [];
   const erros: string[] = [];
   let pulados = 0;
@@ -381,22 +365,20 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     }
     const codigo = textoDaCelula(v('CÓDIGO'));
     const nome = textoDaCelula(v('NOME'));
-    const custo = numeroDaCelula(v('CUSTO'));
+    const venda = numeroDaCelula(v('VENDA'));
     const categoria = textoDaCelula(v('CATEGORIA')).toUpperCase() as CategoriaProduto;
     const unidade = textoDaCelula(v('UNIDADE')).toUpperCase() as Unidade;
-    const margem = numeroDaCelula(v('MARGEM %'));
     const problemas: string[] = [];
     if (!/[0-9A-Za-z]/.test(codigo)) problemas.push('código inválido');
     if (nome.length < 3) problemas.push('nome inválido');
-    if (!(custo > 0)) problemas.push('custo inválido');
+    if (!(venda > 0)) problemas.push('preço de venda inválido');
     if (!(CATEGORIAS_PRODUTO as readonly string[]).includes(categoria)) problemas.push(`categoria "${categoria}" não existe`);
     if (!(UNIDADES as readonly string[]).includes(unidade)) problemas.push(`unidade "${unidade}" não existe`);
-    if (!(margem >= 0 && margem < 100)) problemas.push('MARGEM % vazia ou fora de 0 a 99');
     if (problemas.length) {
       erros.push(`${onde} (${nome || codigo}): ${problemas.join(', ')}`);
       continue;
     }
-    itens.push({ linha, codigo, nome, custo, categoria, unidade, margem, venda: vendaPelaMargem(custo, margem) });
+    itens.push({ linha, codigo, nome, categoria, unidade, venda });
   }
 
   // repetidos entre os que vão entrar, e contra o catálogo
@@ -432,10 +414,10 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
   console.log(`\nBanco: ${onde}\n${itens.length} itens para importar (${pulados} linhas marcadas N ficam de fora):`);
   for (const c of CATEGORIAS_PRODUTO) {
     const daCategoria = itens.filter((i) => i.categoria === c);
-    if (daCategoria.length) console.log(`  ${ROTULO_CATEGORIA[c].padEnd(24)} ${String(daCategoria.length).padStart(3)}   custo ${formatar(daCategoria.reduce((t, i) => t + i.custo, 0)).padStart(14)}   venda ${formatar(daCategoria.reduce((t, i) => t + i.venda, 0)).padStart(14)}`);
+    if (daCategoria.length) console.log(`  ${ROTULO_CATEGORIA[c].padEnd(24)} ${String(daCategoria.length).padStart(3)}   venda ${formatar(daCategoria.reduce((t, i) => t + i.venda, 0)).padStart(14)}`);
   }
   console.log('\nAmostra:');
-  for (const i of itens.slice(0, 5)) console.log(`  cód. ${i.codigo} · ${i.nome} · custo ${formatar(i.custo)} · margem ${i.margem}% · venda ${formatar(i.venda)} · ${ROTULO_UNIDADE[i.unidade]}`);
+  for (const i of itens.slice(0, 5)) console.log(`  cód. ${i.codigo} · ${i.nome} · venda ${formatar(i.venda)} · custo em branco · ${ROTULO_UNIDADE[i.unidade]}`);
 
   const pergunta = createInterface({ input: process.stdin, output: process.stdout });
   const resposta = await pergunta.question(`\nGravar ${itens.length} itens no banco de ${onde}? Digite IMPORTAR para confirmar: `);
@@ -447,7 +429,7 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
   await prisma.$transaction(
     itens.map((i) =>
       prisma.produto.create({
-        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: i.custo, precoVenda: i.venda },
+        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: null, precoVenda: i.venda },
       }),
     ),
   );
@@ -463,13 +445,16 @@ async function main() {
     return i >= 0 ? resto[i + 1] : undefined;
   };
   if (!['revisar', 'gravar'].includes(etapa) || !arquivo) {
-    console.log('Use:\n  npm run produtos:importar -- revisar planilha.xlsx [--margem 30]\n  npm run produtos:importar -- gravar planilha-revisao.xlsx');
+    console.log('Use:\n  npm run produtos:importar -- revisar planilha.xlsx\n  npm run produtos:importar -- gravar planilha-revisao.xlsx');
     process.exitCode = 1;
     return;
   }
   const prisma = new PrismaClient();
   try {
-    if (etapa === 'revisar') await revisar(path.resolve(arquivo), opcao('margem'), prisma);
+    if (opcao('margem') !== undefined || resto.includes('--margem')) {
+      throw new Error('A opção --margem não existe mais: o valor da planilha já é o preço de venda e entra sem margem.');
+    }
+    if (etapa === 'revisar') await revisar(path.resolve(arquivo), prisma);
     else await gravar(path.resolve(arquivo), prisma);
   } finally {
     await prisma.$disconnect();

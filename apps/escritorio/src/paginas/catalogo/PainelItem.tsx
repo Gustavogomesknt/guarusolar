@@ -56,7 +56,8 @@ const esquema = z.object({
   nome: z.string().trim().min(3, 'Informe o nome do item (pelo menos 3 letras)'),
   categoria: z.enum(CATEGORIAS_PRODUTO),
   unidade: z.enum(UNIDADES),
-  precoCusto: z.string().refine((v) => lerNumero(v || '0') >= 0, 'Informe o custo (use 0 se não houver)'),
+  // opcional: em branco = custo desconhecido; 0 = custo zero de verdade
+  precoCusto: z.string().refine((v) => v.trim() === '' || lerNumero(v) >= 0, 'Informe um valor válido ou deixe em branco'),
   precoVenda: z.string().refine((v) => lerNumero(v) > 0, 'Informe o preço de venda'),
   descricaoTecnica: z.string().max(1500, 'Use no máximo 1.500 caracteres'),
   codigoFornecedor: z.string().trim().max(30, 'Use até 30 caracteres'),
@@ -70,7 +71,7 @@ function valoresDoItem(item: Produto | null): DadosItem {
     // o catálogo da Guarusolar é quase todo elétrico e de carregador: "Outros" obriga a escolher
     categoria: item?.categoria ?? 'OUTROS',
     unidade: item?.unidade ?? 'UN',
-    precoCusto: item ? formatarDecimal(Number(item.precoCusto)) : '',
+    precoCusto: item && item.precoCusto !== null ? formatarDecimal(Number(item.precoCusto)) : '',
     precoVenda: item ? formatarDecimal(Number(item.precoVenda)) : '',
     descricaoTecnica: item?.descricaoTecnica ?? '',
     codigoFornecedor: item?.codigoFornecedor ?? '',
@@ -82,7 +83,7 @@ const paraApi = (d: DadosItem) => ({
   nome: d.nome.trim(),
   categoria: d.categoria,
   unidade: d.unidade,
-  precoCusto: lerNumero(d.precoCusto || '0'),
+  precoCusto: d.precoCusto.trim() === '' ? null : lerNumero(d.precoCusto),
   precoVenda: lerNumero(d.precoVenda),
   descricaoTecnica: d.descricaoTecnica.trim() || null,
   codigoFornecedor: d.codigoFornecedor.trim() || null,
@@ -122,9 +123,10 @@ export function PainelItem({
   }, [aberto, item, reset]);
 
   const [custoTexto, vendaTexto] = useWatch({ control, name: ['precoCusto', 'precoVenda'] });
-  const custo = lerNumero(custoTexto || '0');
+  const semCusto = (custoTexto ?? '').trim() === '';
+  const custo = semCusto ? null : lerNumero(custoTexto);
   const venda = lerNumero(vendaTexto);
-  const temPrecos = Number.isFinite(custo) && venda > 0;
+  const temPrecos = custo !== null && Number.isFinite(custo) && venda > 0;
   const margem = temPrecos ? calcularMargem(custo, venda) : null;
   const vendaAbaixoDoCusto = temPrecos && venda < custo;
 
@@ -226,7 +228,7 @@ export function PainelItem({
               <div className="grid grid-cols-2 gap-3">
                 <CampoDinheiro
                   id="item-custo"
-                  rotulo="Preço de custo"
+                  rotulo="Preço de custo (opcional)"
                   erro={errors.precoCusto?.message}
                   registro={register('precoCusto')}
                 />
@@ -251,9 +253,11 @@ export function PainelItem({
                 <div className="flex items-center justify-between gap-3">
                   <span>Margem bruta</span>
                   <span className="font-mono font-medium">
-                    {margem
-                      ? `${margem.margemPercentual.toLocaleString('pt-BR')}% · ${formatarBRL(margem.lucroBruto)} por unidade`
-                      : '—'}
+                    {margem && margem.margemPercentual !== null
+                      ? `${margem.margemPercentual.toLocaleString('pt-BR')}% · ${formatarBRL(margem.lucroBruto ?? 0)} por unidade`
+                      : semCusto
+                        ? 'Informe o custo para ver a margem'
+                        : '—'}
                   </span>
                 </div>
                 {vendaAbaixoDoCusto && (

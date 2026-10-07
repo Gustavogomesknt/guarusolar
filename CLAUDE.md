@@ -117,7 +117,8 @@ apps/api/                      API (Express + Prisma)
   scripts/importar-produtos.ts npm run produtos:importar -- revisar|gravar: catálogo a partir de
                                .xlsx em duas etapas (revisão em Excel, depois grava tudo ou nada).
                                Categoria e unidade por palavra-chave (REGRAS, a primeira que casa
-                               vence); serviços sem margem; repetidos ficam "?" para o usuário
+                               vence); repetidos ficam "?" para o usuário. O VALOR da planilha é PREÇO DE
+                               VENDA (confirmado): entra sem margem e o custo fica em branco
   src/rotas/orcamentoPdf.ts    GET /api/orcamentos/:id/pdf?token= — público, protegido pelo tokenPdf
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
                                validação e técnico)
@@ -495,6 +496,10 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)
   nem WebSocket (cai a cada publicação e sono da Render; o polling seria a reserva de qualquer jeito).
   Com mais de uma instância da API, a versão precisa ir para o banco.
+- **Custo do produto é opcional** (`Produto.precoCusto` pode ser null): em branco = custo
+  desconhecido, e a margem do item volta null (o catálogo mostra "—", nunca 100%); zero = custo
+  zero de verdade (100%). `calcularMargem` trata os dois casos. O catálogo real da Guarusolar só
+  tem preço de venda; o lucro é a margem em reais de cada orçamento (regra 1).
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.

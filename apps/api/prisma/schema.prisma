@@ -161,7 +161,8 @@ model Produto {
   nome             String
   categoria        CategoriaProduto
   unidade          Unidade          @default(UN)
-  precoCusto       Decimal          @db.Decimal(12, 2)
+  /// em branco = custo desconhecido (sem margem para mostrar); zero = custo zero de verdade
+  precoCusto       Decimal?         @db.Decimal(12, 2)
   precoVenda       Decimal          @db.Decimal(12, 2)
   descricaoTecnica String?
   /// código que a Guarusolar já usa (113, 320...): aparece na busca. ÚNICO entre os ATIVOS:

@@ -183,15 +183,17 @@ export type Produto = {
   nome: string;
   categoria: CategoriaProduto;
   unidade: Unidade;
-  precoCusto: string;
+  /** null = custo em branco (desconhecido) */
+  precoCusto: string | null;
   precoVenda: string;
   descricaoTecnica: string | null;
   /** código que a Guarusolar já usa (113, 320...) */
   codigoFornecedor: string | null;
   ativo: boolean;
   /** calculados pela API com calcularMargem */
-  margemPercentual: number;
-  lucroBruto: number;
+  /** null quando não há custo cadastrado */
+  margemPercentual: number | null;
+  lucroBruto: number | null;
   /** linhas de orçamento que usam o item */
   usadoEmOrcamentos: number;
 };
