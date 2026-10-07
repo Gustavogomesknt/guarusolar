@@ -6,6 +6,10 @@ import { CartaoCondicoes } from './CartaoCondicoes';
 import { ESTILO_SOMENTE_LEITURA } from './formulario';
 
 export type Totais = {
+  /** soma dos itens, sem a margem */
+  subtotalItens: number;
+  margem: number;
+  /** itens + margem */
   subtotal: number;
   descontoAplicado: number;
   valorTotal: number;

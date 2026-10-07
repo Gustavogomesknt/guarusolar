@@ -81,6 +81,8 @@ export function GeradorOrcamento({
   const confirmado = salvo !== null && !alterado;
   const totais: Totais = confirmado
     ? {
+        subtotalItens: Number(salvo.subtotal) - Number(salvo.margem ?? 0),
+        margem: Number(salvo.margem ?? 0),
         subtotal: Number(salvo.subtotal),
         descontoAplicado: Number(salvo.descontoAplicado),
         valorTotal: Number(salvo.valorTotal),
@@ -260,7 +262,7 @@ export function GeradorOrcamento({
           <fieldset disabled={somenteLeitura} className={`flex min-w-0 flex-col gap-5 ${ESTILO_SOMENTE_LEITURA}`}>
             <legend className="sr-only">Cliente e itens</legend>
             <CartaoCliente gravado={salvo} somenteLeitura={somenteLeitura} />
-            <CartaoItens subtotal={totais.subtotal} />
+            <CartaoItens subtotal={totais.subtotalItens} />
           </fieldset>
           <ResumoOrcamento
             totais={totais}

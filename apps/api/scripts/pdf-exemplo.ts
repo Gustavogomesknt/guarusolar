@@ -14,7 +14,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Prisma } from '@prisma/client';
-import { calcularOrcamento, formatarBRL } from '@guarusolar/compartilhado';
+import { calcularOrcamento, formatarBRL, MARGEM_PADRAO } from '@guarusolar/compartilhado';
 import { gerarPdfOrcamento, type OrcamentoParaPdf } from '../src/lib/pdf-orcamento';
 
 const D = (v: number) => new Prisma.Decimal(v);
@@ -51,6 +51,7 @@ function exemplo(opcoes: { detalhar: boolean; longo?: boolean; parcelas: number 
   // o mesmo cálculo que a API faz ao salvar
   const t = calcularOrcamento({
     itens: itens.map((i) => ({ quantidade: Number(i.quantidade), precoUnitario: Number(i.precoUnitario) })),
+    margem: MARGEM_PADRAO,
     descontoTipo: 'PERCENTUAL',
     descontoValor: 5,
     condicaoPagamento: 'ENTRADA_PARCELAS',
@@ -65,6 +66,7 @@ function exemplo(opcoes: { detalhar: boolean; longo?: boolean; parcelas: number 
     vendedorId: 'vendedor',
     status: 'ENVIADO',
     subtotal: D(t.subtotal),
+    margem: D(t.margem),
     descontoTipo: 'PERCENTUAL',
     descontoValor: D(5),
     descontoAplicado: D(t.descontoAplicado),
@@ -151,7 +153,7 @@ function mostrarContas(o: OrcamentoParaPdf) {
   const parcelas = o.parcelas ?? 1;
   console.log(`
 Contas de ${o.codigo} (${parcelas}x, taxa ${taxa}%):
-  Itens ${formatarBRL(n(o.subtotal))} - desconto ${formatarBRL(n(o.descontoAplicado))} = proposta ${formatarBRL(n(o.valorTotal))}
+  Itens + margem ${formatarBRL(n(o.subtotal))} (margem ${formatarBRL(n(o.margem))}) - desconto ${formatarBRL(n(o.descontoAplicado))} = proposta ${formatarBRL(n(o.valorTotal))}
   Entrada 30% (Pix/transferência, sem taxa): ${formatarBRL(entrada)}
   Saldo no cartão: ${formatarBRL(saldo)} / (1 - ${taxa / 100}) = ${formatarBRL(saldo / (1 - taxa / 100))} -> cobrado ${formatarBRL(cobrado)} (para cima)
   Parcelas: 1a ${formatarBRL(n(o.valorPrimeiraParcela))} + ${parcelas - 1} x ${formatarBRL(n(o.valorParcela))} = ${formatarBRL(n(o.valorPrimeiraParcela) + (parcelas - 1) * n(o.valorParcela))}

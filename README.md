@@ -62,6 +62,8 @@ packages/compartilhado/
   src/enums.ts              enums do banco, usados pelos fronts sem depender do Prisma
   src/calculo.ts            regra de totais, desconto e parcelamento (com a taxa do cartão)
   src/taxasCartao.ts        tabela de taxas do Mercado Pago: edite aqui quando renegociar
+  src/margemDoOrcamento.ts  margem padrão em reais de todo orçamento novo (MARGEM_PADRAO): edite aqui;
+                            entra antes do desconto e nunca aparece para o cliente (regra 1 do CLAUDE.md)
 packages/web/               o que os dois fronts usam no navegador
   src/api.ts                cliente HTTP com token e tratamento central de erro
   src/sessao.tsx            login, saída e sessão expirada

@@ -213,6 +213,8 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
   src/calculo.ts               totais, desconto e condições de pagamento; calcularCartao
   src/taxasCartao.ts           EDITÁVEL: tabela de taxas do Mercado Pago (débito, 1x a 18x) e a
                                data da última atualização
+  src/margemDoOrcamento.ts     EDITÁVEL: MARGEM_PADRAO (margem em reais de todo orçamento novo) e
+                               distribuirMargem (preços do PDF detalhado)
   src/dias.ts                  dias como texto AAAA-MM-DD (somar, nome do dia, semana...)
   src/datas.ts                 fuso da empresa: diaDeHoje, formatarData/Hora/DataHora, tempoDesde
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
@@ -261,6 +263,15 @@ O `.env` da API fica em `apps/api/.env`.
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
+   **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
+   percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo:
+   itens + margem = `subtotal` -> desconto geral -> desconto à vista -> total -> entrada e cartão.
+   A margem entra ANTES do desconto (decisão): o cliente não a vê, e "10% de desconto" tem de ser
+   10% do preço que ele vê; a tela avisa, sem bloquear, quando o desconto passa da margem.
+   **O cliente NUNCA vê a margem**: nem linha no PDF, nem no WhatsApp. Com "detalhar preços", o PDF
+   distribui a margem nos preços dos itens (`distribuirMargem`, centavos inteiros: a soma das
+   linhas fecha com o subtotal); os preços gravados nos itens não mudam. Fica GRAVADA em
+   `Orcamento.margem`; orçamento anterior ao campo tem zero e abre com zero (não com o padrão).
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
    gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
    não altera orçamento antigo. Na edição (PUT),
@@ -376,6 +387,10 @@ Próximos passos, nesta ordem:
 7. Comparativo **orçado × realizado** por projeto.
 
 (O executável do escritório saiu dos próximos passos: o sistema fica só na web. Ver "Quem usa".)
+
+Melhoria futura (pedida para quando a Guarusolar quiser mudar sozinha): **tela de configurações
+para o ADMIN**, com a margem padrão (hoje `MARGEM_PADRAO` em `margemDoOrcamento.ts`) e a tabela de
+taxas do cartão guardadas no banco, sem depender de publicação.
 
 ## Dívida técnica (resolver antes da produção)
 

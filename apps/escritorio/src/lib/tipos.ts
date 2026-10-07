@@ -159,6 +159,8 @@ export type OrcamentoCompleto = {
   valorTotalCliente: string | null;
   valorTaxaAbsorvida: string | null;
   subtotal: string;
+  /** margem em reais desta proposta; zero em orçamento anterior ao campo */
+  margem: string;
   descontoAplicado: string;
   valorTotal: string;
   /** gravado ao salvar; null só em orçamentos anteriores a essa gravação */

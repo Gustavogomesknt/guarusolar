@@ -1,4 +1,4 @@
-import { MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
+import { MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
@@ -30,6 +30,8 @@ export type ItemFormulario = {
 export type FormularioOrcamento = {
   cliente: Cliente | null;
   itens: ItemFormulario[];
+  /** margem de lucro em reais desta proposta (embutida no total; o cliente não vê) */
+  margem: string;
   descontoTipo: TipoDesconto;
   descontoValor: string;
   condicaoPagamento: CondicaoPagamento;
@@ -79,6 +81,8 @@ export function valoresIniciais(): FormularioOrcamento {
   return {
     cliente: null,
     itens: [],
+    // orçamento novo já começa com a margem padrão (compartilhado/margemDoOrcamento.ts)
+    margem: formatarDecimal(MARGEM_PADRAO),
     descontoTipo: 'PERCENTUAL',
     descontoValor: '0',
     condicaoPagamento: 'A_VISTA',
@@ -124,6 +128,7 @@ export function entradaDoCalculo(f: FormularioOrcamento): EntradaCalculo {
       quantidade: numeroOuZero(item.quantidade),
       precoUnitario: numeroOuZero(item.precoUnitario),
     })),
+    margem: Math.max(numeroOuZero(f.margem), 0),
     descontoTipo: f.descontoTipo,
     descontoValor: numeroOuZero(f.descontoValor),
     condicaoPagamento: f.condicaoPagamento,
@@ -167,6 +172,9 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
       problemas.push({ campo: `itens.${i}.precoUnitario`, mensagem: 'Informe um preço válido' });
     }
   });
+  if (f.margem.trim() !== '' && !(lerNumero(f.margem) >= 0)) {
+    problemas.push({ campo: 'margem', mensagem: 'Informe a margem em reais (use 0 para nenhuma)' });
+  }
   const desconto = problemaNoDesconto(f, subtotal);
   if (desconto) problemas.push({ campo: 'descontoValor', mensagem: desconto });
   if (f.condicaoPagamento === 'A_VISTA') {
@@ -189,6 +197,7 @@ export function paraApi(f: FormularioOrcamento) {
     clienteId: f.cliente!.id,
     // meio-dia UTC: a data continua a mesma em qualquer fuso do Brasil
     validade: `${f.validade}T12:00:00Z`,
+    margem: Math.max(numeroOuZero(f.margem), 0),
     descontoTipo: f.descontoTipo,
     descontoValor: numeroOuZero(f.descontoValor),
     condicaoPagamento: f.condicaoPagamento,
@@ -226,6 +235,7 @@ export type OrcamentoSalvo = {
   codigo: string;
   status: StatusOrcamento;
   subtotal: string;
+  margem?: string;
   descontoAplicado: string;
   valorTotal: string;
   resumoPagamento: string;
@@ -336,6 +346,8 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
       quantidade: formatarQuantidade(Number(item.quantidade)),
       precoUnitario: formatarDecimal(Number(item.precoUnitario)),
     })),
+    // a margem GRAVADA: orçamento anterior ao campo abre com zero, não com o padrão
+    margem: formatarDecimal(Number(o.margem ?? 0)),
     descontoTipo: o.descontoTipo,
     descontoValor:
       o.descontoTipo === 'VALOR' ? formatarDecimal(Number(o.descontoValor)) : numeroTexto(o.descontoValor, '0'),

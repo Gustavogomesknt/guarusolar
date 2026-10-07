@@ -217,7 +217,10 @@ model Orcamento {
   status     StatusOrcamento @default(RASCUNHO)
 
   // valores calculados no servidor a cada gravação (nunca confiar no front)
+  /// itens + margem (o subtotal que o cliente vê)
   subtotal         Decimal      @default(0) @db.Decimal(12, 2)
+  /// margem de lucro em reais desta proposta; embutida no total, nunca aparece para o cliente
+  margem           Decimal      @default(0) @db.Decimal(12, 2)
   descontoTipo     TipoDesconto @default(PERCENTUAL)
   descontoValor    Decimal      @default(0) @db.Decimal(12, 2) // % ou R$, conforme descontoTipo
   descontoAplicado Decimal      @default(0) @db.Decimal(12, 2) // sempre em R$

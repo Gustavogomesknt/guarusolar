@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import type { Content, ContentCanvas, TDocumentDefinitions } from 'pdfmake/interfaces';
 import type { Prisma } from '@prisma/client';
 import {
+  distribuirMargem,
   formatarBRL,
   formatarData,
   formatarQuantidade,
@@ -317,7 +318,14 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
   const itens = o.itens.slice().sort((a, b) => a.ordem - b.ordem);
   const quantidade = (item: (typeof itens)[number]) =>
     item.unidade === 'UN' || item.unidade === 'SERVICO' ? formatarQuantidade(numero(item.quantidade)) : `${formatarQuantidade(numero(item.quantidade))} ${ROTULO_UNIDADE[item.unidade]}`;
-  const linhasItens = itens.map((item) => [
+  // A margem NUNCA aparece como linha. Com os preços detalhados, ela é distribuída nos itens na
+  // proporção de cada um, para a soma das linhas fechar com o subtotal (itens + margem). Os
+  // preços gravados no orçamento não mudam: é só a apresentação ao cliente.
+  const subtotaisComMargem = distribuirMargem(
+    itens.map((item) => numero(item.subtotal)),
+    numero(o.margem),
+  );
+  const linhasItens = itens.map((item, i) => [
     {
       stack: [
         { text: item.descricao, bold: true, fontSize: 10 },
@@ -327,8 +335,12 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
     { text: quantidade(item), alignment: alinhar(1), fontSize: 10 },
     ...(detalhar
       ? [
-          { text: formatarBRL(numero(item.precoUnitario)), alignment: 'right', fontSize: 10 },
-          { text: formatarBRL(numero(item.subtotal)), alignment: 'right', fontSize: 10, bold: true },
+          {
+            text: formatarBRL(numero(o.margem) > 0 ? subtotaisComMargem[i] / (numero(item.quantidade) || 1) : numero(item.precoUnitario)),
+            alignment: 'right',
+            fontSize: 10,
+          },
+          { text: formatarBRL(subtotaisComMargem[i]), alignment: 'right', fontSize: 10, bold: true },
         ]
       : []),
   ]);

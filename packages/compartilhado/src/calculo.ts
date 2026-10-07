@@ -13,6 +13,8 @@ export type ItemCalculo = {
 
 export type EntradaCalculo = {
   itens: ItemCalculo[];
+  /** margem de lucro em reais da proposta (margemDoOrcamento.ts); soma aos itens antes dos descontos */
+  margem?: number | null;
   descontoTipo: TipoDesconto;
   descontoValor: number;
   condicaoPagamento: CondicaoPagamento;
@@ -50,6 +52,10 @@ export type PagamentoCartao = {
 };
 
 export type ResultadoCalculo = {
+  /** soma dos itens, sem a margem (só para a tela do vendedor) */
+  subtotalItens: number;
+  margem: number;
+  /** itens + margem: o subtotal que o cliente vê e a base dos descontos */
   subtotal: number;
   descontoAplicado: number;
   valorTotal: number;
@@ -98,16 +104,19 @@ export function calcularCartao(saldo: number, parcelas: number, debito: boolean,
  * Regra de negócio dos totais do orçamento.
  * Fica isolada aqui para ser usada pela API e testada sem banco.
  *
- * Ordem: subtotal dos itens -> desconto geral (% ou R$) ->
+ * Ordem: itens + margem = subtotal -> desconto geral (% ou R$) ->
  * desconto adicional à vista (quando a condição for A_VISTA).
+ * A margem entra ANTES dos descontos (o cliente não a vê: o desconto é sobre o preço que ele vê).
  */
 export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
-  const subtotal = cent(
+  const subtotalItens = cent(
     entrada.itens.reduce(
       (soma, item) => soma + Number(item.quantidade) * Number(item.precoUnitario),
       0,
     ),
   );
+  const margem = cent(Math.max(Number(entrada.margem || 0), 0));
+  const subtotal = cent(subtotalItens + margem);
 
   const descontoGeral =
     entrada.descontoTipo === 'PERCENTUAL'
@@ -157,7 +166,7 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
   }
 
   const valorTotalCliente = cartao ? cent(entradaValor + cartao.valorCobrado) : valorTotal;
-  return { subtotal, descontoAplicado, valorTotal, entrada: entradaValor, valorParcela, resumoPagamento, valorTotalCliente, cartao };
+  return { subtotalItens, margem, subtotal, descontoAplicado, valorTotal, entrada: entradaValor, valorParcela, resumoPagamento, valorTotalCliente, cartao };
 }
 
 export const formatarBRL = brl;

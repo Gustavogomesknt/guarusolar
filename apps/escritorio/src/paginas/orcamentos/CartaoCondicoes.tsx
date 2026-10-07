@@ -31,7 +31,7 @@ const CLASSE_SELECT =
   'h-10 w-full rounded-[10px] border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
 export function CartaoCondicoes({ totais }: { totais: Totais }) {
-  const { subtotal, descontoAplicado } = totais;
+  const { subtotalItens, margem, subtotal, descontoAplicado } = totais;
   const {
     control,
     register,
@@ -43,6 +43,8 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
     control,
     name: ['descontoTipo', 'descontoValor', 'condicaoPagamento'],
   });
+  // o desconto percentual incide também sobre a margem; aqui o vendedor vê quando ela acabou
+  const descontoPassaDaMargem = margem > 0 && descontoAplicado > margem + 0.005;
 
   // aviso ao vivo enquanto digita; o erro da API (se houver) aparece quando não há aviso
   const erroDesconto = problemaNoDesconto({ descontoTipo, descontoValor }, subtotal) ?? errors.descontoValor?.message;
@@ -54,8 +56,39 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
       </h2>
 
       <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">Itens</span>
+        <span className="font-mono">{formatarBRL(subtotalItens)}</span>
+      </div>
+
+      {/* Margem em reais desta proposta: soma aos itens antes dos descontos */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="margem" className="text-[13px] font-medium text-foreground/80">
+            Margem (R$)
+          </Label>
+          <Input
+            {...ariaDoCampo('margem', errors.margem?.message)}
+            {...register('margem', { onChange: () => clearErrors('margem') })}
+            aria-describedby={errors.margem ? 'margem-erro' : 'margem-ajuda'}
+            inputMode="decimal"
+            autoComplete="off"
+            className="h-11 w-[150px] rounded-[10px] text-right font-mono"
+          />
+        </div>
+        {errors.margem?.message ? (
+          <p id="margem-erro" className="text-[13px] text-destructive">
+            {errors.margem.message}
+          </p>
+        ) : (
+          <p id="margem-ajuda" className="text-xs text-muted-foreground">
+            Embutida no valor total. O cliente não vê a margem no PDF nem no WhatsApp.
+          </p>
+        )}
+      </div>
+
+      <div className="flex justify-between border-t pt-3 text-sm">
         <span className="text-muted-foreground">Subtotal</span>
-        <span className="font-mono">{formatarBRL(subtotal)}</span>
+        <span className="font-mono font-medium">{formatarBRL(subtotal)}</span>
       </div>
 
       {/* Desconto geral */}
@@ -101,6 +134,12 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
           <span className="text-muted-foreground">Desconto aplicado</span>
           <span className="font-mono text-destructive">− {formatarBRL(descontoAplicado)}</span>
         </div>
+        {descontoPassaDaMargem && (
+          <p role="status" className="rounded-[10px] border border-destaque bg-destaque-suave px-3 py-2 text-[13px] text-destaque-texto">
+            O desconto ({formatarBRL(descontoAplicado)}) é maior que a margem ({formatarBRL(margem)}): esta proposta sai
+            abaixo do preço dos itens.
+          </p>
+        )}
       </div>
 
       <div className="h-px bg-border" />
@@ -246,6 +285,12 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
               <span id="detalhar-precos-ajuda" className="text-xs font-normal text-muted-foreground">
                 Desmarcado, o cliente vê só os itens, as quantidades e o valor total.
               </span>
+              {field.value && margem > 0 && (
+                <span id="detalhar-precos-margem" className="text-xs font-normal text-destaque-texto">
+                  No PDF, o preço de cada item sai com a margem distribuída (para a soma fechar com o subtotal de{' '}
+                  {formatarBRL(subtotal)}). Por isso fica diferente do preço do catálogo: não é defeito.
+                </span>
+              )}
             </Label>
             <Switch
               id="detalhar-precos"

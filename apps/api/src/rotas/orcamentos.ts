@@ -48,6 +48,9 @@ const orcamentoSchema = z.object({
   // o vendedor pediu para trocar a cópia gravada do cliente pelos dados atuais do cadastro
   atualizarDadosCliente: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
+  // margem de lucro em reais da proposta. Ausente (tela da versão anterior, durante uma
+  // publicação): criar grava zero e editar mantém a que estava gravada
+  margem: z.number().nonnegative('A margem não pode ser negativa').max(9_999_999).optional(),
   // gerado pela tela ao abrir um orçamento novo: o mesmo "criar" repetido (resposta perdida numa
   // queda de internet) atualiza o orçamento já criado em vez de criar outro
   idCriacao: z.string().uuid().optional(),
@@ -303,6 +306,7 @@ rotasOrcamentos.post(
     const itens = await prepararItens(dados.itens);
     const totais = calcularOrcamento({
       itens: itens.map((i) => i._calculo),
+      margem: dados.margem ?? 0,
       descontoTipo: dados.descontoTipo,
       descontoValor: dados.descontoValor,
       condicaoPagamento: dados.condicaoPagamento,
@@ -334,6 +338,7 @@ rotasOrcamentos.post(
           descricaoServico: dados.descricaoServico || null,
           detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
           subtotal: totais.subtotal,
+          margem: totais.margem,
           descontoAplicado: totais.descontoAplicado,
           valorTotal: totais.valorTotal,
           ...pagamentoGravado(dados.condicaoPagamento, totais),
@@ -365,6 +370,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   const itens = await prepararItens(dados.itens, atual.itens);
   const totais = calcularOrcamento({
     itens: itens.map((i) => i._calculo),
+    margem: dados.margem ?? Number(atual.margem),
     descontoTipo: dados.descontoTipo,
     descontoValor: dados.descontoValor,
     condicaoPagamento: dados.condicaoPagamento,
@@ -395,6 +401,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         descricaoServico: dados.descricaoServico || null,
         detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
         subtotal: totais.subtotal,
+        margem: totais.margem,
         descontoAplicado: totais.descontoAplicado,
         valorTotal: totais.valorTotal,
         ...pagamentoGravado(dados.condicaoPagamento, totais),

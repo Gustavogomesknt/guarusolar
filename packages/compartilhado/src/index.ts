@@ -7,3 +7,4 @@ export * from './datas.js';
 export * from './dias.js';
 export * from './mascaras.js';
 export * from './margem.js';
+export * from './margemDoOrcamento.js';
