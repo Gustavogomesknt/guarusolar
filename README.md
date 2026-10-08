@@ -161,7 +161,8 @@ inválidas saem N. Regras combinadas com a Guarusolar: **de nomes repetidos fica
 margem agora é um campo do orçamento); ferramenta entra normalmente, com um lembrete. Código
 repetido entre itens diferentes sai "?" para você decidir; o que já está no catálogo sai N. Uma
 A coluna DESCRIÇÃO TÉCNICA é opcional: o texto vai para a descrição técnica do item, que
-**aparece no PDF do orçamento** (não use para recado interno que o cliente não deva ler). Uma
+**aparece no PDF do orçamento** (não use para recado interno que o cliente não deva ler). A
+coluna ATIVO também é opcional: N grava o item já desativado (fora da busca dos orçamentos). Uma
 revisão gerada pelo formato antigo (com as colunas CUSTO e MARGEM %) é recusada: gere de novo. Revise no Excel e grave:
 
 ```powershell

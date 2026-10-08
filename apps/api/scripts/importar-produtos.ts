@@ -183,6 +183,8 @@ type LinhaRevisao = {
 const COLUNAS_REVISAO = ['LINHA', 'CÓDIGO', 'NOME', 'VENDA', 'CATEGORIA', 'PALAVRA QUE DEFINIU', 'UNIDADE', 'UNIDADE VEIO DE', 'IMPORTAR', 'SITUAÇÃO'];
 /** opcional na revisão: texto que vai para a descrição técnica do item (aparece no PDF do orçamento) */
 const COLUNA_DESCRICAO = 'DESCRIÇÃO TÉCNICA';
+/** opcional na revisão: N grava o item já DESATIVADO (fica no catálogo, fora da busca dos orçamentos) */
+const COLUNA_ATIVO = 'ATIVO';
 /** colunas que só a revisão do formato antigo tinha (valor tratado como custo, com margem) */
 const COLUNAS_ANTIGAS = ['CUSTO', 'MARGEM %'];
 
@@ -305,9 +307,9 @@ const formatar = (v: number) => (Number.isFinite(v) ? v.toLocaleString('pt-BR', 
 async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
   const livro = new ExcelJS.Workbook();
   const folha = livro.addWorksheet('Revisão', { views: [{ state: 'frozen', ySplit: 1 }] });
-  folha.addRow([...COLUNAS_REVISAO, COLUNA_DESCRICAO]);
+  folha.addRow([...COLUNAS_REVISAO, COLUNA_DESCRICAO, COLUNA_ATIVO]);
   folha.getRow(1).font = { bold: true };
-  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 70, 50].map((width) => ({ width }));
+  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 70, 50, 8].map((width) => ({ width }));
 
   // listas de escolha (códigos) e a legenda com o nome de cada um
   const listas = livro.addWorksheet('Listas');
@@ -327,6 +329,8 @@ async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
     folha.getCell(`D${r}`).numFmt = '"R$" #,##0.00';
     folha.getCell(`E${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: [`Listas!$A$2:$A$${CATEGORIAS_PRODUTO.length + 1}`] };
     folha.getCell(`G${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: [`Listas!$D$2:$D$${UNIDADES.length + 1}`] };
+    folha.getCell(`L${r}`).value = 'S';
+    folha.getCell(`L${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"S,N"'] };
     folha.getCell(`I${r}`).dataValidation = { type: 'list', allowBlank: false, formulae: ['"S,N,?"'] };
     if (l.importar !== 'S') {
       const cor = l.importar === '?' ? 'FFFFF2CC' : 'FFF4F6FA';
@@ -378,8 +382,9 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
   }
   const col = Object.fromEntries(COLUNAS_REVISAO.map((n) => [n, coluna(n)]));
   const colDescricao = titulos.indexOf(COLUNA_DESCRICAO) + 1; // 0 = a revisão não tem a coluna
+  const colAtivo = titulos.indexOf(COLUNA_ATIVO) + 1;
 
-  type Item = { linha: number; codigo: string; nome: string; categoria: CategoriaProduto; unidade: Unidade; venda: number; descricaoTecnica: string | null };
+  type Item = { linha: number; codigo: string; nome: string; categoria: CategoriaProduto; unidade: Unidade; venda: number; descricaoTecnica: string | null; ativo: boolean };
   const itens: Item[] = [];
   const erros: string[] = [];
   let pulados = 0;
@@ -411,11 +416,13 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     if (!(UNIDADES as readonly string[]).includes(unidade)) problemas.push(`unidade "${unidade}" não existe`);
     const descricaoTecnica = colDescricao ? textoDaCelula(row.getCell(colDescricao).value).trim() || null : null;
     if (descricaoTecnica && descricaoTecnica.length > 1500) problemas.push('descrição técnica com mais de 1.500 caracteres');
+    const ativoTexto = colAtivo ? textoDaCelula(row.getCell(colAtivo).value).toUpperCase() : '';
+    if (!['', 'S', 'N'].includes(ativoTexto)) problemas.push(`ATIVO está "${ativoTexto}"; use S ou N`);
     if (problemas.length) {
       erros.push(`${onde} (${nome || codigo}): ${problemas.join(', ')}`);
       continue;
     }
-    itens.push({ linha, codigo, nome, categoria, unidade, venda, descricaoTecnica });
+    itens.push({ linha, codigo, nome, categoria, unidade, venda, descricaoTecnica, ativo: ativoTexto !== 'N' });
   }
 
   // repetidos entre os que vão entrar, e contra o catálogo
@@ -453,6 +460,8 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     const daCategoria = itens.filter((i) => i.categoria === c);
     if (daCategoria.length) console.log(`  ${ROTULO_CATEGORIA[c].padEnd(24)} ${String(daCategoria.length).padStart(3)}   venda ${formatar(daCategoria.reduce((t, i) => t + i.venda, 0)).padStart(14)}`);
   }
+  const desativados = itens.filter((i) => !i.ativo);
+  if (desativados.length) console.log(`\nEntram DESATIVADOS (fora da busca dos orçamentos): ${desativados.map((i) => `cód. ${i.codigo} ${i.nome}`).join('; ')}`);
   console.log('\nAmostra:');
   for (const i of itens.slice(0, 5)) console.log(`  cód. ${i.codigo} · ${i.nome} · venda ${formatar(i.venda)} · custo em branco · ${ROTULO_UNIDADE[i.unidade]}`);
 
@@ -466,7 +475,7 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
   await prisma.$transaction(
     itens.map((i) =>
       prisma.produto.create({
-        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: null, precoVenda: i.venda, descricaoTecnica: i.descricaoTecnica },
+        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: null, precoVenda: i.venda, descricaoTecnica: i.descricaoTecnica, ativo: i.ativo },
       }),
     ),
   );
