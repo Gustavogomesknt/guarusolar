@@ -181,6 +181,8 @@ type LinhaRevisao = {
 };
 
 const COLUNAS_REVISAO = ['LINHA', 'CÓDIGO', 'NOME', 'VENDA', 'CATEGORIA', 'PALAVRA QUE DEFINIU', 'UNIDADE', 'UNIDADE VEIO DE', 'IMPORTAR', 'SITUAÇÃO'];
+/** opcional na revisão: texto que vai para a descrição técnica do item (aparece no PDF do orçamento) */
+const COLUNA_DESCRICAO = 'DESCRIÇÃO TÉCNICA';
 /** colunas que só a revisão do formato antigo tinha (valor tratado como custo, com margem) */
 const COLUNAS_ANTIGAS = ['CUSTO', 'MARGEM %'];
 
@@ -303,9 +305,9 @@ const formatar = (v: number) => (Number.isFinite(v) ? v.toLocaleString('pt-BR', 
 async function gravarRevisao(destino: string, linhas: LinhaRevisao[]) {
   const livro = new ExcelJS.Workbook();
   const folha = livro.addWorksheet('Revisão', { views: [{ state: 'frozen', ySplit: 1 }] });
-  folha.addRow(COLUNAS_REVISAO);
+  folha.addRow([...COLUNAS_REVISAO, COLUNA_DESCRICAO]);
   folha.getRow(1).font = { bold: true };
-  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 70].map((width) => ({ width }));
+  folha.columns = [8, 10, 46, 12, 18, 18, 12, 14, 10, 70, 50].map((width) => ({ width }));
 
   // listas de escolha (códigos) e a legenda com o nome de cada um
   const listas = livro.addWorksheet('Listas');
@@ -375,8 +377,9 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     );
   }
   const col = Object.fromEntries(COLUNAS_REVISAO.map((n) => [n, coluna(n)]));
+  const colDescricao = titulos.indexOf(COLUNA_DESCRICAO) + 1; // 0 = a revisão não tem a coluna
 
-  type Item = { linha: number; codigo: string; nome: string; categoria: CategoriaProduto; unidade: Unidade; venda: number };
+  type Item = { linha: number; codigo: string; nome: string; categoria: CategoriaProduto; unidade: Unidade; venda: number; descricaoTecnica: string | null };
   const itens: Item[] = [];
   const erros: string[] = [];
   let pulados = 0;
@@ -406,11 +409,13 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
     if (!(venda > 0)) problemas.push('preço de venda inválido');
     if (!(CATEGORIAS_PRODUTO as readonly string[]).includes(categoria)) problemas.push(`categoria "${categoria}" não existe`);
     if (!(UNIDADES as readonly string[]).includes(unidade)) problemas.push(`unidade "${unidade}" não existe`);
+    const descricaoTecnica = colDescricao ? textoDaCelula(row.getCell(colDescricao).value).trim() || null : null;
+    if (descricaoTecnica && descricaoTecnica.length > 1500) problemas.push('descrição técnica com mais de 1.500 caracteres');
     if (problemas.length) {
       erros.push(`${onde} (${nome || codigo}): ${problemas.join(', ')}`);
       continue;
     }
-    itens.push({ linha, codigo, nome, categoria, unidade, venda });
+    itens.push({ linha, codigo, nome, categoria, unidade, venda, descricaoTecnica });
   }
 
   // repetidos entre os que vão entrar, e contra o catálogo
@@ -461,7 +466,7 @@ async function gravar(arquivo: string, prisma: PrismaClient) {
   await prisma.$transaction(
     itens.map((i) =>
       prisma.produto.create({
-        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: null, precoVenda: i.venda },
+        data: { nome: i.nome, codigoFornecedor: i.codigo, categoria: i.categoria, unidade: i.unidade, precoCusto: null, precoVenda: i.venda, descricaoTecnica: i.descricaoTecnica },
       }),
     ),
   );

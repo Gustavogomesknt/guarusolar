@@ -160,6 +160,8 @@ inválidas saem N. Regras combinadas com a Guarusolar: **de nomes repetidos fica
 (com o mesmo valor, o de menor código) e os outros saem N; a linha "MARGEM ALEATORIA" sai N (a
 margem agora é um campo do orçamento); ferramenta entra normalmente, com um lembrete. Código
 repetido entre itens diferentes sai "?" para você decidir; o que já está no catálogo sai N. Uma
+A coluna DESCRIÇÃO TÉCNICA é opcional: o texto vai para a descrição técnica do item, que
+**aparece no PDF do orçamento** (não use para recado interno que o cliente não deva ler). Uma
 revisão gerada pelo formato antigo (com as colunas CUSTO e MARGEM %) é recusada: gere de novo. Revise no Excel e grave:
 
 ```powershell
