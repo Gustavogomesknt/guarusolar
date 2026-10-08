@@ -156,10 +156,11 @@ npm run produtos:importar -- revisar materiais.xlsx
 
 Gera `materiais-revisao.xlsx` (nada é gravado) com, por linha: categoria e unidade sugeridas por
 palavra-chave (listas de escolha), o preço de venda, IMPORTAR (S, N ou ?) e a situação. Linhas
-inválidas saem N; **nomes ou códigos repetidos na planilha saem "?"** para você decidir (para
-manter os dois, mude o nome de um); o que já está no catálogo sai N. A linha "MARGEM ALEATORIA"
-sai "?": marque N (a margem agora é um campo do orçamento). Uma revisão gerada pelo formato
-antigo (com as colunas CUSTO e MARGEM %) é recusada: gere de novo. Revise no Excel e grave:
+inválidas saem N. Regras combinadas com a Guarusolar: **de nomes repetidos fica o de maior valor**
+(com o mesmo valor, o de menor código) e os outros saem N; a linha "MARGEM ALEATORIA" sai N (a
+margem agora é um campo do orçamento); ferramenta entra normalmente, com um lembrete. Código
+repetido entre itens diferentes sai "?" para você decidir; o que já está no catálogo sai N. Uma
+revisão gerada pelo formato antigo (com as colunas CUSTO e MARGEM %) é recusada: gere de novo. Revise no Excel e grave:
 
 ```powershell
 npm run produtos:importar -- gravar materiais-revisao.xlsx

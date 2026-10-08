@@ -4,8 +4,9 @@
  *   1. npm run produtos:importar -- revisar materiais.xlsx
  *      Lê COD, PRODUTO e VALOR e, se houver, UNIDADE. Gera materiais-revisao.xlsx com categoria e
  *      unidade inferidas por palavra-chave (listas de escolha no Excel), o preço de VENDA, a coluna
- *      IMPORTAR (S, N ou ?) e a SITUAÇÃO de cada linha. Linha inválida sai N; nome repetido na
- *      planilha sai "?" para você decidir; o que já está no catálogo sai N. Não grava nada.
+ *      IMPORTAR (S, N ou ?) e a SITUAÇÃO de cada linha. Linha inválida sai N; de nomes repetidos
+ *      fica o de maior valor (empate: menor código) e os outros saem N; código repetido entre
+ *      itens diferentes sai "?" para você decidir; o que já está no catálogo sai N. Não grava nada.
  *   2. Revise no Excel: categoria, unidade, venda e IMPORTAR (troque todo "?" por S ou N; para
  *      importar dois itens de mesmo nome, mude o nome de um deles).
  *   3. npm run produtos:importar -- gravar materiais-revisao.xlsx
@@ -64,10 +65,19 @@ const REGRAS: Regra[] = [
   { categoria: 'CONEXAO', padroes: [/\bPLUGU?E?\b/, /\bTOMADA\b/] },
 ];
 
-/** Linhas que não parecem material nem serviço vendável: saem "?" para o usuário decidir. */
-const SUSPEITOS: [RegExp, string][] = [
-  [/\bMARGEM\b/, 'não é material: a margem agora é um campo do orçamento (marque N)'],
-  [/SERRA COPO|\bBROCA\b|FERRAMENTA/, 'parece ferramenta da equipe, não item vendido'],
+/*
+ * Regras decididas com a Guarusolar (07/10/2026) para a revisão não parar em perguntas já
+ * respondidas:
+ * - NUNCA_IMPORTAR: sai N sozinha. A "MARGEM ALEATORIA" da planilha virou o campo de margem do
+ *   orçamento (compartilhado/margemDoOrcamento.ts); não é item do catálogo.
+ * - SO_OBSERVAR: importa normalmente (S), com um lembrete. Ferramenta entra em Outros; se for de
+ *   uso interno, o cliente desativa pela tela do catálogo depois.
+ * - Nome repetido na planilha: fica o de MAIOR valor; com o mesmo valor, o de MENOR código. Os
+ *   outros saem N (ver "Nome repetido DENTRO da planilha", na etapa revisar).
+ */
+const NUNCA_IMPORTAR: [RegExp, string][] = [[/\bMARGEM\b/, 'não é material: a margem agora é um campo do orçamento']];
+const SO_OBSERVAR: [RegExp, string][] = [
+  [/SERRA COPO|\bBROCA\b|FERRAMENTA/, 'parece ferramenta: entra no catálogo; se for de uso interno, desative pela tela depois'],
 ];
 
 const normalizar = (s: string) =>
@@ -205,11 +215,13 @@ async function revisar(arquivo: string, prisma: PrismaClient) {
       importar = 'N';
       situacao.push(`INVÁLIDA: ${invalida.join(', ')}`);
     }
-    const suspeito = SUSPEITOS.find(([padrao]) => padrao.test(normalizar(nome)));
-    if (suspeito && importar === 'S') {
-      importar = '?';
-      situacao.push(`CONFIRA: ${suspeito[1]}`);
+    const fora = NUNCA_IMPORTAR.find(([padrao]) => padrao.test(normalizar(nome)));
+    if (fora && importar === 'S') {
+      importar = 'N';
+      situacao.push(`FORA: ${fora[1]}`);
     }
+    const lembrete = SO_OBSERVAR.find(([padrao]) => padrao.test(normalizar(nome)));
+    if (lembrete && importar === 'S') situacao.push(`OBSERVE: ${lembrete[1]}`);
     if (unidadeTexto && !daPlanilha) situacao.push(`unidade "${unidadeTexto}" não reconhecida: escolha na lista`);
     if (!palavra) situacao.push('categoria não reconhecida: confira');
 
@@ -227,7 +239,28 @@ async function revisar(arquivo: string, prisma: PrismaClient) {
     });
   }
 
-  // Repetidos DENTRO da planilha: não escolho sozinho, ficam "?" para você decidir
+  // Nome repetido DENTRO da planilha (regra da Guarusolar): fica o de maior valor; com o mesmo
+  // valor, o de menor código. Os outros saem N, dizendo qual ficou.
+  const codigoComoNumero = (c: string) => (/^\d+$/.test(c) ? Number(c) : Number.MAX_SAFE_INTEGER);
+  const porNomeNaPlanilha = new Map<string, LinhaRevisao[]>();
+  for (const l of linhas.filter((x) => x.importar !== 'N')) {
+    const k = chaveDoNome(l.nome);
+    if (k) porNomeNaPlanilha.set(k, [...(porNomeNaPlanilha.get(k) ?? []), l]);
+  }
+  for (const grupo of porNomeNaPlanilha.values()) {
+    if (grupo.length < 2) continue;
+    const [fica, ...saem] = [...grupo].sort(
+      (a, b) => b.venda - a.venda || codigoComoNumero(a.codigo) - codigoComoNumero(b.codigo) || a.codigo.localeCompare(b.codigo),
+    );
+    const criterio = saem.every((x) => x.venda === fica.venda) ? 'mesmo valor: fica o menor código' : 'fica o de maior valor';
+    fica.situacao.push(`REPETIDO, FICOU ESTE (${criterio}); saiu: ${saem.map((x) => `cód. ${x.codigo} (${formatar(x.venda)})`).join(', ')}`);
+    for (const x of saem) {
+      x.importar = 'N';
+      x.situacao.push(`REPETIDO, SAIU (${criterio}): ficou o cód. ${fica.codigo} (${formatar(fica.venda)})`);
+    }
+  }
+
+  // Código repetido entre itens DIFERENTES: não escolho sozinho, fica "?" para você decidir
   const marcarRepetidos = (chave: (l: LinhaRevisao) => string, oQue: string) => {
     const grupos = new Map<string, LinhaRevisao[]>();
     for (const l of linhas.filter((x) => x.importar !== 'N')) {
@@ -243,7 +276,6 @@ async function revisar(arquivo: string, prisma: PrismaClient) {
       }
     }
   };
-  marcarRepetidos((l) => chaveDoNome(l.nome), 'NOME');
   marcarRepetidos((l) => l.codigo, 'CÓDIGO');
 
   // Já no catálogo (itens ativos): mesmo código ou mesmo nome

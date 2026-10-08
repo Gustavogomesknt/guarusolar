@@ -118,7 +118,9 @@ apps/api/                      API (Express + Prisma)
   scripts/importar-produtos.ts npm run produtos:importar -- revisar|gravar: catálogo a partir de
                                .xlsx em duas etapas (revisão em Excel, depois grava tudo ou nada).
                                Categoria e unidade por palavra-chave (REGRAS, a primeira que casa
-                               vence); repetidos ficam "?" para o usuário. O VALOR da planilha é PREÇO DE
+                               vence). Regras da Guarusolar: de nomes repetidos fica o de MAIOR valor (empate:
+                               menor código); "MARGEM" sai N; código repetido entre itens diferentes
+                               fica "?" para o usuário. O VALOR da planilha é PREÇO DE
                                VENDA (confirmado): entra sem margem e o custo fica em branco
   src/rotas/orcamentoPdf.ts    GET /api/orcamentos/:id/pdf?token= — público, protegido pelo tokenPdf
   src/rotas/                   auth, clientes, produtos, orcamentos, operacao (agenda,
