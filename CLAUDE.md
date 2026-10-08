@@ -436,6 +436,7 @@ npm run db:seed          # base (catálogo, equipes, checklist) + usuários de t
 npm run db:seed:base     # só a base (produção)
 npm run usuario -- listar  # usuários reais: criar | nova-senha | desativar | listar
 npm run db:marcar-producao # uma vez, no banco de produção
+npm run db:diagnostico   # de onde vem a DATABASE_URL (janela ou .env), formato e se conecta; sem mostrar segredo
 npm run dev:api          # API em http://localhost:3333
 npm run dev:escritorio   # front em http://localhost:5173 (repassa /api para a API)
 npm run dev:tecnico      # app do técnico em http://localhost:5174 (idem; sem service worker)
@@ -525,6 +526,13 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   desconhecido, e a margem do item volta null (o catálogo mostra "—", nunca 100%); zero = custo
   zero de verdade (100%). `calcularMargem` trata os dois casos. O catálogo real da Guarusolar só
   tem preço de venda; o lucro é a margem em reais de cada orçamento (regra 1).
+- **Qual banco um comando usa:** todos os scripts e a API fazem `import 'dotenv/config'` +
+  `new PrismaClient()` (lê `DATABASE_URL`); a variável definida na JANELA vence o `apps/api/.env`
+  (o dotenv não sobrescreve), também passando pelo npm workspaces. Só o `prisma migrate deploy`
+  usa a `DIRECT_URL`. Na mensagem "Authentication failed ... credentials for `X`", o `X` é o nome
+  que o SERVIDOR devolve, não prova de que outra string foi usada: é senha recusada. Em dúvida,
+  `npm run db:diagnostico` na mesma janela. No PowerShell, definir a string com aspas SIMPLES
+  (aspas duplas interpretam `$` e crase da senha).
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.

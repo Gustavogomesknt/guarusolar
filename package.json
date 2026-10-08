@@ -22,6 +22,7 @@
     "db:seed:base": "npm run db:seed:base -w @guarusolar/api --",
     "db:marcar-producao": "npm run db:marcar-producao -w @guarusolar/api --",
     "db:conferir-producao": "npm run db:conferir-producao -w @guarusolar/api --",
+    "db:diagnostico": "npm run db:diagnostico -w @guarusolar/api --",
     "usuario": "npm run usuario -w @guarusolar/api --",
     "db:limpar": "npm run db:limpar -w @guarusolar/api --",
     "db:studio": "npm run db:studio -w @guarusolar/api --",
