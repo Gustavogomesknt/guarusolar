@@ -21,10 +21,15 @@ import {
 import { diaDaApi, diasUteis, fimDoServico, nomeLongo, type Dia } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { CLASSE_SELECT } from './DialogAgendar';
+import { AvisosDeConflito, escalaPadrao, nomesDaEscala, QuemVai, SemTecnicoEscalado, useAvisosDeConflito, useTecnicos } from './escala';
 
-type Modo = 'ver' | 'remarcar' | 'cancelar';
+type Modo = 'ver' | 'remarcar' | 'escala' | 'cancelar';
+const EM_ABERTO = ['AGENDADO', 'EM_EXECUCAO', 'DEVOLVIDO'];
 
-/** Detalhes de um serviço agendado, com remarcar e cancelar (PATCH /api/agenda/:id). */
+/**
+ * Detalhes de um serviço agendado: quem vai (com "Trocar"), remarcar e cancelar
+ * (PATCH /api/agenda/:id). A escala só muda com o serviço em aberto.
+ */
 export function DialogServico({
   servico,
   equipes,
@@ -35,10 +40,12 @@ export function DialogServico({
   onFechar: () => void;
 }) {
   const clienteConsultas = useQueryClient();
+  const tecnicos = useTecnicos();
   const [modo, setModo] = useState<Modo>('ver');
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
   const [dias, setDias] = useState('1');
+  const [escala, setEscala] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,19 +54,39 @@ export function DialogServico({
     setEquipeId(servico.equipeId);
     setDia(diaDaApi(servico.dataInicio));
     setDias(String(diasUteis(diaDaApi(servico.dataInicio), diaDaApi(servico.dataFim))));
+    setEscala(servico.escala.map((e) => e.usuario.id));
     setErro(null);
   }, [servico]);
+
+  const quantidade = Math.max(1, Math.min(30, Math.trunc(Number(dias) || 1)));
+  const novoFim = dia ? fimDoServico(dia, quantidade) : '';
+  const mudouDeEquipe = servico !== null && equipeId !== servico.equipeId;
+  // Remarcando para outra equipe, a escala passa a ser a composição padrão dela (a API faz o mesmo)
+  const escalaDepois =
+    modo === 'remarcar' && mudouDeEquipe && tecnicos.data ? escalaPadrao(equipeId, tecnicos.data) : modo === 'escala' ? escala : (servico?.escala.map((e) => e.usuario.id) ?? []);
+  const avisos = useAvisosDeConflito({
+    equipeId,
+    inicio: modo === 'remarcar' ? dia : servico ? diaDaApi(servico.dataInicio) : '',
+    fim: modo === 'remarcar' ? novoFim : servico ? diaDaApi(servico.dataFim) : '',
+    tecnicos: escalaDepois,
+    ignorar: servico?.id,
+    ativo: servico !== null && (modo === 'remarcar' || modo === 'escala'),
+  });
 
   const alterar = useMutation({
     mutationFn: (corpo: Record<string, unknown>) => api.patch(`/api/agenda/${servico!.id}`, corpo),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: (_r, corpo) => {
+      const cliente = servico!.projeto.cliente.nome;
       toast.success(
         corpo.status === 'CANCELADO'
-          ? `Serviço de ${servico!.projeto.cliente.nome} cancelado. O projeto voltou para "A agendar".`
-          : `Serviço de ${servico!.projeto.cliente.nome} remarcado para ${nomeLongo(dia)}`,
+          ? `Serviço de ${cliente} cancelado. O projeto voltou para "A agendar".`
+          : corpo.tecnicos
+            ? `Escala de ${cliente} atualizada`
+            : `Serviço de ${cliente} remarcado para ${nomeLongo(dia)}`,
       );
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
+      void clienteConsultas.invalidateQueries({ queryKey: ['projetos'] });
       onFechar();
     },
     onError: (e) => setErro(e instanceof ErroApi ? e.message : 'Não foi possível alterar o serviço.'),
@@ -70,13 +97,13 @@ export function DialogServico({
   const inicio = diaDaApi(servico.dataInicio);
   const fim = diaDaApi(servico.dataFim);
   const equipe = equipes.find((e) => e.id === servico.equipeId);
-  const quantidade = Math.max(1, Math.min(30, Math.trunc(Number(dias) || 1)));
-  const novoFim = dia ? fimDoServico(dia, quantidade) : '';
   const cidade = [servico.projeto.cliente.cidade, servico.projeto.cliente.uf].filter(Boolean).join('/');
+  const emAberto = EM_ABERTO.includes(servico.status);
+  const equipeNova = equipes.find((e) => e.id === equipeId);
 
   return (
     <Dialog open onOpenChange={(a) => !a && !alterar.isPending && onFechar()}>
-      <DialogContent className="bg-card sm:max-w-lg">
+      <DialogContent className="max-h-[92svh] overflow-y-auto bg-card sm:max-w-lg">
         <DialogHeader>
           <span className={cn('self-start rounded-full border px-2.5 py-0.5 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
             {tipo.rotulo}
@@ -103,6 +130,17 @@ export function DialogServico({
             <dt className="text-xs text-muted-foreground">Quando</dt>
             <dd className="font-medium">{inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`}</dd>
           </div>
+          <div className="col-span-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Quem vai</dt>
+              <dd className="font-medium">{servico.escala.length > 0 ? nomesDaEscala(servico.escala) : <SemTecnicoEscalado className="text-sm" />}</dd>
+            </div>
+            {modo === 'ver' && emAberto && (
+              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 rounded-[10px] bg-card" onClick={() => setModo('escala')}>
+                Trocar
+              </Button>
+            )}
+          </div>
           <div className="col-span-2">
             <dt className="text-xs text-muted-foreground">Situação</dt>
             <dd className="mt-0.5">
@@ -110,6 +148,29 @@ export function DialogServico({
             </dd>
           </div>
         </dl>
+
+        {modo === 'escala' && (
+          <form
+            id="form-escala"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setErro(null);
+              alterar.mutate({ tecnicos: escala });
+            }}
+            className="flex flex-col gap-3"
+          >
+            {tecnicos.data ? (
+              <QuemVai equipeId={servico.equipeId} equipes={equipes} tecnicos={tecnicos.data} selecionados={escala} onChange={setEscala} />
+            ) : (
+              <p role="status" className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden /> Carregando os técnicos…
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Quem sair deixa de ver este serviço no app na hora; quem entrar passa a ver, com as fotos já enviadas.
+            </p>
+          </form>
+        )}
 
         {modo === 'remarcar' && (
           <form
@@ -121,7 +182,15 @@ export function DialogServico({
             }}
             className="flex flex-col gap-3"
           >
-            <Campo id="rm-equipe" rotulo="Equipe">
+            <Campo
+              id="rm-equipe"
+              rotulo="Equipe"
+              ajuda={
+                mudouDeEquipe && emAberto
+                  ? `A escala passa a ser a da ${equipeNova?.nome ?? 'equipe'}. Depois dá para trocar quem vai.`
+                  : undefined
+              }
+            >
               <select id="rm-equipe" value={equipeId} onChange={(e) => setEquipeId(e.target.value)} className={CLASSE_SELECT}>
                 {equipes.map((e) => (
                   <option key={e.id} value={e.id}>
@@ -140,6 +209,8 @@ export function DialogServico({
             </div>
           </form>
         )}
+
+        {(modo === 'remarcar' || modo === 'escala') && <AvisosDeConflito avisos={avisos.data} />}
 
         {modo === 'cancelar' && (
           <p className="rounded-[10px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
@@ -162,6 +233,17 @@ export function DialogServico({
               </Button>
               <Button className="h-11 rounded-[10px] font-semibold" onClick={() => setModo('remarcar')}>
                 Remarcar
+              </Button>
+            </>
+          )}
+          {modo === 'escala' && (
+            <>
+              <Button variant="outline" className="h-11 rounded-[10px]" onClick={() => setModo('ver')} disabled={alterar.isPending}>
+                Voltar
+              </Button>
+              <Button type="submit" form="form-escala" className="h-11 rounded-[10px] font-semibold" disabled={alterar.isPending || !tecnicos.data}>
+                {alterar.isPending && <Loader2 className="animate-spin" aria-hidden />}
+                Salvar quem vai
               </Button>
             </>
           )}

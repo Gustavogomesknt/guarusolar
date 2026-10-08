@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { fimDoServico, diaDeHoje, nomeLongo, type Dia } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
+import { AvisosDeConflito, escalaPadrao, QuemVai, useAvisosDeConflito, useTecnicos } from './escala';
 
 export const CLASSE_SELECT =
   'h-11 w-full rounded-[10px] border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
@@ -25,9 +26,11 @@ export const CLASSE_SELECT =
 export type PreAgendamento = { projetoId?: string; equipeId?: string; dia?: Dia };
 
 /**
- * Agendar um projeto aprovado. Aberto pela grade (dia livre clicado, já com equipe e data)
- * ou pelo botão "Novo agendamento" (tudo em branco). A duração não existe na API:
- * pergunta quantos dias, com 1 como padrão, e manda o último dia como dataFim.
+ * Agendar um projeto aprovado. Aberto pela grade (dia clicado, já com equipe e data) ou pelo
+ * botão "Novo agendamento" (tudo em branco). A duração não existe na API: pergunta quantos
+ * dias, com 1 como padrão, e manda o último dia como dataFim.
+ * "Quem vai" já vem com os técnicos da equipe (a composição padrão): agendar o caso normal não
+ * ganha clique nenhum. Conflito de equipe ou de pessoa AVISA e não bloqueia (regra 8).
  */
 export function DialogAgendar({
   aberto,
@@ -45,11 +48,13 @@ export function DialogAgendar({
   onAgendado: () => void;
 }) {
   const clienteConsultas = useQueryClient();
+  const tecnicos = useTecnicos();
   const [projetoId, setProjetoId] = useState('');
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
   const [tipo, setTipo] = useState<TipoServico>('INSTALACAO');
   const [dias, setDias] = useState('1');
+  const [escala, setEscala] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,13 +67,19 @@ export function DialogAgendar({
     setErro(null);
   }, [aberto, inicial, projetos, equipes]);
 
+  // a escala começa pela composição padrão da equipe escolhida (e recomeça ao trocar de equipe)
+  const todos = tecnicos.data;
+  useEffect(() => {
+    if (aberto && todos && equipeId) setEscala(escalaPadrao(equipeId, todos));
+  }, [aberto, equipeId, todos]);
+
   const quantidade = Math.max(1, Math.min(30, Math.trunc(Number(dias) || 1)));
   const fim = dia ? fimDoServico(dia, quantidade) : '';
   const projeto = projetos.find((p) => p.id === projetoId);
+  const avisos = useAvisosDeConflito({ equipeId, inicio: dia, fim, tecnicos: escala, ativo: aberto });
 
   const agendar = useMutation({
-    mutationFn: () =>
-      api.post('/api/agenda', { projetoId, equipeId, tipo, dataInicio: dia, dataFim: fim }),
+    mutationFn: () => api.post('/api/agenda', { projetoId, equipeId, tipo, dataInicio: dia, dataFim: fim, tecnicos: escala }),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: () => {
       const equipe = equipes.find((e) => e.id === equipeId)?.nome;
@@ -76,15 +87,15 @@ export function DialogAgendar({
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
       onAgendado();
     },
-    // conflito de equipe (409) e demais recusas ficam visíveis dentro do diálogo
     onError: (e) => setErro(e instanceof ErroApi ? e.message : 'Não foi possível agendar. Tente novamente.'),
   });
 
-  const podeEnviar = projetoId && equipeId && dia && !agendar.isPending;
+  // sem a lista de técnicos a escala iria vazia: espera carregar
+  const podeEnviar = projetoId && equipeId && dia && !agendar.isPending && todos !== undefined;
 
   return (
     <Dialog open={aberto} onOpenChange={(a) => !a && !agendar.isPending && onFechar()}>
-      <DialogContent className="bg-card sm:max-w-lg">
+      <DialogContent className="max-h-[92svh] overflow-y-auto bg-card sm:max-w-lg">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -151,6 +162,16 @@ export function DialogAgendar({
             </Campo>
           </div>
 
+          {todos ? (
+            <QuemVai equipeId={equipeId} equipes={equipes} tecnicos={todos} selecionados={escala} onChange={setEscala} />
+          ) : (
+            <p role="status" className="flex items-center gap-2 text-[13px] text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden /> Carregando os técnicos…
+            </p>
+          )}
+
+          <AvisosDeConflito avisos={avisos.data} />
+
           {erro && (
             <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {erro}
@@ -163,7 +184,7 @@ export function DialogAgendar({
             </Button>
             <Button type="submit" className="h-11 rounded-[10px] font-semibold" disabled={!podeEnviar}>
               {agendar.isPending && <Loader2 className="animate-spin" aria-hidden />}
-              Agendar
+              {avisos.data?.length ? 'Agendar assim mesmo' : 'Agendar'}
             </Button>
           </DialogFooter>
         </form>

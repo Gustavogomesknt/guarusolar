@@ -115,8 +115,9 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
   const cliente = dados.projeto.cliente;
   const cidade = [cliente.cidade, cliente.uf].filter(Boolean).join('/');
   const devolvido = dados.status === 'DEVOLVIDO';
-  // técnico: o responsável do agendamento; sem ele, quem enviou a última foto
-  const tecnico = dados.tecnicoResponsavel?.nome ?? dados.fotos.at(-1)?.enviadaPor.nome;
+  // quem foi escalado; quem enviou para validação (em serviço antigo, quem mandou a última foto)
+  const escalados = dados.escala.map((e) => e.usuario.nome).join(', ');
+  const enviadoPor = dados.enviadoPor?.nome ?? dados.fotos.at(-1)?.enviadaPor.nome;
 
   const paraRefazer = dados.fotos.filter((f) => marcas[f.id] === 'refazer');
   const conferidas = dados.fotos.filter((f) => marcas[f.id] === 'ok').length;
@@ -171,14 +172,17 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
 
       <dl className="grid grid-cols-2 gap-4 rounded-xl bg-[#F8FAFD] px-4 py-3.5 text-[13px] 2xl:grid-cols-4">
         <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">Técnico responsável</dt>
+          <dt className="text-muted-foreground">Quem foi</dt>
           <dd className="font-medium">
-            {tecnico ?? '—'} <span className="font-normal text-muted-foreground">· {dados.equipe.nome}</span>
+            {escalados || 'Sem técnico escalado'} <span className="font-normal text-muted-foreground">· {dados.equipe.nome}</span>
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">Enviado em</dt>
-          <dd className="font-medium">{dados.enviadoEm ? formatarDataHora(dados.enviadoEm) : '—'}</dd>
+          <dd className="font-medium">
+            {dados.enviadoEm ? formatarDataHora(dados.enviadoEm) : '—'}
+            {enviadoPor && <span className="font-normal text-muted-foreground"> · por {enviadoPor}</span>}
+          </dd>
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">Projeto e orçamento</dt>

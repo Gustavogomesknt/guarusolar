@@ -56,7 +56,7 @@ model Usuario {
   senhaTemporaria Boolean  @default(false)
   /// muda ao desativar, trocar papel/equipe ou gerar senha nova: o login antigo (token com
   /// outra versão) deixa de valer na hora (lib/auth.ts, conferirSessao)
-  sessaoVersao Int @default(0)
+  sessaoVersao    Int      @default(0)
   papel           Papel
   telefone        String?
   ativo           Boolean  @default(true)
@@ -69,6 +69,9 @@ model Usuario {
   historicos         HistoricoStatus[]
   servicosExecutados Agendamento[]     @relation("TecnicoResponsavel")
   servicosValidados  Agendamento[]     @relation("ValidadoPor")
+  servicosEnviados   Agendamento[]     @relation("EnviadoPor")
+  /// serviços em que este técnico está escalado: é o que ele vê no app (regra 6)
+  escalas            EscalaServico[]
   fotosEnviadas      FotoServico[]
   eventosProjeto     EventoProjeto[]
 
@@ -113,7 +116,7 @@ model Cliente {
   ativo       Boolean    @default(true)
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca String? @default(dbgenerated())
+  textoBusca  String?    @default(dbgenerated())
   criadoEm    DateTime   @default(now())
   editadoEm   DateTime   @updatedAt
 
@@ -172,7 +175,7 @@ model Produto {
   ativo            Boolean          @default(true)
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca String? @default(dbgenerated())
+  textoBusca       String?          @default(dbgenerated())
   criadoEm         DateTime         @default(now())
   editadoEm        DateTime         @updatedAt
 
@@ -285,7 +288,7 @@ model Orcamento {
   motivoRecusa        String?
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca String? @default(dbgenerated())
+  textoBusca          String?     @default(dbgenerated())
   criadoEm            DateTime    @default(now())
   editadoEm           DateTime    @updatedAt
 
@@ -361,7 +364,7 @@ model Projeto {
   motivoCancelamento String?
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca String? @default(dbgenerated())
+  textoBusca         String?       @default(dbgenerated())
   criadoEm           DateTime      @default(now())
   editadoEm          DateTime      @updatedAt
 
@@ -391,6 +394,22 @@ enum StatusAgendamento {
   CANCELADO
 }
 
+/// A ESCALA: quem vai de fato em cada serviço. Nasce como cópia dos técnicos ativos da equipe
+/// (a composição padrão) e o gestor troca por serviço; vale para o serviço inteiro, mesmo de
+/// vários dias. É a escala, e não a equipe do técnico, que dá acesso no app (regra 6).
+/// É cópia: mudar a equipe padrão de alguém no cadastro não mexe em serviço já agendado.
+model EscalaServico {
+  id            String      @id @default(uuid())
+  agendamentoId String
+  agendamento   Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  usuarioId     String
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+  criadoEm      DateTime    @default(now())
+
+  @@unique([agendamentoId, usuarioId])
+  @@index([usuarioId])
+}
+
 model Agendamento {
   id        String            @id @default(uuid())
   projetoId String
@@ -409,6 +428,8 @@ model Agendamento {
   observacoesTecnico String?
   sistemaTestado     Boolean   @default(false)
   enviadoEm          DateTime? // quando o técnico enviou para validação
+  enviadoPorId       String? // quem enviou (um dos escalados)
+  enviadoPor         Usuario?  @relation("EnviadoPor", fields: [enviadoPorId], references: [id])
   validadoPorId      String?
   validadoPor        Usuario?  @relation("ValidadoPor", fields: [validadoPorId], references: [id])
   validadoEm         DateTime?
@@ -420,6 +441,8 @@ model Agendamento {
   fotos     FotoServico[]
   materiais MaterialUtilizado[]
   eventos   EventoProjeto[]
+  /// quem vai de fato neste serviço
+  escala    EscalaServico[]
 
   @@index([equipeId, dataInicio])
   @@index([status])

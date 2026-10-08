@@ -25,11 +25,12 @@ rotasFotos.get(
   '/:id',
   rota(async (req, res) => {
     const { tamanho } = z.object({ tamanho: z.enum(['original', 'miniatura']).default('original') }).parse(req.query);
+    const usuario = req.usuario!;
     const foto = await prisma.fotoServico.findUnique({
       where: { id: req.params.id },
-      select: { arquivoChave: true, agendamento: { select: { equipeId: true, tecnicoResponsavelId: true } } },
+      // só a linha da escala de quem pede: basta para saber se está escalado no serviço da foto
+      select: { arquivoChave: true, agendamento: { select: { escala: { where: { usuarioId: usuario.id }, select: { usuarioId: true } } } } },
     });
-    const usuario = req.usuario!;
     if (!foto || (usuario.papel === 'TECNICO' && !tecnicoPodeVer(usuario, foto.agendamento))) {
       throw new ErroHttp(404, 'Foto não encontrada');
     }

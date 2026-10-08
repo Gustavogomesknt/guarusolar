@@ -137,7 +137,8 @@ rotasProjetos.get(
           orderBy: { criadoEm: 'asc' },
           include: {
             equipe: { select: { nome: true } },
-            tecnicoResponsavel: { select: { nome: true } },
+            escala: { select: { usuario: { select: { id: true, nome: true } } }, orderBy: { usuario: { nome: 'asc' } } },
+            enviadoPor: { select: { nome: true } },
             validadoPor: { select: { nome: true } },
             _count: { select: { fotos: true } },
             ...(podeVerFotos

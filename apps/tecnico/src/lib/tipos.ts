@@ -25,6 +25,9 @@ export type ServicoNaAgenda = {
   dataFim: string;
   motivoDevolucao: string | null;
   projeto: { codigo: string; cliente: ClienteDoServico };
+  /** a linha da agenda e quem está escalado neste serviço (é a escala que dá acesso) */
+  equipe?: { nome: string };
+  escala?: { usuario: { id: string; nome: string } }[];
 };
 
 export type RevisaoFoto = 'PENDENTE' | 'OK' | 'REFAZER';

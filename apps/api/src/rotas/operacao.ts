@@ -35,32 +35,106 @@ const idEquipe = z.string().trim().min(1, 'Escolha a equipe');
 /** 2026-09-29 -> 29/09 (datas do agendamento são só dia, sem hora). */
 const diaMes = (d: Date) => d.toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/');
 
+const EM_ABERTO: StatusAgendamento[] = ['AGENDADO', 'EM_EXECUCAO', 'DEVOLVIDO'];
+const ESCALA = { escala: { select: { usuario: { select: { id: true, nome: true } } }, orderBy: { usuario: { nome: 'asc' } } } } as const;
+
+type Tecnico = { id: string; nome: string };
+
+/** "Willian", "Willian e Washington", "A, B e C"; lista vazia = ninguém. */
+const nomesDe = (tecnicos: Tecnico[]) => {
+  const nomes = tecnicos.map((t) => t.nome);
+  if (nomes.length === 0) return 'ninguém escalado';
+  return nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`;
+};
+
+/** A composição padrão: os técnicos ativos da equipe. É a escala de um serviço novo. */
+const tecnicosDaEquipe = (equipeId: string): Promise<Tecnico[]> =>
+  prisma.usuario.findMany({ where: { equipeId, papel: 'TECNICO', ativo: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } });
+
+/** Os técnicos que o gestor escolheu: só entram técnicos ativos. */
+async function tecnicosEscolhidos(ids: string[]): Promise<Tecnico[]> {
+  const unicos = [...new Set(ids)];
+  const tecnicos = await prisma.usuario.findMany({
+    where: { id: { in: unicos }, papel: 'TECNICO', ativo: true },
+    select: { id: true, nome: true },
+    orderBy: { nome: 'asc' },
+  });
+  if (tecnicos.length !== unicos.length) throw new ErroHttp(400, 'Só técnicos ativos podem ser escalados. Recarregue a tela e escolha de novo.');
+  return tecnicos;
+}
+
+export type AvisoDeConflito = { quem: 'EQUIPE' | 'TECNICO'; nome: string; texto: string };
+
 /**
- * A mesma equipe não pode ter dois serviços no mesmo período (regra 8 do CLAUDE.md).
- * `ignorarId` deixa de fora o próprio agendamento ao remarcar.
+ * Regra 8 do CLAUDE.md: conflito AVISA, não bloqueia (decisão da Guarusolar). A agenda trabalha
+ * com dias inteiros e uma visita técnica dura cerca de uma hora: a mesma dupla faz duas ou três
+ * no mesmo dia. O aviso diz onde a equipe e cada pessoa já estão (projeto e cliente), para o
+ * gestor decidir informado. Serviços cancelados não contam. `ignorarId`: o próprio serviço.
  */
-async function conferirConflito(equipeId: string, inicio: Date, fim: Date, ignorarId?: string) {
-  const conflito = await prisma.agendamento.findFirst({
+async function avisosDeConflito(opcoes: { equipeId: string; tecnicos: string[]; inicio: Date; fim: Date; ignorarId?: string }): Promise<AvisoDeConflito[]> {
+  const { equipeId, tecnicos, inicio, fim, ignorarId } = opcoes;
+  const outros = await prisma.agendamento.findMany({
     where: {
-      equipeId,
-      status: { notIn: ['CANCELADO'] },
+      status: { not: 'CANCELADO' },
       dataInicio: { lte: fim },
       dataFim: { gte: inicio },
       ...(ignorarId ? { id: { not: ignorarId } } : {}),
+      OR: [{ equipeId }, ...(tecnicos.length ? [{ escala: { some: { usuarioId: { in: tecnicos } } } }] : [])],
     },
-    include: { equipe: { select: { nome: true } }, projeto: { include: { cliente: { select: { nome: true } } } } },
+    orderBy: { dataInicio: 'asc' },
+    include: { equipe: { select: { nome: true } }, projeto: { select: { codigo: true, cliente: { select: { nome: true } } } }, ...ESCALA },
   });
-  if (conflito) {
-    const periodo =
-      conflito.dataInicio.getTime() === conflito.dataFim.getTime()
-        ? `em ${diaMes(conflito.dataInicio)}`
-        : `de ${diaMes(conflito.dataInicio)} a ${diaMes(conflito.dataFim)}`;
-    throw new ErroHttp(
-      409,
-      `A ${conflito.equipe.nome} já tem serviço ${periodo} (${conflito.projeto.cliente.nome}). Escolha outro dia ou outra equipe.`,
-    );
-  }
+  const onde = (o: (typeof outros)[number]) =>
+    `${o.projeto.codigo} (${o.projeto.cliente.nome}), ${o.dataInicio.getTime() === o.dataFim.getTime() ? `em ${diaMes(o.dataInicio)}` : `de ${diaMes(o.dataInicio)} a ${diaMes(o.dataFim)}`}`;
+  // um aviso por serviço: a equipe (se for a mesma linha da agenda) e quem dos escolhidos já está lá
+  return outros.map((o) => {
+    const mesmaEquipe = o.equipeId === equipeId;
+    const pessoas = o.escala.filter((e) => tecnicos.includes(e.usuario.id)).map((e) => e.usuario);
+    const texto = mesmaEquipe
+      ? `A ${o.equipe.nome} já tem ${onde(o)}${pessoas.length ? `, com ${nomesDe(pessoas)}` : ''}.`
+      : `${nomesDe(pessoas)} já ${pessoas.length > 1 ? 'estão' : 'está'} em ${onde(o)}, com a ${o.equipe.nome}.`;
+    return { quem: mesmaEquipe ? ('EQUIPE' as const) : ('TECNICO' as const), nome: mesmaEquipe ? o.equipe.nome : nomesDe(pessoas), texto };
+  });
 }
+
+/** Avisos de conflito para a janela de agendar/remarcar, enquanto o gestor escolhe. */
+rotasAgenda.get(
+  '/conflitos',
+  rota(async (req, res) => {
+    const consulta = z
+      .object({
+        equipeId: idEquipe,
+        inicio: z.coerce.date(),
+        fim: z.coerce.date(),
+        tecnicos: z.string().optional(),
+        ignorar: z.string().uuid().optional(),
+      })
+      .parse(req.query);
+    res.json(
+      await avisosDeConflito({
+        equipeId: consulta.equipeId,
+        tecnicos: (consulta.tecnicos ?? '').split(',').filter(Boolean),
+        inicio: consulta.inicio,
+        fim: consulta.fim,
+        ignorarId: consulta.ignorar,
+      }),
+    );
+  }),
+);
+
+/** Todos os técnicos ativos, com a equipe padrão de cada um: quem pode ser escalado. */
+rotasAgenda.get(
+  '/tecnicos',
+  rota(async (_req, res) => {
+    res.json(
+      await prisma.usuario.findMany({
+        where: { papel: 'TECNICO', ativo: true },
+        select: { id: true, nome: true, equipeId: true },
+        orderBy: { nome: 'asc' },
+      }),
+    );
+  }),
+);
 
 rotasAgenda.get(
   '/',
@@ -84,7 +158,7 @@ rotasAgenda.get(
                 orcamento: { select: { id: true, codigo: true } },
               },
             },
-            tecnicoResponsavel: { select: { id: true, nome: true } },
+            ...ESCALA,
           },
         },
       },
@@ -120,8 +194,8 @@ rotasAgenda.post(
         tipo: z.enum(['INSTALACAO', 'VISITA_TECNICA', 'MANUTENCAO', 'VISTORIA_CONCESSIONARIA']),
         dataInicio: z.coerce.date(),
         dataFim: z.coerce.date(),
-        tecnicoResponsavelId: z.string().uuid().optional(),
-        observacoes: z.string().optional(),
+        // quem vai; ausente = os técnicos ativos da equipe (a composição padrão)
+        tecnicos: z.array(z.string().uuid()).max(20).optional(),
       })
       .refine((d) => d.dataFim >= d.dataInicio, {
         message: 'A data final não pode ser antes da inicial',
@@ -137,23 +211,28 @@ rotasAgenda.post(
     const equipe = await prisma.equipe.findFirst({ where: { id: dados.equipeId, ativa: true } });
     if (!equipe) throw new ErroHttp(404, 'Equipe não encontrada');
 
-    await conferirConflito(dados.equipeId, dados.dataInicio, dados.dataFim);
+    const { tecnicos: escolhidos, ...campos } = dados;
+    const escala = escolhidos ? await tecnicosEscolhidos(escolhidos) : await tecnicosDaEquipe(dados.equipeId);
+    // conflito não bloqueia (regra 8): volta como aviso junto com o serviço criado
+    const avisos = await avisosDeConflito({ equipeId: dados.equipeId, tecnicos: escala.map((t) => t.id), inicio: dados.dataInicio, fim: dados.dataFim });
 
     const agendamento = await prisma.$transaction(async (tx) => {
-      const criado = await tx.agendamento.create({ data: dados });
+      const criado = await tx.agendamento.create({
+        data: { ...campos, escala: { create: escala.map((t) => ({ usuarioId: t.id })) } },
+      });
       await tx.projeto.update({ where: { id: dados.projetoId }, data: { status: 'AGENDADO' } });
       await registrarEvento(tx, {
         projetoId: dados.projetoId,
         agendamentoId: criado.id,
         tipo: 'SERVICO_AGENDADO',
-        descricao: `${rotuloDoServico(dados.tipo)} agendada para ${periodoDoServico(dados.dataInicio, dados.dataFim)} · ${equipe.nome}`,
+        descricao: `${rotuloDoServico(dados.tipo)} agendada para ${periodoDoServico(dados.dataInicio, dados.dataFim)} com a ${equipe.nome}: ${nomesDe(escala)}`,
         usuarioId: req.usuario!.id,
       });
       return criado;
     });
 
     operacaoMudou();
-    res.status(201).json(agendamento);
+    res.status(201).json({ ...agendamento, avisos });
   }),
 );
 
@@ -165,12 +244,13 @@ rotasAgenda.patch(
         equipeId: idEquipe.optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
-        tecnicoResponsavelId: z.string().uuid().nullable().optional(),
+        // troca a escala (quem vai); só com o serviço em aberto
+        tecnicos: z.array(z.string().uuid()).max(20).optional(),
         status: z.enum(['AGENDADO', 'EM_EXECUCAO', 'CANCELADO']).optional(),
       })
       .parse(req.body);
 
-    const atual = await prisma.agendamento.findUnique({ where: { id: req.params.id } });
+    const atual = await prisma.agendamento.findUnique({ where: { id: req.params.id }, include: ESCALA });
     if (!atual) throw new ErroHttp(404, 'Serviço não encontrado');
     if (atual.status === 'CANCELADO') throw new ErroHttp(409, 'Este serviço já foi cancelado.');
 
@@ -179,12 +259,31 @@ rotasAgenda.patch(
     const inicio = dados.dataInicio ?? atual.dataInicio;
     const fim = dados.dataFim ?? atual.dataFim;
     if (fim < inicio) throw new ErroHttp(400, 'A data final não pode ser antes da inicial');
-    if (dados.status !== 'CANCELADO' && (dados.equipeId || dados.dataInicio || dados.dataFim)) {
-      await conferirConflito(equipeId, inicio, fim, atual.id);
+    // Escala nova: a que o gestor escolheu; ou, mudando de equipe sem dizer quem vai, a
+    // composição padrão da equipe nova. Senão a escala fica como está.
+    const { tecnicos: escolhidos, ...campos } = dados;
+    const escalaAntes = atual.escala.map((e) => e.usuario);
+    let escala: Tecnico[] | null = null;
+    if (dados.status !== 'CANCELADO') {
+      if (escolhidos) escala = await tecnicosEscolhidos(escolhidos);
+      // (serviço já enviado ou concluído muda de linha na agenda, mas a escala fica: é o registro de quem foi)
+      else if (dados.equipeId && dados.equipeId !== atual.equipeId && EM_ABERTO.includes(atual.status)) escala = await tecnicosDaEquipe(dados.equipeId);
     }
+    const saiu = escala ? escalaAntes.filter((a) => !escala!.some((t) => t.id === a.id)) : [];
+    const entrou = escala ? escala.filter((t) => !escalaAntes.some((a) => a.id === t.id)) : [];
+    if ((saiu.length || entrou.length) && !EM_ABERTO.includes(atual.status)) {
+      throw new ErroHttp(409, 'A escala só pode mudar com o serviço em aberto (agendado, em execução ou devolvido).');
+    }
+    // conflito não bloqueia (regra 8): volta como aviso
+    const avisos =
+      dados.status === 'CANCELADO'
+        ? []
+        : await avisosDeConflito({ equipeId, tecnicos: (escala ?? escalaAntes).map((t) => t.id), inicio, fim, ignorarId: atual.id });
 
     const atualizado = await prisma.$transaction(async (tx) => {
-      const ag = await tx.agendamento.update({ where: { id: atual.id }, data: dados, include: { equipe: { select: { nome: true } }, tecnicoResponsavel: { select: { nome: true } } } });
+      if (saiu.length) await tx.escalaServico.deleteMany({ where: { agendamentoId: atual.id, usuarioId: { in: saiu.map((t) => t.id) } } });
+      if (entrou.length) await tx.escalaServico.createMany({ data: entrou.map((t) => ({ agendamentoId: atual.id, usuarioId: t.id })) });
+      const ag = await tx.agendamento.update({ where: { id: atual.id }, data: campos, include: { equipe: { select: { nome: true } }, ...ESCALA } });
       // cancelado: o projeto volta para "A agendar" para ganhar outra data
       if (dados.status === 'CANCELADO') {
         await tx.projeto.update({ where: { id: atual.projetoId }, data: { status: 'AGUARDANDO_AGENDAMENTO' } });
@@ -201,10 +300,12 @@ rotasAgenda.patch(
         const mudancas: string[] = [];
         if (antes !== depois) mudancas.push(`de ${antes} para ${depois}`);
         if (ag.equipeId !== atual.equipeId) mudancas.push(`equipe: ${ag.equipe.nome}`);
-        if (dados.tecnicoResponsavelId !== undefined && ag.tecnicoResponsavelId !== atual.tecnicoResponsavelId) {
-          mudancas.push(`técnico responsável: ${ag.tecnicoResponsavel?.nome ?? 'nenhum'}`);
-        }
         if (mudancas.length) await evento('SERVICO_REMARCADO', `${servico} remarcada: ${mudancas.join(' · ')}`);
+        // quem foi escalado fica no histórico: é o que responde depois "quem fez esta obra"
+        if (saiu.length || entrou.length) {
+          const partes = [saiu.length ? `saiu ${nomesDe(saiu)}` : '', entrou.length ? `entrou ${nomesDe(entrou)}` : ''].filter(Boolean);
+          await evento('SERVICO_REMARCADO', `Escala alterada: ${partes.join(', ')}. Vão: ${nomesDe(ag.escala.map((e) => e.usuario))}`);
+        }
         if (dados.status === 'EM_EXECUCAO' && atual.status !== 'EM_EXECUCAO') {
           await evento('SERVICO_INICIADO', `${servico} marcada como em execução`);
         }
@@ -212,7 +313,7 @@ rotasAgenda.patch(
       return ag;
     });
     operacaoMudou();
-    res.json(atualizado);
+    res.json({ ...atualizado, avisos });
   }),
 );
 
@@ -250,7 +351,6 @@ rotasValidacao.get(
       orderBy: [{ status: 'asc' }, { enviadoEm: 'asc' }],
       include: {
         projeto: { include: { cliente: { select: { nome: true, cidade: true, uf: true } } } },
-        tecnicoResponsavel: { select: { nome: true } },
         _count: { select: { fotos: true } },
       },
     });
@@ -273,7 +373,8 @@ rotasValidacao.get(
       include: {
         projeto: { include: { cliente: true, orcamento: { select: { codigo: true, id: true } } } },
         equipe: { select: { nome: true } },
-        tecnicoResponsavel: { select: { nome: true, telefone: true } },
+        ...ESCALA,
+        enviadoPor: { select: { nome: true, telefone: true } },
         fotos: { orderBy: { criadoEm: 'asc' }, include: { enviadaPor: { select: { nome: true } } } },
         materiais: { include: { produto: { select: { nome: true, unidade: true } } } },
       },
@@ -422,12 +523,14 @@ const upload = multer({
   },
 });
 
-/** Garante que o técnico só acesse os serviços da própria equipe (regra em lib/acesso.ts). */
-async function servicoDoTecnico(id: string, usuarioId: string, equipeId: string | null) {
+/** Garante que o técnico só acesse os serviços em que está escalado (regra em lib/acesso.ts). */
+async function servicoDoTecnico(id: string, usuarioId: string) {
   const servico = await prisma.agendamento.findFirst({
-    where: { id, ...filtroDoTecnico({ id: usuarioId, equipeId }) },
+    where: { id, ...filtroDoTecnico({ id: usuarioId }) },
     include: {
       projeto: { include: { cliente: true } },
+      equipe: { select: { nome: true } },
+      ...ESCALA,
       fotos: { orderBy: { criadoEm: 'asc' } },
     },
   });
@@ -473,6 +576,9 @@ rotasTecnico.get(
       },
       orderBy: { dataInicio: 'asc' },
       include: {
+        // com quem ele vai: a equipe (linha da agenda) e os colegas escalados
+        equipe: { select: { nome: true } },
+        ...ESCALA,
         projeto: {
           include: {
             cliente: {
@@ -494,7 +600,7 @@ rotasTecnico.get(
 rotasTecnico.get(
   '/servicos/:id',
   rota(async (req, res) => {
-    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
     const checklist = await prisma.checklistFoto.findMany({
       where: { tipoServico: servico.tipo, ativo: true },
       orderBy: { ordem: 'asc' },
@@ -515,7 +621,7 @@ rotasTecnico.post(
   '/servicos/:id/fotos',
   upload.single('arquivo'),
   rota(async (req, res) => {
-    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
     if (!req.file) throw new ErroHttp(400, 'Envie o arquivo da foto');
 
     const { chave, latitude, longitude, capturadaEm, idLocal } = z
@@ -641,7 +747,7 @@ rotasTecnico.post(
 rotasTecnico.post(
   '/servicos/:id/materiais',
   rota(async (req, res) => {
-    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
     const { materiais } = z
       .object({
         materiais: z
@@ -671,7 +777,7 @@ rotasTecnico.post(
 rotasTecnico.post(
   '/servicos/:id/concluir',
   rota(async (req, res) => {
-    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id, req.usuario!.equipeId);
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
     conferirServicoAberto(servico.status);
     const { observacoesTecnico, sistemaTestado } = z
       .object({ observacoesTecnico: z.string().optional(), sistemaTestado: z.boolean() })
@@ -702,6 +808,7 @@ rotasTecnico.post(
           observacoesTecnico,
           sistemaTestado,
           enviadoEm: new Date(),
+          enviadoPorId: req.usuario!.id,
           motivoDevolucao: null,
         },
       });

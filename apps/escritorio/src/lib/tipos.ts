@@ -49,7 +49,8 @@ export type AgendamentoNaAgenda = {
     cliente: { nome: string; cidade: string | null; uf: string | null };
     orcamento: { id: string; codigo: string };
   };
-  tecnicoResponsavel: { id: string; nome: string } | null;
+  /** quem vai de fato neste serviço (a equipe é só a composição padrão) */
+  escala: { usuario: { id: string; nome: string } }[];
 };
 
 /** Uma linha da grade: equipe com membros e serviços da semana. */
@@ -236,7 +237,9 @@ export type ServicoEmValidacao = {
   observacoesTecnico: string | null;
   motivoDevolucao: string | null;
   equipe: { nome: string };
-  tecnicoResponsavel: { nome: string; telefone: string | null } | null;
+  /** quem foi escalado e quem enviou para validação */
+  escala: { usuario: { id: string; nome: string } }[];
+  enviadoPor: { nome: string; telefone: string | null } | null;
   projetoId: string;
   projeto: {
     codigo: string;
@@ -331,7 +334,8 @@ export type FichaDoProjeto = {
     motivoDevolucao: string | null;
     observacoesTecnico: string | null;
     equipe: { nome: string };
-    tecnicoResponsavel: { nome: string } | null;
+    escala: { usuario: { id: string; nome: string } }[];
+    enviadoPor: { nome: string } | null;
     validadoPor: { nome: string } | null;
     _count: { fotos: number };
     fotos?: FotoDoProjeto[];

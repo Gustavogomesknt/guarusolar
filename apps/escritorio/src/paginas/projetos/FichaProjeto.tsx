@@ -340,14 +340,15 @@ function Servicos({ projeto: p, gestor }: { projeto: Ficha; gestor: boolean }) {
                 </span>
                 <span className="text-[13px] text-muted-foreground">
                   {s.equipe.nome}
-                  {s.tecnicoResponsavel && ` · técnico ${s.tecnicoResponsavel.nome}`}
+                  {' · '}
+                  {s.escala.length ? s.escala.map((e) => e.usuario.nome).join(', ') : 'sem técnico escalado'}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
                 <SituacaoServico status={s.status} className="self-start" />
                 <span className="text-[13px] text-muted-foreground">
                   {s._count.fotos} {s._count.fotos === 1 ? 'foto' : 'fotos'}
-                  {s.enviadoEm && ` · enviado em ${formatarDataHora(s.enviadoEm)}`}
+                  {s.enviadoEm && ` · enviado em ${formatarDataHora(s.enviadoEm)}${s.enviadoPor ? ` por ${s.enviadoPor.nome}` : ''}`}
                 </span>
               </div>
               <div className="flex flex-col gap-1 text-[13px]">

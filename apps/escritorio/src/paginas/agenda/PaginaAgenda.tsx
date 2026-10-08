@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, TriangleAlert, Users, X } from 'lucide-react';
 import { TIPOS_SERVICO } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
@@ -25,26 +25,42 @@ import {
   type Dia,
 } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
+import { escalaTrocada, nomesCurtos, nomesDaEscala, SemTecnicoEscalado } from './escala';
 
 const COLUNAS = 'grid-cols-[170px_repeat(6,minmax(98px,1fr))]';
 const DIA_VALIDO = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Um serviço recortado para a semana visível: coluna inicial e quantas colunas ocupa. */
-type Bloco = { servico: AgendamentoNaAgenda; coluna: number; largura: number };
+/** Um serviço recortado para a semana visível: coluna inicial, quantas colunas ocupa e a faixa. */
+type Bloco = { servico: AgendamentoNaAgenda; coluna: number; largura: number; faixa: number };
 
+/**
+ * A mesma equipe pode ter mais de um serviço no mesmo dia (conflito só avisa: regra 8). Os que
+ * têm dias em comum se empilham em FAIXAS dentro da linha da equipe: cada bloco vai para a
+ * primeira faixa em que cabe. Sem sobreposição há uma faixa só, e a linha fica como sempre foi.
+ */
 function blocosDaSemana(equipe: EquipeNaAgenda, dias: Dia[]) {
   const blocos: Bloco[] = [];
   const ocupados = new Set<number>();
-  for (const servico of equipe.agendamentos) {
-    const inicio = diaDaApi(servico.dataInicio);
-    const fim = diaDaApi(servico.dataFim);
-    const cobertos = dias.map((d, i) => (d >= inicio && d <= fim ? i : -1)).filter((i) => i >= 0);
-    if (cobertos.length === 0) continue;
-    // colunas seguidas (segunda a sábado); o domingo não aparece, então não quebra o bloco
-    blocos.push({ servico, coluna: cobertos[0], largura: cobertos[cobertos.length - 1] - cobertos[0] + 1 });
-    cobertos.forEach((i) => ocupados.add(i));
+  const fimDaFaixa: number[] = []; // última coluna ocupada em cada faixa
+  const recortados = equipe.agendamentos
+    .map((servico) => {
+      const inicio = diaDaApi(servico.dataInicio);
+      const fim = diaDaApi(servico.dataFim);
+      const cobertos = dias.map((d, i) => (d >= inicio && d <= fim ? i : -1)).filter((i) => i >= 0);
+      // colunas seguidas (segunda a sábado); o domingo não aparece, então não quebra o bloco
+      return cobertos.length ? { servico, coluna: cobertos[0], largura: cobertos[cobertos.length - 1] - cobertos[0] + 1 } : null;
+    })
+    .filter((b) => b !== null)
+    // os mais longos primeiro: a barra de vários dias fica em cima e as visitas do dia, embaixo
+    .sort((a, b) => a.coluna - b.coluna || b.largura - a.largura);
+  for (const b of recortados) {
+    let faixa = fimDaFaixa.findIndex((fim) => fim < b.coluna);
+    if (faixa < 0) faixa = fimDaFaixa.length;
+    fimDaFaixa[faixa] = b.coluna + b.largura - 1;
+    blocos.push({ ...b, faixa });
+    for (let c = b.coluna; c < b.coluna + b.largura; c++) ocupados.add(c);
   }
-  return { blocos, ocupados };
+  return { blocos, ocupados, faixas: Math.max(1, fimDaFaixa.length) };
 }
 
 export function PaginaAgenda() {
@@ -167,7 +183,7 @@ export function PaginaAgenda() {
               {selecionado ? (
                 <>
                   <strong className="font-semibold text-foreground">{selecionado.cliente.nome}</strong> selecionado:
-                  escolha um dia livre na grade.
+                  escolha o dia na grade.
                 </>
               ) : (
                 projetos.length > 0 && 'Selecione um projeto para ver os dias livres.'
@@ -314,14 +330,21 @@ function LinhaEquipe({
   onAgendar: (dia: Dia) => void;
   onAbrirServico: (servico: AgendamentoNaAgenda) => void;
 }) {
-  const { blocos, ocupados } = blocosDaSemana(equipe, dias);
-  const responsavel = equipe.membros[0]?.nome;
+  const { blocos, ocupados, faixas } = blocosDaSemana(equipe, dias);
+  // a composição padrão da equipe (quem vai em cada serviço é a escala, editável na janela dele)
+  const padrao = equipe.membros.filter((m) => m.papel === 'TECNICO').map((m) => m.nome.trim().split(/\s+/)[0]);
+  // com mais de uma faixa os blocos ficam compactos, para a linha não crescer demais
+  const compacto = faixas > 1;
+  // com um projeto selecionado, uma faixa a mais no rodapé: "+" também nos dias já ocupados
+  const linhas = faixas + (selecionado ? 1 : 0);
 
   return (
-    <li className={`grid ${COLUNAS} min-h-[88px] border-b last:border-b-0`}>
-      <div className="flex flex-col justify-center gap-0.5 px-4 py-3" style={{ gridColumn: 1, gridRow: 1 }}>
+    <li className={`grid ${COLUNAS} border-b last:border-b-0`} style={{ gridTemplateRows: `repeat(${faixas}, minmax(${compacto ? 52 : 88}px, auto))${selecionado ? ' 44px' : ''}` }}>
+      <div className="flex flex-col justify-center gap-0.5 px-4 py-3" style={{ gridColumn: 1, gridRow: `1 / span ${linhas}` }}>
         <span className="font-semibold">{equipe.nome}</span>
-        <span className="truncate text-xs text-muted-foreground">{responsavel ?? 'Sem técnico cadastrado'}</span>
+        <span className="truncate text-xs text-muted-foreground" title={padrao.join(', ')}>
+          {padrao.length ? padrao.join(', ') : 'Sem técnico na composição padrão'}
+        </span>
         <span className="text-xs text-muted-foreground">
           {ocupados.size} de 6 dias ocupados
         </span>
@@ -334,9 +357,24 @@ function LinhaEquipe({
         return (
           <div
             key={d}
-            className={cn('border-l p-1.5', eHoje && 'bg-primary/5')}
-            style={{ gridColumn: i + 2, gridRow: 1 }}
+            className={cn('flex flex-col justify-end border-l p-1.5', eHoje && 'bg-primary/5')}
+            style={{ gridColumn: i + 2, gridRow: `1 / span ${linhas}` }}
           >
+            {/* dia ocupado também aceita outro serviço: o aviso de quem já está lá aparece na janela */}
+            {!livre && selecionado && (
+              <button
+                type="button"
+                onClick={() => onAgendar(d)}
+                aria-label={`Agendar ${selecionado.cliente.nome} com a ${equipe.nome} em ${nomeLongo(d)}, que já tem serviço`}
+                className={cn(
+                  'relative z-20 flex h-8 w-full items-center justify-center gap-1 rounded-[8px] border border-dashed border-primary/45 bg-card text-xs font-medium text-primary',
+                  'hover:border-primary hover:bg-primary/10 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+                )}
+              >
+                <Plus className="size-3.5" aria-hidden />
+                Agendar
+              </button>
+            )}
             {livre && selecionado && (
               <button
                 type="button"
@@ -355,12 +393,15 @@ function LinhaEquipe({
         );
       })}
 
-      {blocos.map(({ servico, coluna, largura }) => {
+      {blocos.map(({ servico, coluna, largura, faixa }) => {
         const tipo = TIPOS_SERVICO_AGENDA[servico.tipo];
         const inicio = diaDaApi(servico.dataInicio);
         const fim = diaDaApi(servico.dataFim);
         const quando = inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`;
         const cidade = servico.projeto.cliente.cidade;
+        const semEscala = servico.escala.length === 0;
+        const trocada = !semEscala && escalaTrocada(servico.escala, equipe);
+        const quemVai = semEscala ? 'sem técnico escalado' : `vão ${nomesDaEscala(servico.escala)}`;
         return (
           <button
             key={servico.id}
@@ -368,23 +409,55 @@ function LinhaEquipe({
             // com um projeto selecionado a grade serve para escolher dia livre: serviços ficam só de consulta
             disabled={selecionado !== null}
             onClick={() => onAbrirServico(servico)}
-            aria-label={`${tipo.rotulo}: ${servico.projeto.cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}. Abrir detalhes`}
-            style={{ gridColumn: `${coluna + 2} / span ${largura}`, gridRow: 1 }}
+            aria-label={`${tipo.rotulo}: ${servico.projeto.cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}, ${quemVai}. Abrir detalhes`}
+            style={{ gridColumn: `${coluna + 2} / span ${largura}`, gridRow: faixa + 1 }}
             className={cn(
-              'relative z-10 m-1.5 flex min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] border-l-4 px-3 py-2 text-left',
+              'relative z-10 flex min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] border-l-4 text-left',
+              compacto ? 'mx-1.5 my-1 px-2.5 py-1.5' : 'm-1.5 px-3 py-2',
               'hover:brightness-[0.97] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-60',
               tipo.fundo,
               tipo.borda,
               tipo.texto,
             )}
           >
-            <span className="w-full truncate text-[10px] font-semibold tracking-[0.04em] uppercase">{tipo.rotulo}</span>
-            <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{servico.projeto.cliente.nome}</span>
-            <span className="w-full truncate text-xs opacity-80">
-              {[cidade, servico.projeto.orcamento.codigo].filter(Boolean).join(' · ')}
-            </span>
-            {/* a cor do bloco é do tipo; a situação tem a mesma aparência de todas as telas */}
-            <SituacaoServico status={servico.status} className="mt-0.5 text-[11px]" />
+{compacto ? (
+              // faixa compacta: tipo, sinal da situação e cliente; o resto está na janela do serviço
+              <>
+                <span className="flex w-full items-center justify-between gap-1.5">
+                  <span className="truncate text-[10px] font-semibold tracking-[0.04em] uppercase">{tipo.rotulo}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {semEscala && (
+                      <span title="Sem técnico escalado">
+                        <TriangleAlert className="size-3.5 text-destaque-texto" aria-hidden />
+                      </span>
+                    )}
+                    <SituacaoServico status={servico.status} soBolinha />
+                  </span>
+                </span>
+                <span className="w-full truncate text-[13px] leading-tight font-semibold">{servico.projeto.cliente.nome}</span>
+              </>
+            ) : (
+              <>
+                <span className="w-full truncate text-[10px] font-semibold tracking-[0.04em] uppercase">{tipo.rotulo}</span>
+                <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{servico.projeto.cliente.nome}</span>
+                <span className="w-full truncate text-xs opacity-80">
+                  {[cidade, servico.projeto.orcamento.codigo].filter(Boolean).join(' · ')}
+                </span>
+                {/* a escala só aparece no bloco quando foge do padrão da equipe, ou quando falta */}
+                {semEscala ? (
+                  <SemTecnicoEscalado className="text-[11px]" />
+                ) : (
+                  trocada && (
+                    <span className="flex w-full items-center gap-1 truncate text-[11px] font-medium" title={nomesDaEscala(servico.escala)}>
+                      <Users className="size-3 shrink-0" aria-hidden />
+                      <span className="truncate">{nomesCurtos(servico.escala)}</span>
+                    </span>
+                  )
+                )}
+                {/* a cor do bloco é do tipo; a situação tem a mesma aparência de todas as telas */}
+                <SituacaoServico status={servico.status} className="mt-0.5 text-[11px]" />
+              </>
+            )}
           </button>
         );
       })}

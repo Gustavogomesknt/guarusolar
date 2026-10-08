@@ -17,7 +17,28 @@ const BOLINHA: Record<StatusAgendamento, string> = {
   CANCELADO: 'bg-muted-foreground/50',
 };
 
-export function SituacaoServico({ status, className = '' }: { status: StatusAgendamento; className?: string }) {
+export function SituacaoServico({
+  status,
+  className = '',
+  soBolinha = false,
+}: {
+  status: StatusAgendamento;
+  className?: string;
+  /** bloco compacto da agenda: só o sinal, com o texto para leitor de tela e na dica do mouse */
+  soBolinha?: boolean;
+}) {
+  if (soBolinha) {
+    return (
+      <span title={ROTULO_STATUS_AGENDAMENTO[status]} className={`inline-flex shrink-0 items-center ${className}`}>
+        {status === 'DEVOLVIDO' ? (
+          <AlertTriangle className="size-3.5 text-destaque-texto" aria-hidden />
+        ) : (
+          <span aria-hidden className={`size-2 rounded-full ${BOLINHA[status]}`} />
+        )}
+        <span className="sr-only">{ROTULO_STATUS_AGENDAMENTO[status]}</span>
+      </span>
+    );
+  }
   if (status === 'DEVOLVIDO') {
     return (
       <span

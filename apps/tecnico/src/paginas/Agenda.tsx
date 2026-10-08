@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw, Users } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
@@ -186,6 +186,8 @@ export function Agenda() {
 
 function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaAgenda; dia: Dia; atrasado?: boolean }) {
   const { cliente } = servico.projeto;
+  const { usuario } = useSessao();
+  const colegas = (servico.escala ?? []).filter((e) => e.usuario.id !== usuario?.id).map((e) => e.usuario.nome.trim().split(/\s+/)[0]);
   const tipo = TIPOS_SERVICO_AGENDA[servico.tipo];
   const inicio = diaDaApi(servico.dataInicio);
   const fim = diaDaApi(servico.dataFim);
@@ -223,6 +225,13 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
           <span className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
             {endereco}
+          </span>
+        )}
+        {/* com quem vai: a escala deste serviço (pode ser diferente da equipe de sempre) */}
+        {servico.equipe && servico.escala && (
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Users className="size-4 shrink-0" aria-hidden />
+            {servico.equipe.nome} · {colegas.length ? `com ${colegas.join(' e ')}` : 'só você neste serviço'}
           </span>
         )}
         {servico.status === 'DEVOLVIDO' && servico.motivoDevolucao && (

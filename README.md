@@ -89,14 +89,16 @@ packages/web/               o que os dois fronts usam no navegador
 | POST | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me`; rascunho passa a ENVIADO |
 | GET | `/api/agenda?inicio&fim` | gestor | semana por equipe |
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |
-| POST | `/api/agenda` | gestor | agendar serviço (409 se a equipe já tem serviço no período) |
-| PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas) ou cancelar (`status: CANCELADO`) |
+| POST | `/api/agenda` | gestor | agendar serviço; `tecnicos` = quem vai (ausente: os técnicos da equipe). Conflito não bloqueia: volta em `avisos` |
+| PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas), trocar a escala (`tecnicos`, só com o serviço em aberto) ou cancelar (`status: CANCELADO`) |
+| GET | `/api/agenda/tecnicos` | gestor | técnicos ativos com a equipe padrão de cada um (quem pode ser escalado) |
+| GET | `/api/agenda/conflitos` | gestor | onde a equipe e as pessoas escolhidas já estão no período (avisos da janela de agendar) |
 | GET | `/api/validacao/fila` | gestor | aguardando validação (mais antigos primeiro) e, depois, os devolvidos |
 | GET | `/api/validacao/versao` | gestor | versão da operação, sem banco: muda quando a fila, a agenda ou a situação de um serviço muda (o escritório pergunta a cada 20 s) |
 | GET | `/api/validacao/:id` | gestor | serviço com fotos na ordem do checklist, materiais, técnico e equipe |
 | POST | `/api/validacao/:id/aprovar` | gestor | conclui serviço e projeto; foto marcada para refazer exige `confirmarFotosMarcadas` |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
-| GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico | a foto (ou miniatura de 480 px); técnico só da própria equipe |
+| GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico | a foto (ou miniatura de 480 px); técnico só dos serviços em que está escalado |
 | GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |
 | GET | `/api/tecnico/servicos/:id` | técnico | serviço com o checklist e as fotos já enviadas |
 | POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist; `idLocal` evita duplicata no reenvio |
@@ -192,8 +194,12 @@ nada) depois que você digitar `IMPORTAR`.
   OneDrive muda apenas `armazenamento.ts`. A única exceção sem login é o PDF do orçamento,
   aberto pelo cliente com o token do link.
 - **Agenda é do gestor.** As rotas `/api/agenda` aceitam só GESTOR (e ADMIN); o comercial
-  acompanha pelo status dos orçamentos. Uma equipe não pega dois serviços no mesmo período,
-  nem ao agendar nem ao remarcar. Cancelar devolve o projeto para "A agendar".
+  acompanha pelo status dos orçamentos. Conflito AVISA e não bloqueia: a mesma equipe ou
+  a mesma pessoa pode ter mais de um serviço no dia (uma visita técnica dura uma hora); a janela
+  de agendar diz onde cada um já está. Cancelar devolve o projeto para "A agendar".
+- **Equipe é a composição padrão; quem vai é a escala.** Cada serviço guarda os técnicos escalados
+  (começa com os da equipe; o gestor troca em "Quem vai"). O técnico vê no app só os serviços em
+  que está escalado. A equipe padrão de cada um fica em Usuários.
 - **Duração do serviço** é informada ao agendar (padrão: 1 dia). Serviços de vários dias
   pulam o domingo; a grade mostra segunda a sábado.
 

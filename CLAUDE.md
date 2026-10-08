@@ -95,10 +95,11 @@ apps/api/                      API (Express + Prisma)
                                "01 Item hh-mm-ss.jpg" (segundos: reenvio substitui, não duplica)
   scripts/sharepoint-conferir.ts  npm run sharepoint:conferir: testa credencial, site, biblioteca,
                                envio e leitura antes de ligar em produção
-  src/lib/acesso.ts            regra 6 (técnico só vê a própria equipe) num lugar só:
-                               tecnicoPodeVer e filtroDoTecnico
+  src/lib/acesso.ts            regra 6 (técnico só vê os serviços em que está ESCALADO) num lugar
+                               só: tecnicoPodeVer e filtroDoTecnico
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
-                               login sempre; gestor vê todas, técnico só da equipe (outra: 404),
+                               login sempre; gestor vê todas, técnico só de serviço em que está
+                               escalado (outro: 404),
                                comercial não (403). Não existe pasta pública de arquivos
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central; erros do Prisma viram
                                mensagem para o usuário (banco fora do ar = 503, P2025 = 404, P2002 = 409)
@@ -151,7 +152,10 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                grade da semana (segunda a sábado) por equipe, agendar,
                                remarcar e cancelar. Datas como texto AAAA-MM-DD (dias.ts no
                                compartilhado); serviço de N dias pula o domingo (fimDoServico).
-                               A duração não existe na API: o front pergunta os dias e manda dataFim
+                               A duração não existe na API: o front pergunta os dias e manda dataFim.
+                               A linha da equipe empilha em FAIXAS os serviços com dias em comum
+                               (blocosDaSemana); com mais de uma faixa os blocos ficam compactos.
+                               escala.tsx: "Quem vai" (QuemVai), avisos de conflito e os nomes
   src/paginas/validacao/       validação (/validacao, só GESTOR): fila à esquerda (aguardando,
                                depois devolvidos; serviço aberto em ?servico=), detalhe com fotos
                                OK/Refazer, foto ampliada (← → navegam, O/R marcam, Esc fecha),
@@ -289,8 +293,16 @@ O `.env` da API fica em `apps/api/.env`.
 5. **Status seguem transições válidas** (mapa `TRANSICOES_STATUS` em
    `packages/compartilhado/src/status.ts`, usado pela API e pelo menu de status da lista).
    Orçamento `APROVADO` não pode ser editado.
-6. **Técnico só acessa os serviços da própria equipe**, validado no servidor, nunca apenas
-   escondendo botões na interface. Vale também para as fotos (`lib/acesso.ts`).
+6. **Técnico só acessa os serviços em que está ESCALADO** (tabela `EscalaServico`), validado no
+   servidor, nunca apenas escondendo botões na interface. Vale também para as fotos
+   (`lib/acesso.ts`). A equipe (`Usuario.equipeId`) é só a COMPOSIÇÃO PADRÃO e a linha da agenda:
+   o serviço nasce com os técnicos ativos da equipe e o gestor troca quem vai, por serviço (a
+   escala vale para o serviço inteiro, mesmo de vários dias). É cópia: mudar a equipe padrão de
+   alguém não mexe em serviço já agendado. Sair da escala tira o acesso na hora, inclusive às
+   fotos. A escala só muda com o serviço em aberto; depois fica como registro de quem foi, e cada
+   troca entra no histórico do projeto. Serviço sem ninguém escalado é permitido (o gestor marca
+   a data antes de definir quem vai) e aparece com o aviso "Sem técnico escalado". O "técnico
+   responsável" não é mais usado (a coluna continua); mostra-se a escala e `enviadoPor`.
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
@@ -301,9 +313,12 @@ O `.env` da API fica em `apps/api/.env`.
    (gestor) só com o serviço aguardando validação ou devolvido: `servicoEmValidacao`. Devolver
    põe o projeto de volta em `EM_EXECUCAO`; aprovar conclui o projeto e marca todas as fotos OK
    (foto ainda marcada para refazer exige `confirmarFotosMarcadas`).
-8. **Uma equipe não pode ter dois serviços no mesmo período** (validação em `POST /api/agenda`
-   e ao remarcar em `PATCH /api/agenda/:id`; serviços cancelados não contam). Cancelar um
-   serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
+8. **Conflito de agenda AVISA, não bloqueia** (decisão da Guarusolar; antes bloqueava por
+   equipe). A agenda trabalha com dias inteiros e uma visita técnica dura cerca de uma hora: a
+   mesma dupla faz duas ou três no mesmo dia. `avisosDeConflito` (operacao.ts) diz onde a equipe
+   e cada pessoa escalada já estão, com projeto e cliente; vem em `GET /api/agenda/conflitos` e
+   na resposta de agendar e remarcar. Serviços cancelados não contam. Não reintroduza bloqueio.
+   Cancelar um serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
 
 ## Convenções de código
 
