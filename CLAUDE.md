@@ -69,10 +69,12 @@ apps/api/                      API (Express + Prisma)
   scripts/marcar-producao.ts   npm run db:marcar-producao: grava a marca de produção NO banco
                                (tabela AmbienteDoBanco; lib/ambienteDoBanco.ts confere)
   prisma/limpar.ts             apaga os dados de operação (npm run db:limpar)
-  scripts/zerar-para-entrega.ts  npm run db:zerar-para-entrega -- --admin <e-mail>: o ÚNICO que apaga
-                               em PRODUÇÃO (dados de teste antes da entrega): tudo do db:limpar,
-                               mais a escala e todos os usuários menos o ADMIN indicado. Recusa
-                               se esse ADMIN não existir/ativo; pede a frase "ZERAR PRODUCAO".
+  scripts/zerar-para-entrega.ts  npm run db:zerar-para-entrega -- --admin <e-mail> | --manter-usuarios:
+                               o ÚNICO que apaga em PRODUÇÃO (dados de teste): tudo do db:limpar,
+                               mais a escala e os ARQUIVOS das fotos (no Supabase, a pasta inteira
+                               de cada projeto). --admin remove os usuários menos esse ADMIN (recusa
+                               se não existir/ativo); --manter-usuarios não toca em usuário. Recusa
+                               se a janela não alcança o armazenamento; frase "ZERAR PRODUCAO".
   src/server.ts                sobe a API e monta as rotas
   src/lib/appsWeb.ts           em produção a API entrega o escritório (/) e o técnico (/campo/):
                                assets/ com cache de 1 ano; index.html, sw.js e manifest sem cache;
@@ -459,8 +461,9 @@ npm run db:studio        # inspecionar o banco
 npm run db:limpar        # APAGA clientes, orçamentos, projetos etc. e zera os códigos;
                          # mantém usuários, equipes, checklist e catálogo. Pede LIMPAR;
                          # recusa em produção. Nunca rode por conta própria: quem roda é o usuário.
-npm run db:zerar-para-entrega -- --admin email  # zera os dados de TESTE, inclusive em PRODUÇÃO, e
-                         # deixa só esse ADMIN. Nunca rode por conta própria: quem roda é o usuário.
+npm run db:zerar-para-entrega -- --manter-usuarios   # zera os dados de TESTE (inclusive em PRODUÇÃO)
+npm run db:zerar-para-entrega -- --admin email        # idem, e remove os usuários menos esse ADMIN
+                         # Nunca rode por conta própria: quem roda é o usuário.
 npm run build            # compila todos os workspaces
 npm run sharepoint:conferir  # testa a configuração MS_* do SharePoint (envio e leitura reais)
 npm run storage:conferir     # testa o Supabase Storage (bucket privado, envio, leitura, sem link público)
