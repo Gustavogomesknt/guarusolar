@@ -111,6 +111,9 @@ apps/api/                      API (Express + Prisma)
                                "01 Item hh-mm-ss.jpg" (segundos: reenvio substitui, não duplica)
   scripts/sharepoint-conferir.ts  npm run sharepoint:conferir: testa credencial, site, biblioteca,
                                envio e leitura antes de ligar em produção
+  src/lib/situacaoDoProjeto.ts ÚNICO lugar que muda a situação do projeto (regra 9): passagens
+                               permitidas, histórico com situação anterior e nova
+  src/lib/roteiroDeFotos.ts    acerta a tabela ChecklistFoto pelo roteiro do código, ao subir a API
   src/lib/acesso.ts            regra 6 (técnico só vê os serviços em que está ESCALADO) num lugar
                                só: tecnicoPodeVer e filtroDoTecnico
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
@@ -238,6 +241,9 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
                                data da última atualização
   src/margemDoOrcamento.ts     EDITÁVEL: MARGEM_PADRAO (margem em reais de todo orçamento novo) e
                                distribuirMargem (preços do PDF detalhado)
+  src/roteiroDoServico.ts      EDITÁVEL: por tipo de serviço, as fotos pedidas, as observações (nome e
+                               se são obrigatórias), se pede o teste do sistema e o efeito da
+                               validação no projeto (`aoValidar`); TIPOS_SERVICO_AGENDAVEIS
   src/dias.ts                  dias como texto AAAA-MM-DD (somar, nome do dia, semana...)
   src/datas.ts                 fuso da empresa: diaDeHoje, formatarData/Hora/DataHora, tempoDesde
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
@@ -308,6 +314,7 @@ O `.env` da API fica em `apps/api/.env`.
    Cópia nula (orçamento criado pela versão anterior numa publicação): o documento usa o cadastro.
 3. **Nada é apagado.** Cliente e produto são desativados (`ativo = false`).
 4. **Aprovar orçamento cria o projeto** automaticamente, com status `AGUARDANDO_AGENDAMENTO`.
+   (Criar é automático; CONCLUIR nunca é: regra 9.)
 5. **Status seguem transições válidas** (mapa `TRANSICOES_STATUS` em
    `packages/compartilhado/src/status.ts`, usado pela API e pelo menu de status da lista).
    Orçamento `APROVADO` não pode ser editado.
@@ -324,19 +331,41 @@ O `.env` da API fica em `apps/api/.env`.
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
-7. **Concluir serviço exige o checklist completo** de fotos obrigatórias e a confirmação do
-   teste do sistema. O checklist fica na tabela `ChecklistFoto`, editável por tipo de serviço.
+7. **Enviar o serviço exige o roteiro completo do TIPO** (`packages/compartilhado/src/roteiroDoServico.ts`,
+   o único lugar onde ele é editado): as fotos obrigatórias; a confirmação do teste do sistema
+   (instalação, manutenção e retrabalho; visita técnica não tem sistema para testar); e, na visita
+   técnica, as "Observações de medição" (obrigatórias). A tabela `ChecklistFoto` é acertada pelo
+   código ao subir a API (`lib/roteiroDeFotos.ts`): item que sai do roteiro é desativado, não apagado.
+   Nunca mude a `chave` de um item que já tem fotos.
    Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
    devolvido): `conferirServicoAberto` em `apps/api/src/rotas/operacao.ts`. Aprovar e devolver
    (gestor) só com o serviço aguardando validação ou devolvido: `servicoEmValidacao`. Devolver
-   põe o projeto de volta em `EM_EXECUCAO`; aprovar conclui o projeto e marca todas as fotos OK
-   (foto ainda marcada para refazer exige `confirmarFotosMarcadas`).
+   põe o projeto de volta em `EM_EXECUCAO`; aprovar marca todas as fotos OK (foto ainda marcada
+   para refazer exige `confirmarFotosMarcadas`), deixa o SERVIÇO "Validado" (`APROVADO` no banco)
+   e NUNCA conclui o projeto (regra 9).
 8. **Conflito de agenda AVISA, não bloqueia** (decisão da Guarusolar; antes bloqueava por
    equipe). A agenda trabalha com dias inteiros e uma visita técnica dura cerca de uma hora: a
    mesma dupla faz duas ou três no mesmo dia. `avisosDeConflito` (operacao.ts) diz onde a equipe
    e cada pessoa escalada já estão, com projeto e cliente; vem em `GET /api/agenda/conflitos` e
    na resposta de agendar e remarcar. Serviços cancelados não contam. Não reintroduza bloqueio.
-   Cancelar um serviço devolve o projeto para `AGUARDANDO_AGENDAMENTO`.
+   Cancelar um serviço devolve o projeto ao repouso (`situacaoDeRepouso`): "A agendar" ou, se já
+   tem instalação validada, "Aguardando conclusão".
+9. **Nenhum caminho conclui um projeto sozinho.** O TIPO do serviço decide o efeito da validação
+   (`aoValidar` em `roteiroDoServico.ts`): VISITA_TECNICA devolve o projeto para "A agendar" e grava
+   `visitaTecnicaConcluidaEm` (aviso "Visita concluída — agendar instalação"); INSTALACAO leva a
+   `AGUARDANDO_CONCLUSAO`; MANUTENCAO e RETRABALHO não mexem na situação em NENHUM passo (um
+   projeto concluído continua concluído enquanto a manutenção é agendada, feita e validada).
+   Só `POST /api/projetos/:id/concluir` grava `CONCLUIDO` (GESTOR ou ADMIN, a partir de
+   `AGUARDANDO_CONCLUSAO`, com `concluidoEm` e `concluidoPorId`); `POST .../reabrir` devolve a
+   `AGUARDANDO_CONCLUSAO`, com justificativa obrigatória. Motivo: uma instalação pode levar vários
+   dias, com mais de um agendamento; quem sabe que terminou é o gestor. Técnico e comercial nunca
+   concluem nem reabrem. **Toda mudança de situação passa por `mudarSituacaoDoProjeto`**
+   (`lib/situacaoDoProjeto.ts`): confere a passagem (tabela `PASSAGENS`), muda e grava no histórico
+   autor, situação anterior, nova e data. Não escreva `projeto.update({ status })` em outro lugar.
+   Um projeto tem um serviço "em curso" por vez. O que cabe agendar: visita técnica só antes da
+   instalação; instalação não em projeto concluído (reabrir antes); manutenção e retrabalho também
+   em projeto aguardando conclusão ou concluído (pela ficha: "Agendar outro serviço").
+   `VISTORIA_CONCESSIONARIA` ficou no enum para registros antigos, fora da lista da agenda.
 
 ## Convenções de código
 

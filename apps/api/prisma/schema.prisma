@@ -70,6 +70,7 @@ model Usuario {
   servicosExecutados Agendamento[]     @relation("TecnicoResponsavel")
   servicosValidados  Agendamento[]     @relation("ValidadoPor")
   servicosEnviados   Agendamento[]     @relation("EnviadoPor")
+  projetosConcluidos Projeto[]         @relation("ProjetosConcluidos")
   /// serviços em que este técnico está escalado: é o que ele vê no app (regra 6)
   escalas            EscalaServico[]
   fotosEnviadas      FotoServico[]
@@ -344,29 +345,37 @@ enum StatusProjeto {
   AGENDADO
   EM_EXECUCAO
   AGUARDANDO_VALIDACAO
+  /// instalação validada: falta o gestor dizer que a obra terminou (pode haver mais serviços)
+  AGUARDANDO_CONCLUSAO
+  /// só pela ação "Concluir projeto" do gestor: nenhum caminho conclui sozinho
   CONCLUIDO
   CANCELADO
 }
 
 model Projeto {
-  id                 String        @id @default(uuid())
-  codigo             String        @unique // PRJ-2026-0146
-  orcamentoId        String        @unique
-  orcamento          Orcamento     @relation(fields: [orcamentoId], references: [id])
-  clienteId          String
-  cliente            Cliente       @relation(fields: [clienteId], references: [id])
-  status             StatusProjeto @default(AGUARDANDO_AGENDAMENTO)
-  potenciaKwp        Decimal?      @db.Decimal(8, 2)
-  observacoes        String?
-  concluidoEm        DateTime?
+  id                       String        @id @default(uuid())
+  codigo                   String        @unique // PRJ-2026-0146
+  orcamentoId              String        @unique
+  orcamento                Orcamento     @relation(fields: [orcamentoId], references: [id])
+  clienteId                String
+  cliente                  Cliente       @relation(fields: [clienteId], references: [id])
+  status                   StatusProjeto @default(AGUARDANDO_AGENDAMENTO)
+  potenciaKwp              Decimal?      @db.Decimal(8, 2)
+  observacoes              String?
+  concluidoEm              DateTime?
+  /// quem concluiu (gestor ou admin); a conclusão é sempre manual
+  concluidoPorId           String?
+  concluidoPor             Usuario?      @relation("ProjetosConcluidos", fields: [concluidoPorId], references: [id])
+  /// visita técnica validada: o projeto volta para "A agendar", com o aviso de agendar a instalação
+  visitaTecnicaConcluidaEm DateTime?
   /// cancelado pelo gestor antes de a execução começar (o cliente desistiu)
-  canceladoEm        DateTime?
-  motivoCancelamento String?
+  canceladoEm              DateTime?
+  motivoCancelamento       String?
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca         String?       @default(dbgenerated())
-  criadoEm           DateTime      @default(now())
-  editadoEm          DateTime      @updatedAt
+  textoBusca               String?       @default(dbgenerated())
+  criadoEm                 DateTime      @default(now())
+  editadoEm                DateTime      @updatedAt
 
   agendamentos Agendamento[]
   eventos      EventoProjeto[]
@@ -378,11 +387,16 @@ model Projeto {
 // Agenda das equipes
 // ---------------------------------------------------------------------------
 
+/// O tipo decide o efeito da validação sobre o projeto (lib/situacaoDoProjeto.ts):
+/// visita técnica devolve o projeto para "A agendar"; instalação leva a "Aguardando conclusão";
+/// manutenção e retrabalho não mexem na situação do projeto.
 enum TipoServico {
   INSTALACAO
   VISITA_TECNICA
   MANUTENCAO
+  /// não é mais oferecida na agenda (ficou para registros antigos); não mexe no projeto
   VISTORIA_CONCESSIONARIA
+  RETRABALHO
 }
 
 enum StatusAgendamento {
@@ -416,7 +430,7 @@ model Agendamento {
   projeto   Projeto           @relation(fields: [projetoId], references: [id])
   equipeId  String
   equipe    Equipe            @relation(fields: [equipeId], references: [id])
-  tipo      TipoServico
+  tipo      TipoServico       @default(INSTALACAO)
   status    StatusAgendamento @default(AGENDADO)
 
   dataInicio DateTime @db.Date
@@ -527,6 +541,7 @@ enum TipoEventoProjeto {
   PROJETO_EDITADO // potência ou observações
   PROJETO_CONCLUIDO
   PROJETO_CANCELADO
+  PROJETO_REABERTO // gestor reabriu um projeto concluído, com justificativa
 }
 
 /// Gravado por quem muda a obra (aprovação, agenda, app do técnico, validação, ficha do
@@ -534,17 +549,20 @@ enum TipoEventoProjeto {
 /// `reconstruido`: criado pela migration a partir das datas que existiam antes desta tabela
 /// (remarcações e devoluções antigas não tinham registro; o texto avisa o que é aproximado).
 model EventoProjeto {
-  id            String            @id @default(uuid())
-  projetoId     String
-  projeto       Projeto           @relation(fields: [projetoId], references: [id])
-  agendamentoId String?
-  agendamento   Agendamento?      @relation(fields: [agendamentoId], references: [id])
-  tipo          TipoEventoProjeto
-  descricao     String
-  usuarioId     String?
-  usuario       Usuario?          @relation(fields: [usuarioId], references: [id])
-  reconstruido  Boolean           @default(false)
-  criadoEm      DateTime          @default(now())
+  id             String            @id @default(uuid())
+  projetoId      String
+  projeto        Projeto           @relation(fields: [projetoId], references: [id])
+  agendamentoId  String?
+  agendamento    Agendamento?      @relation(fields: [agendamentoId], references: [id])
+  tipo           TipoEventoProjeto
+  descricao      String
+  usuarioId      String?
+  usuario        Usuario?          @relation(fields: [usuarioId], references: [id])
+  /// quando o evento mudou a situação do projeto: de qual para qual (autor e data já estão aqui)
+  statusAnterior StatusProjeto?
+  statusNovo     StatusProjeto?
+  reconstruido   Boolean           @default(false)
+  criadoEm       DateTime          @default(now())
 
   @@index([projetoId, criadoEm])
 }

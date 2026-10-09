@@ -50,6 +50,7 @@ export const STATUS_PROJETO = [
   'AGENDADO',
   'EM_EXECUCAO',
   'AGUARDANDO_VALIDACAO',
+  'AGUARDANDO_CONCLUSAO',
   'CONCLUIDO',
   'CANCELADO',
 ] as const;
@@ -67,6 +68,7 @@ export const TIPOS_EVENTO_PROJETO = [
   'PROJETO_EDITADO',
   'PROJETO_CONCLUIDO',
   'PROJETO_CANCELADO',
+  'PROJETO_REABERTO',
 ] as const;
 export type TipoEventoProjeto = (typeof TIPOS_EVENTO_PROJETO)[number];
 
@@ -75,6 +77,7 @@ export const TIPOS_SERVICO = [
   'VISITA_TECNICA',
   'MANUTENCAO',
   'VISTORIA_CONCESSIONARIA',
+  'RETRABALHO',
 ] as const;
 export type TipoServico = (typeof TIPOS_SERVICO)[number];
 

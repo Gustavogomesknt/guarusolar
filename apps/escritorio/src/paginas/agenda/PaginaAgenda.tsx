@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, TriangleAlert, Users, X } from 'lucide-react';
-import { TIPOS_SERVICO } from '@guarusolar/compartilhado';
+import { ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import type { AgendamentoNaAgenda, EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
@@ -79,9 +79,15 @@ export function PaginaAgenda() {
     queryKey: ['agenda', 'semana', segunda],
     queryFn: ({ signal }) => api.get<EquipeNaAgenda[]>(`/api/agenda?inicio=${segunda}&fim=${sabado}`, { signal }),
   });
+  // /agenda?projeto=<id> pode trazer um projeto que NÃO está "A agendar" (aguardando conclusão
+  // ou concluído), aberto pela ficha para ganhar outro serviço: ele entra na faixa enquanto a
+  // tela estiver aberta
+  const projetoNaUrl = parametros.get('projeto');
+  const [incluido, setIncluido] = useState<string | null>(null);
+  const incluir = projetoNaUrl ?? incluido;
   const pendentes = useQuery({
-    queryKey: ['agenda', 'pendentes'],
-    queryFn: ({ signal }) => api.get<ProjetoPendente[]>('/api/agenda/pendentes', { signal }),
+    queryKey: ['agenda', 'pendentes', incluir],
+    queryFn: ({ signal }) => api.get<ProjetoPendente[]>(`/api/agenda/pendentes${incluir ? `?incluir=${incluir}` : ''}`, { signal }),
   });
 
   const equipes = agenda.data ?? [];
@@ -94,9 +100,9 @@ export function PaginaAgenda() {
   }, [selecionadoId, selecionado, pendentes.data]);
 
   // /agenda?projeto=<id> (ficha e lista de Projetos): já chega com o projeto escolhido na faixa
-  const projetoNaUrl = parametros.get('projeto');
   useEffect(() => {
     if (!projetoNaUrl || !pendentes.data) return;
+    setIncluido(projetoNaUrl);
     if (pendentes.data.some((p) => p.id === projetoNaUrl)) setSelecionadoId(projetoNaUrl);
     setParametros(
       (atuais) => {
@@ -223,9 +229,16 @@ export function PaginaAgenda() {
                       ativo ? 'border-primary bg-primary/5' : 'border-border',
                     )}
                   >
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
-                      {tipo.rotulo}
-                    </span>
+                    {p.status === 'AGUARDANDO_AGENDAMENTO' ? (
+                      <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
+                        {tipo.rotulo}
+                      </span>
+                    ) : (
+                      // aberto pela ficha para outro serviço (mais um dia, retrabalho, manutenção)
+                      <span className="rounded-full border border-input bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground/80">
+                        {ROTULO_STATUS_PROJETO[p.status]} · outro serviço
+                      </span>
+                    )}
                     <span className="w-full truncate text-sm font-semibold">{p.cliente.nome}</span>
                     <span className="flex w-full items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span className="flex min-w-0 items-center gap-1 truncate">
@@ -288,7 +301,7 @@ export function PaginaAgenda() {
       </section>
 
       <footer aria-label="Legenda" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
-        {TIPOS_SERVICO.map((t) => {
+        {TIPOS_SERVICO_AGENDAVEIS.map((t) => {
           const tipo = TIPOS_SERVICO_AGENDA[t];
           return (
             <span key={t} className="flex items-center gap-2">

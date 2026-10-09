@@ -204,7 +204,8 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
         className="flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:ring-inset active:bg-muted/60"
       >
         <span className="flex flex-wrap items-center gap-2">
-          <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
+          {/* o tipo em destaque: o técnico precisa saber o que foi agendado antes de sair */}
+          <span className={cn('rounded-full border-2 px-3 py-1 text-sm font-bold', tipo.fundo, tipo.borda, tipo.texto)}>
             {tipo.rotulo}
           </span>
           <SituacaoServico status={servico.status} />

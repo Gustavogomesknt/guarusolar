@@ -18,9 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { diaDaApi, diasUteis, fimDoServico, nomeLongo, type Dia } from '@guarusolar/compartilhado';
+import { diaDaApi, diasUteis, fimDoServico, nomeLongo, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type Dia, type TipoServico } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
-import { CLASSE_SELECT } from './DialogAgendar';
+import { CLASSE_SELECT, EFEITO_DA_VALIDACAO } from './DialogAgendar';
 import { AvisosDeConflito, escalaPadrao, nomesDaEscala, QuemVai, SemTecnicoEscalado, useAvisosDeConflito, useTecnicos } from './escala';
 
 type Modo = 'ver' | 'remarcar' | 'escala' | 'cancelar';
@@ -45,6 +45,7 @@ export function DialogServico({
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
   const [dias, setDias] = useState('1');
+  const [tipoEscolhido, setTipoEscolhido] = useState<TipoServico>('INSTALACAO');
   const [escala, setEscala] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -55,6 +56,7 @@ export function DialogServico({
     setDia(diaDaApi(servico.dataInicio));
     setDias(String(diasUteis(diaDaApi(servico.dataInicio), diaDaApi(servico.dataFim))));
     setEscala(servico.escala.map((e) => e.usuario.id));
+    setTipoEscolhido(servico.tipo);
     setErro(null);
   }, [servico]);
 
@@ -83,7 +85,7 @@ export function DialogServico({
           ? `Serviço de ${cliente} cancelado. O projeto voltou para "A agendar".`
           : corpo.tecnicos
             ? `Escala de ${cliente} atualizada`
-            : `Serviço de ${cliente} remarcado para ${nomeLongo(dia)}`,
+            : `Serviço de ${cliente} atualizado: ${nomeLongo(dia)}`,
       );
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
       void clienteConsultas.invalidateQueries({ queryKey: ['projetos'] });
@@ -178,10 +180,33 @@ export function DialogServico({
             onSubmit={(e) => {
               e.preventDefault();
               setErro(null);
-              alterar.mutate({ equipeId, dataInicio: dia, dataFim: novoFim });
+              alterar.mutate({ equipeId, dataInicio: dia, dataFim: novoFim, ...(tipoEscolhido !== servico.tipo ? { tipo: tipoEscolhido } : {}) });
             }}
             className="flex flex-col gap-3"
           >
+            {/* o tipo define o roteiro de fotos: só muda antes de o técnico começar */}
+            <Campo
+              id="rm-tipo"
+              rotulo="Tipo de serviço"
+              obrigatorio
+              ajuda={servico.status === 'AGENDADO' ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar] : 'O tipo só pode mudar antes de o técnico começar.'}
+            >
+              <select
+                id="rm-tipo"
+                required
+                value={tipoEscolhido}
+                disabled={servico.status !== 'AGENDADO'}
+                onChange={(e) => setTipoEscolhido(e.target.value as TipoServico)}
+                className={CLASSE_SELECT}
+              >
+                {/* tipo antigo que não é mais oferecido continua aparecendo no serviço que já o tem */}
+                {[...new Set<TipoServico>([...TIPOS_SERVICO_AGENDAVEIS, servico.tipo])].map((t) => (
+                  <option key={t} value={t}>
+                    {TIPOS_SERVICO_AGENDA[t].rotulo}
+                  </option>
+                ))}
+              </select>
+            </Campo>
             <Campo
               id="rm-equipe"
               rotulo="Equipe"
@@ -254,7 +279,7 @@ export function DialogServico({
               </Button>
               <Button type="submit" form="form-remarcar" className="h-11 rounded-[10px] font-semibold" disabled={alterar.isPending || !dia}>
                 {alterar.isPending && <Loader2 className="animate-spin" aria-hidden />}
-                Salvar nova data
+                Salvar alterações
               </Button>
             </>
           )}

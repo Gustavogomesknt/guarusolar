@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { TIPOS_SERVICO, type TipoServico } from '@guarusolar/compartilhado';
+import { ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type TipoServico } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,13 @@ export const CLASSE_SELECT =
   'h-11 w-full rounded-[10px] border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
 export type PreAgendamento = { projetoId?: string; equipeId?: string; dia?: Dia };
+
+/** O que a validação das fotos faz com o projeto, conforme o tipo (o gestor escolhe sabendo). */
+export const EFEITO_DA_VALIDACAO: Record<(typeof ROTEIRO_DO_SERVICO)[TipoServico]['aoValidar'], string> = {
+  A_AGENDAR: 'Ao validar: o projeto volta para "A agendar", para a instalação.',
+  AGUARDANDO_CONCLUSAO: 'Ao validar: o projeto fica "Aguardando conclusão"; quem conclui é você.',
+  NAO_MEXE: 'Ao validar: a situação do projeto não muda.',
+};
 
 /**
  * Agendar um projeto aprovado. Aberto pela grade (dia clicado, já com equipe e data) ou pelo
@@ -125,9 +132,9 @@ export function DialogAgendar({
           </Campo>
 
           <div className="grid grid-cols-2 gap-3">
-            <Campo id="ag-tipo" rotulo="Tipo de serviço">
-              <select id="ag-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoServico)} className={CLASSE_SELECT}>
-                {TIPOS_SERVICO.map((t) => (
+            <Campo id="ag-tipo" rotulo="Tipo de serviço" obrigatorio ajuda={EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipo].aoValidar]}>
+              <select id="ag-tipo" required value={tipo} onChange={(e) => setTipo(e.target.value as TipoServico)} className={CLASSE_SELECT}>
+                {TIPOS_SERVICO_AGENDAVEIS.map((t) => (
                   <option key={t} value={t}>
                     {TIPOS_SERVICO_AGENDA[t].rotulo}
                   </option>

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowRight, Check, ChevronLeft, ChevronRight, ExternalLink, ImageOff, Loader2, MessageCircle } from 'lucide-react';
+import { ArrowRight, Check, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, ImageOff, Loader2, MessageCircle, RotateCcw } from 'lucide-react';
 import {
   formatarData,
   formatarDataHora,
   formatarHora,
+  ROTULO_STATUS_PROJETO,
   ROTULO_TIPO_SERVICO,
   segundaDaSemana,
   type TipoEventoProjeto,
@@ -52,6 +53,8 @@ export function FichaProjeto() {
   const { usuario } = useSessao();
   const gestor = usuario?.papel === 'GESTOR' || usuario?.papel === 'ADMIN';
   const [cancelando, setCancelando] = useState(false);
+  const [concluindo, setConcluindo] = useState(false);
+  const [reabrindo, setReabrindo] = useState(false);
 
   const ficha = useQuery({
     queryKey: ['projetos', 'ficha', id],
@@ -105,13 +108,34 @@ export function FichaProjeto() {
             {p.orcamento.descricaoServico && <span className="text-muted-foreground"> · {p.orcamento.descricaoServico}</span>}
           </p>
         </div>
-        {gestor && <AcaoPrincipal projeto={p} atual={atual} />}
+        {gestor && <AcaoPrincipal projeto={p} atual={atual} onConcluir={() => setConcluindo(true)} onReabrir={() => setReabrindo(true)} />}
       </header>
 
       {p.status === 'CANCELADO' && (
         <p role="status" className="rounded-xl border bg-muted px-4 py-3 text-sm text-foreground/80">
           Projeto cancelado{p.canceladoEm ? ` em ${formatarData(p.canceladoEm)}` : ''}
           {p.motivoCancelamento && <>: {p.motivoCancelamento}</>}. O orçamento continua aprovado; nada foi apagado.
+        </p>
+      )}
+
+      {/* visita técnica validada: o projeto voltou para "A agendar", agora para a instalação */}
+      {p.status === 'AGUARDANDO_AGENDAMENTO' && p.visitaTecnicaConcluidaEm && (
+        <p role="status" className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-[#0E3F7E]">
+          <ClipboardCheck className="size-4 shrink-0" aria-hidden />
+          Visita concluída — agendar instalação
+          <span className="font-normal text-foreground/70">· visita validada em {formatarData(p.visitaTecnicaConcluidaEm)}</span>
+        </p>
+      )}
+      {p.status === 'AGUARDANDO_CONCLUSAO' && (
+        <p role="status" className="rounded-xl border border-[#BFDCD2] bg-[#E3F1EC] px-4 py-3 text-sm text-[#1F5A4A]">
+          <strong className="font-semibold">Instalação validada.</strong> O projeto não se conclui sozinho: quando a obra terminar,{' '}
+          {gestor ? 'use "Concluir projeto"' : 'o gestor conclui o projeto'}. Se faltar mais um dia de serviço ou um retrabalho, é só agendar.
+        </p>
+      )}
+      {p.status === 'CONCLUIDO' && p.concluidoEm && (
+        <p role="status" className="rounded-xl border border-[#BFE3CC] bg-[#DCF0E3] px-4 py-3 text-sm text-[#17653E]">
+          Projeto concluído em {formatarDataHora(p.concluidoEm)}
+          {p.concluidoPor ? ` por ${p.concluidoPor.nome}` : ''}.
         </p>
       )}
 
@@ -139,25 +163,76 @@ export function FichaProjeto() {
         </div>
       )}
       <DialogCancelar projeto={p} aberto={cancelando} onAbertoChange={setCancelando} />
+      <DialogConcluir projeto={p} aberto={concluindo} onAbertoChange={setConcluindo} />
+      <DialogReabrir projeto={p} aberto={reabrindo} onAbertoChange={setReabrindo} />
     </div>
   );
 }
 
 /** O próximo passo do gestor, levando à tela que resolve (sem duplicar Agenda e Validação). */
-function AcaoPrincipal({ projeto: p, atual }: { projeto: Ficha; atual: Servico | null }) {
-  const botao = (para: string, texto: string) => (
-    <Button asChild className="h-11 rounded-[10px] font-semibold">
+function AcaoPrincipal({
+  projeto: p,
+  atual,
+  onConcluir,
+  onReabrir,
+}: {
+  projeto: Ficha;
+  atual: Servico | null;
+  onConcluir: () => void;
+  onReabrir: () => void;
+}) {
+  const botao = (para: string, texto: string, secundario = false) => (
+    <Button asChild variant={secundario ? 'outline' : 'default'} className={cn('h-11 rounded-[10px] font-semibold', secundario && 'bg-card')}>
       <Link to={para}>
         {texto} <ArrowRight aria-hidden />
       </Link>
     </Button>
   );
-  if (p.status === 'AGUARDANDO_AGENDAMENTO') return botao(`/agenda?projeto=${p.id}`, 'Agendar na agenda');
-  if (p.status === 'AGENDADO' && atual) return botao(agendaDaSemana(atual), 'Ver ou remarcar na agenda');
-  if ((p.status === 'AGUARDANDO_VALIDACAO' || atual?.status === 'DEVOLVIDO') && atual) {
-    return botao(`/validacao?servico=${atual.id}`, 'Abrir na validação');
-  }
-  return null;
+  // serviço em curso (inclusive manutenção ou retrabalho, que não mexem na situação do projeto)
+  const emCurso = atual && atual.status !== 'APROVADO' ? atual : null;
+  const doServico = emCurso
+    ? emCurso.status === 'AGUARDANDO_VALIDACAO' || emCurso.status === 'DEVOLVIDO'
+      ? botao(`/validacao?servico=${emCurso.id}`, 'Abrir na validação', p.status === 'AGUARDANDO_CONCLUSAO')
+      : botao(agendaDaSemana(emCurso), 'Ver ou remarcar na agenda', p.status === 'AGUARDANDO_CONCLUSAO')
+    : null;
+
+  // Concluir é SEMPRE do gestor, e só com a instalação validada ("Aguardando conclusão"): o
+  // botão aparece desde o começo, desabilitado, para ficar claro que o projeto não se conclui sozinho.
+  const porQueNao: Partial<Record<Ficha['status'], string>> = {
+    AGUARDANDO_AGENDAMENTO: 'Só depois de a instalação ser feita e validada',
+    AGENDADO: 'Só depois de o serviço ser feito e validado',
+    EM_EXECUCAO: 'Só depois de o serviço ser enviado e validado',
+    AGUARDANDO_VALIDACAO: 'Valide as fotos da instalação primeiro',
+  };
+  const concluir =
+    p.status === 'CONCLUIDO' || p.status === 'CANCELADO' ? null : (
+      <Button
+        type="button"
+        variant={p.status === 'AGUARDANDO_CONCLUSAO' ? 'default' : 'outline'}
+        className={cn('h-11 rounded-[10px] font-semibold', p.status !== 'AGUARDANDO_CONCLUSAO' && 'bg-card')}
+        disabled={p.status !== 'AGUARDANDO_CONCLUSAO'}
+        title={porQueNao[p.status]}
+        onClick={onConcluir}
+      >
+        <Check aria-hidden /> Concluir projeto
+      </Button>
+    );
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2.5">
+      {p.status === 'AGUARDANDO_AGENDAMENTO' && botao(`/agenda?projeto=${p.id}`, p.visitaTecnicaConcluidaEm ? 'Agendar instalação' : 'Agendar na agenda')}
+      {doServico}
+      {/* mais um dia de obra, retrabalho ou manutenção: o projeto não precisa estar "A agendar" */}
+      {!emCurso && p.status === 'AGUARDANDO_CONCLUSAO' && botao(`/agenda?projeto=${p.id}`, 'Agendar outro serviço', true)}
+      {!emCurso && p.status === 'CONCLUIDO' && botao(`/agenda?projeto=${p.id}`, 'Agendar manutenção ou retrabalho', true)}
+      {concluir}
+      {p.status === 'CONCLUIDO' && (
+        <Button type="button" variant="outline" className="h-11 rounded-[10px] bg-card font-semibold" onClick={onReabrir}>
+          <RotateCcw aria-hidden /> Reabrir projeto
+        </Button>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -176,7 +251,9 @@ const ETAPA_DO_STATUS: Record<Ficha['status'], number> = {
   AGENDADO: 1,
   EM_EXECUCAO: 2,
   AGUARDANDO_VALIDACAO: 3,
-  CONCLUIDO: 4,
+  // validação feita; a etapa "Concluído" só é alcançada pela ação do gestor
+  AGUARDANDO_CONCLUSAO: 3.5,
+  CONCLUIDO: 5,
   CANCELADO: -1,
 };
 
@@ -205,7 +282,9 @@ function Etapas({ projeto: p, atual }: { projeto: Ficha; atual: Servico | null }
               {i < ETAPAS.length - 1 && <span className={cn('h-0.5 flex-1 rounded', alcancada > i ? 'bg-primary' : 'bg-border')} />}
             </div>
             <span className={cn('text-sm', corrente ? 'font-semibold' : feita ? 'font-medium' : 'text-muted-foreground')}>{etapa.rotulo}</span>
-            <span className="text-xs text-muted-foreground">{quando ?? (p.status === 'CANCELADO' ? '' : '·')}</span>
+            <span className="text-xs text-muted-foreground">
+              {i === 4 && p.status === 'AGUARDANDO_CONCLUSAO' ? 'aguardando o gestor' : (quando ?? (p.status === 'CANCELADO' ? '' : '·'))}
+            </span>
           </li>
         );
       })}
@@ -599,6 +678,12 @@ function Historico({ projeto: p }: { projeto: Ficha }) {
               </time>
               <span className="flex flex-col gap-0.5">
                 <span>{e.descricao}</span>
+                {e.statusNovo && (
+                  <span className="text-xs text-foreground/70">
+                    Situação: {e.statusAnterior ? `${ROTULO_STATUS_PROJETO[e.statusAnterior]} → ` : ''}
+                    <strong className="font-semibold">{ROTULO_STATUS_PROJETO[e.statusNovo]}</strong>
+                  </span>
+                )}
                 <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {e.usuario?.nome ?? (e.reconstruido ? 'Autor não registrado' : 'Sistema')}
                   {e.reconstruido && <Selo>Reconstruído</Selo>}
@@ -669,6 +754,94 @@ function DialogCancelar({ projeto: p, aberto, onAbertoChange }: { projeto: Ficha
           </Button>
           <Button variant="destructive" className="h-11 rounded-[10px]" disabled={curto || cancelar.isPending} onClick={() => cancelar.mutate()}>
             {cancelar.isPending && <Loader2 className="animate-spin" aria-hidden />} Cancelar projeto
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Concluir e reabrir (só gestor e admin; a API confere)
+// ---------------------------------------------------------------------------------------------
+
+function DialogConcluir({ projeto: p, aberto, onAbertoChange }: { projeto: Ficha; aberto: boolean; onAbertoChange: (aberto: boolean) => void }) {
+  const consultas = useQueryClient();
+  const concluir = useMutation({
+    mutationFn: () => api.post(`/api/projetos/${p.id}/concluir`),
+    onSuccess: () => {
+      toast.success(`Projeto ${p.codigo} concluído`);
+      onAbertoChange(false);
+      void consultas.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+  const validados = p.agendamentos.filter((s) => s.status === 'APROVADO');
+  return (
+    <Dialog open={aberto} onOpenChange={onAbertoChange}>
+      <DialogContent className="bg-card sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Concluir o projeto {p.codigo}?</DialogTitle>
+          <DialogDescription>
+            Confirme que a obra terminou: não falta nenhum dia de instalação nem retrabalho. Serviços validados neste projeto:{' '}
+            {validados.length ? validados.map((s) => `${ROTULO_TIPO_SERVICO[s.tipo]} (${periodo(s)})`).join(', ') : 'nenhum'}. Dá para reabrir
+            depois, com justificativa.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" className="h-11 rounded-[10px]" onClick={() => onAbertoChange(false)}>
+            Voltar
+          </Button>
+          <Button className="h-11 rounded-[10px] font-semibold" disabled={concluir.isPending} onClick={() => concluir.mutate()}>
+            {concluir.isPending && <Loader2 className="animate-spin" aria-hidden />} Concluir projeto
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DialogReabrir({ projeto: p, aberto, onAbertoChange }: { projeto: Ficha; aberto: boolean; onAbertoChange: (aberto: boolean) => void }) {
+  const consultas = useQueryClient();
+  const [justificativa, setJustificativa] = useState('');
+  const reabrir = useMutation({
+    mutationFn: () => api.post(`/api/projetos/${p.id}/reabrir`, { justificativa: justificativa.trim() }),
+    onSuccess: () => {
+      toast.success(`Projeto ${p.codigo} reaberto: voltou para "Aguardando conclusão"`);
+      onAbertoChange(false);
+      setJustificativa('');
+      void consultas.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+  const curta = justificativa.trim().length < 5;
+  return (
+    <Dialog open={aberto} onOpenChange={onAbertoChange}>
+      <DialogContent className="bg-card sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reabrir o projeto {p.codigo}?</DialogTitle>
+          <DialogDescription>
+            O projeto volta para "Aguardando conclusão" e a data de conclusão é apagada. A justificativa fica no histórico, com o seu nome.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="justificativa-reabertura" className="text-[13px] font-medium">
+            Justificativa (obrigatória)
+          </Label>
+          <Textarea
+            id="justificativa-reabertura"
+            value={justificativa}
+            onChange={(e) => setJustificativa(e.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="Ex.: faltou trocar o disjuntor; cliente pediu mais um painel"
+            className="rounded-[10px] text-sm"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="h-11 rounded-[10px]" onClick={() => onAbertoChange(false)}>
+            Voltar
+          </Button>
+          <Button className="h-11 rounded-[10px] font-semibold" disabled={curta || reabrir.isPending} onClick={() => reabrir.mutate()}>
+            {reabrir.isPending && <Loader2 className="animate-spin" aria-hidden />} Reabrir projeto
           </Button>
         </DialogFooter>
       </DialogContent>

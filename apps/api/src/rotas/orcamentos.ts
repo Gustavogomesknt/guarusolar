@@ -494,6 +494,7 @@ async function mudarStatus(
       tipo: 'PROJETO_CRIADO',
       descricao: `Orçamento ${novo.codigo} aprovado: projeto criado`,
       usuarioId,
+      statusNovo: projeto.status,
     });
   }
 

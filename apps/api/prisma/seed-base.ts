@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
+import { sincronizarRoteiroDeFotos } from '../src/lib/roteiroDeFotos';
 
 /*
  * Dados de BASE, iguais em qualquer banco (produção inclusive): equipes, catálogo inicial e
@@ -42,32 +43,9 @@ async function main() {
     }
   }
 
-  // --- Checklist de fotos por tipo de serviço ------------------------------
-  // Editável pelo gestor: reflete o que o Alvo exige hoje.
-  const checklists = {
-    INSTALACAO: [
-      { chave: 'paineis_instalados', rotulo: 'Painéis instalados (visão geral)' },
-      { chave: 'estrutura_fixacao', rotulo: 'Estrutura e fixação' },
-      { chave: 'inversor', rotulo: 'Inversor instalado' },
-      { chave: 'string_box', rotulo: 'String box / quadro CC' },
-      { chave: 'aterramento', rotulo: 'Aterramento' },
-      { chave: 'padrao_entrada', rotulo: 'Padrão de entrada / medidor' },
-    ],
-    MANUTENCAO: [
-      { chave: 'antes', rotulo: 'Antes do serviço' },
-      { chave: 'depois', rotulo: 'Depois do serviço' },
-      { chave: 'leitura_inversor', rotulo: 'Leitura do inversor' },
-    ],
-  } as const;
-  for (const [tipoServico, itens] of Object.entries(checklists) as [keyof typeof checklists, (typeof checklists)[keyof typeof checklists]][]) {
-    for (const [ordem, item] of itens.entries()) {
-      await prisma.checklistFoto.upsert({
-        where: { tipoServico_chave: { tipoServico, chave: item.chave } },
-        update: { rotulo: item.rotulo, ordem },
-        create: { tipoServico, ordem, obrigatoria: true, ...item },
-      });
-    }
-  }
+  // --- Roteiro de fotos por tipo de serviço ---------------------------------
+  // Os itens ficam num lugar só: packages/compartilhado/src/roteiroDoServico.ts
+  await sincronizarRoteiroDeFotos(prisma);
 
   console.log('Pronto.');
 }

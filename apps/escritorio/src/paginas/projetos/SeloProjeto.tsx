@@ -10,6 +10,8 @@ export const CORES_PROJETO: Record<StatusProjeto, { fundo: string; texto: string
   AGENDADO: { fundo: 'bg-[#E1EAF7]', texto: 'text-[#23508F]' },
   EM_EXECUCAO: { fundo: 'bg-[#D6E2F3]', texto: 'text-[#0B2F5E]' },
   AGUARDANDO_VALIDACAO: { fundo: 'bg-[#FFF1C7]', texto: 'text-[#6E4E00]' },
+  // quase lá: falta só o gestor concluir (ainda não é verde: verde é só Concluído)
+  AGUARDANDO_CONCLUSAO: { fundo: 'bg-[#E3F1EC]', texto: 'text-[#1F5A4A]' },
   CONCLUIDO: { fundo: 'bg-[#DCF0E3]', texto: 'text-[#17653E]' },
   CANCELADO: { fundo: 'bg-[#E7EBF2]', texto: 'text-[#414F60]' },
 };

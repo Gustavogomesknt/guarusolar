@@ -8,17 +8,19 @@ import { ErroHttp, rota } from '../lib/erros';
 import { operacaoMudou } from '../lib/versaoDaOperacao';
 import { autenticar, autorizar } from '../lib/auth';
 import { registrarEvento } from '../lib/eventosProjeto';
+import { mudarSituacaoDoProjeto } from '../lib/situacaoDoProjeto';
 
 /*
  * Projetos (obras): lista e ficha. Comercial CONSULTA (responde "quando vão instalar?"); só o
- * gestor edita e cancela. Agendar, remarcar e validar continuam na Agenda e na Validação.
+ * gestor edita, cancela, CONCLUI e REABRE. Nenhum outro caminho conclui um projeto: a validação
+ * das fotos nunca conclui (lib/situacaoDoProjeto.ts). Agendar, remarcar e validar continuam na Agenda e na Validação.
  * Fotos: só o gestor as vê (regra 6); para o comercial, a ficha traz só a contagem.
  */
 export const rotasProjetos = Router();
 rotasProjetos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
 
 /** "Em andamento" = tudo que ainda não terminou (o filtro padrão da tela). */
-const EM_ANDAMENTO: StatusProjeto[] = ['AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO'];
+const EM_ANDAMENTO: StatusProjeto[] = ['AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'AGUARDANDO_CONCLUSAO'];
 const ordemDoStatus = (s: StatusProjeto) => STATUS_PROJETO.indexOf(s);
 
 rotasProjetos.get(
@@ -146,6 +148,7 @@ rotasProjetos.get(
               : {}),
           },
         },
+        concluidoPor: { select: { nome: true } },
         eventos: { include: { usuario: { select: { nome: true } } } },
       },
     });
@@ -211,6 +214,7 @@ rotasProjetos.post(
       const situacao: Partial<Record<StatusProjeto, string>> = {
         EM_EXECUCAO: 'a execução já começou',
         AGUARDANDO_VALIDACAO: 'o serviço já foi feito e está em validação',
+        AGUARDANDO_CONCLUSAO: 'a instalação já foi feita',
         CONCLUIDO: 'o projeto já foi concluído',
         CANCELADO: 'o projeto já está cancelado',
       };
@@ -222,14 +226,83 @@ rotasProjetos.post(
       if (agendados.length) {
         await tx.agendamento.updateMany({ where: { id: { in: agendados.map((a) => a.id) } }, data: { status: 'CANCELADO' } });
       }
-      const p = await tx.projeto.update({
-        where: { id: atual.id },
-        data: { status: 'CANCELADO', canceladoEm: new Date(), motivoCancelamento: motivo },
-      });
       const junto = agendados.length ? ` (${agendados.length} ${agendados.length === 1 ? 'serviço agendado cancelado' : 'serviços agendados cancelados'} junto)` : '';
-      await registrarEvento(tx, { projetoId: atual.id, tipo: 'PROJETO_CANCELADO', descricao: `Projeto cancelado: ${motivo}${junto}`, usuarioId: req.usuario!.id });
+      const p = await mudarSituacaoDoProjeto(tx, {
+        projetoId: atual.id,
+        para: 'CANCELADO',
+        evento: 'PROJETO_CANCELADO',
+        descricao: `Projeto cancelado: ${motivo}${junto}`,
+        usuarioId: req.usuario!.id,
+        dados: { canceladoEm: new Date(), motivoCancelamento: motivo },
+      });
       return p;
     });
+    operacaoMudou();
+    res.json(projeto);
+  }),
+);
+
+/**
+ * CONCLUIR o projeto: a ÚNICA porta para CONCLUIDO. Só o gestor (ou o admin), e só com o projeto
+ * "Aguardando conclusão" (instalação validada). A validação das fotos não conclui: uma instalação
+ * pode levar vários dias, com mais de um agendamento, e quem sabe que a obra terminou é o gestor.
+ */
+rotasProjetos.post(
+  '/:id/concluir',
+  autorizar('GESTOR'),
+  rota(async (req, res) => {
+    const atual = await prisma.projeto.findUnique({ where: { id: req.params.id } });
+    if (!atual) throw new ErroHttp(404, 'Projeto não encontrado');
+    if (atual.status !== 'AGUARDANDO_CONCLUSAO') {
+      const porque: Partial<Record<StatusProjeto, string>> = {
+        AGUARDANDO_AGENDAMENTO: 'a instalação ainda não foi agendada',
+        AGENDADO: 'há um serviço agendado que ainda não foi feito',
+        EM_EXECUCAO: 'há um serviço em execução',
+        AGUARDANDO_VALIDACAO: 'há um serviço esperando a validação das fotos',
+        CONCLUIDO: 'ele já está concluído',
+        CANCELADO: 'ele foi cancelado',
+      };
+      throw new ErroHttp(409, `Não dá para concluir o projeto ${atual.codigo}: ${porque[atual.status]}. Só um projeto "Aguardando conclusão" (com a instalação validada) pode ser concluído.`);
+    }
+    const projeto = await prisma.$transaction((tx) =>
+      mudarSituacaoDoProjeto(tx, {
+        projetoId: atual.id,
+        para: 'CONCLUIDO',
+        evento: 'PROJETO_CONCLUIDO',
+        descricao: 'Projeto concluído pelo gestor',
+        usuarioId: req.usuario!.id,
+        dados: { concluidoEm: new Date(), concluidoPorId: req.usuario!.id },
+      }),
+    );
+    operacaoMudou();
+    res.json(projeto);
+  }),
+);
+
+/**
+ * REABRIR um projeto concluído (faltou algo, concluído por engano): volta para "Aguardando
+ * conclusão", com justificativa obrigatória, que fica no histórico com o autor.
+ */
+rotasProjetos.post(
+  '/:id/reabrir',
+  autorizar('GESTOR'),
+  rota(async (req, res) => {
+    const { justificativa } = z
+      .object({ justificativa: z.string({ message: 'Explique por que o projeto está sendo reaberto' }).trim().min(5, 'Explique por que o projeto está sendo reaberto').max(500, 'Use até 500 caracteres') })
+      .parse(req.body);
+    const atual = await prisma.projeto.findUnique({ where: { id: req.params.id } });
+    if (!atual) throw new ErroHttp(404, 'Projeto não encontrado');
+    if (atual.status !== 'CONCLUIDO') throw new ErroHttp(409, `Só um projeto concluído pode ser reaberto. O projeto ${atual.codigo} não está concluído.`);
+    const projeto = await prisma.$transaction((tx) =>
+      mudarSituacaoDoProjeto(tx, {
+        projetoId: atual.id,
+        para: 'AGUARDANDO_CONCLUSAO',
+        evento: 'PROJETO_REABERTO',
+        descricao: `Projeto reaberto: ${justificativa}`,
+        usuarioId: req.usuario!.id,
+        dados: { concluidoEm: null, concluidoPorId: null },
+      }),
+    );
     operacaoMudou();
     res.json(projeto);
   }),

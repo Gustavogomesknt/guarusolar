@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { Prisma, type StatusAgendamento } from '@prisma/client';
+import { Prisma, type StatusAgendamento, type StatusProjeto, type TipoEventoProjeto, type TipoServico } from '@prisma/client';
 import { z } from 'zod';
-import { periodoDoServico, registrarEvento, rotuloDoServico } from '../lib/eventosProjeto';
+import { oa, periodoDoServico, registrarEvento, rotuloDoServico } from '../lib/eventosProjeto';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
@@ -18,7 +18,8 @@ import {
 } from '../lib/armazenamento';
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 import { filtroDoTecnico } from '../lib/acesso';
-import { diaDeHoje } from '@guarusolar/compartilhado';
+import { diaDeHoje, moveOProjeto, ROTEIRO_DO_SERVICO, ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
+import { mudarSituacaoDoProjeto, situacaoDeRepouso } from '../lib/situacaoDoProjeto';
 
 // Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
 const TIPOS_DE_FOTO_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
@@ -37,6 +38,32 @@ const idEquipe = z.string().trim().min(1, 'Escolha a equipe');
 const diaMes = (d: Date) => d.toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/');
 
 const EM_ABERTO: StatusAgendamento[] = ['AGENDADO', 'EM_EXECUCAO', 'DEVOLVIDO'];
+/** O projeto só tem um serviço por vez "em curso": estes ainda não foram validados nem cancelados. */
+const EM_CURSO: StatusAgendamento[] = [...EM_ABERTO, 'AGUARDANDO_VALIDACAO'];
+
+/**
+ * Registra no histórico um passo do serviço. Visita técnica e instalação MOVEM a situação do
+ * projeto (`para`); manutenção e retrabalho correm por fora e só deixam o evento: um projeto
+ * concluído continua concluído enquanto a manutenção é agendada, feita e validada.
+ */
+async function passoDoServico(
+  tx: Prisma.TransactionClient,
+  passo: {
+    servico: { id: string; projetoId: string; tipo: TipoServico };
+    para: StatusProjeto;
+    evento: TipoEventoProjeto;
+    descricao: string;
+    usuarioId: string;
+    dados?: Parameters<typeof mudarSituacaoDoProjeto>[1]['dados'];
+  },
+) {
+  const { servico, para, evento, descricao, usuarioId, dados } = passo;
+  if (moveOProjeto(servico.tipo)) {
+    await mudarSituacaoDoProjeto(tx, { projetoId: servico.projetoId, agendamentoId: servico.id, para, evento, descricao, usuarioId, dados });
+  } else {
+    await registrarEvento(tx, { projetoId: servico.projetoId, agendamentoId: servico.id, tipo: evento, descricao, usuarioId });
+  }
+}
 const ESCALA = { escala: { select: { usuario: { select: { id: true, nome: true } } }, orderBy: { usuario: { nome: 'asc' } } } } as const;
 
 type Tecnico = { id: string; nome: string };
@@ -172,9 +199,14 @@ rotasAgenda.get(
 /** Projetos aprovados que ainda não têm data: lista "A agendar". */
 rotasAgenda.get(
   '/pendentes',
-  rota(async (_req, res) => {
+  rota(async (req, res) => {
+    // `incluir`: um projeto que não está "A agendar" mas vai ganhar outro serviço (mais um dia
+    // de instalação, retrabalho ou manutenção), aberto pela ficha dele
+    const { incluir } = z.object({ incluir: z.string().uuid().optional() }).parse(req.query);
     const projetos = await prisma.projeto.findMany({
-      where: { status: 'AGUARDANDO_AGENDAMENTO' },
+      where: {
+        OR: [{ status: 'AGUARDANDO_AGENDAMENTO' }, ...(incluir ? [{ id: incluir, status: { in: ['AGUARDANDO_CONCLUSAO', 'CONCLUIDO'] as StatusProjeto[] } }] : [])],
+      },
       orderBy: { criadoEm: 'asc' },
       include: {
         cliente: { select: { nome: true, cidade: true, uf: true } },
@@ -192,7 +224,8 @@ rotasAgenda.post(
       .object({
         projetoId: z.string().uuid(),
         equipeId: idEquipe,
-        tipo: z.enum(['INSTALACAO', 'VISITA_TECNICA', 'MANUTENCAO', 'VISTORIA_CONCESSIONARIA']),
+        // obrigatório: é o tipo que decide o roteiro de fotos e o efeito da validação
+        tipo: z.enum(TIPOS_SERVICO_AGENDAVEIS, { message: 'Escolha o tipo de serviço' }),
         dataInicio: z.coerce.date(),
         dataFim: z.coerce.date(),
         // quem vai; ausente = os técnicos ativos da equipe (a composição padrão)
@@ -206,8 +239,18 @@ rotasAgenda.post(
 
     const projeto = await prisma.projeto.findUnique({ where: { id: dados.projetoId } });
     if (!projeto) throw new ErroHttp(404, 'Projeto não encontrado');
-    if (projeto.status !== 'AGUARDANDO_AGENDAMENTO') {
-      throw new ErroHttp(409, `O projeto ${projeto.codigo} já está agendado. Para mudar a data, remarque o serviço.`);
+    if (projeto.status === 'CANCELADO') throw new ErroHttp(409, `O projeto ${projeto.codigo} foi cancelado.`);
+    // um serviço por vez em cada projeto: o anterior precisa ser validado (ou cancelado) antes
+    const emCurso = await prisma.agendamento.findFirst({ where: { projetoId: projeto.id, status: { in: EM_CURSO } }, select: { tipo: true } });
+    if (emCurso) {
+      throw new ErroHttp(409, `O projeto ${projeto.codigo} já tem um serviço em andamento (${rotuloDoServico(emCurso.tipo).toLowerCase()}). Para mudar a data, remarque esse serviço; para agendar outro, ele precisa ser validado ou cancelado antes.`);
+    }
+    // o que cabe em cada situação do projeto
+    if (dados.tipo === 'VISITA_TECNICA' && projeto.status !== 'AGUARDANDO_AGENDAMENTO') {
+      throw new ErroHttp(409, `Visita técnica só antes da instalação: o projeto ${projeto.codigo} está "${ROTULO_STATUS_PROJETO[projeto.status]}". Use manutenção ou retrabalho.`);
+    }
+    if (dados.tipo === 'INSTALACAO' && projeto.status === 'CONCLUIDO') {
+      throw new ErroHttp(409, `O projeto ${projeto.codigo} está concluído. Agende como manutenção ou retrabalho, ou reabra o projeto na ficha dele para agendar mais um dia de instalação.`);
     }
     const equipe = await prisma.equipe.findFirst({ where: { id: dados.equipeId, ativa: true } });
     if (!equipe) throw new ErroHttp(404, 'Equipe não encontrada');
@@ -221,12 +264,11 @@ rotasAgenda.post(
       const criado = await tx.agendamento.create({
         data: { ...campos, escala: { create: escala.map((t) => ({ usuarioId: t.id })) } },
       });
-      await tx.projeto.update({ where: { id: dados.projetoId }, data: { status: 'AGENDADO' } });
-      await registrarEvento(tx, {
-        projetoId: dados.projetoId,
-        agendamentoId: criado.id,
-        tipo: 'SERVICO_AGENDADO',
-        descricao: `${rotuloDoServico(dados.tipo)} agendada para ${periodoDoServico(dados.dataInicio, dados.dataFim)} com a ${equipe.nome}: ${nomesDe(escala)}`,
+      await passoDoServico(tx, {
+        servico: { id: criado.id, projetoId: dados.projetoId, tipo: dados.tipo },
+        para: 'AGENDADO',
+        evento: 'SERVICO_AGENDADO',
+        descricao: `${rotuloDoServico(dados.tipo)} agendad${oa(dados.tipo)} para ${periodoDoServico(dados.dataInicio, dados.dataFim)} com a ${equipe.nome}: ${nomesDe(escala)}`,
         usuarioId: req.usuario!.id,
       });
       return criado;
@@ -247,6 +289,8 @@ rotasAgenda.patch(
         dataFim: z.coerce.date().optional(),
         // troca a escala (quem vai); só com o serviço em aberto
         tecnicos: z.array(z.string().uuid()).max(20).optional(),
+        // troca o tipo; só antes de o técnico começar (o tipo define o roteiro de fotos)
+        tipo: z.enum(TIPOS_SERVICO_AGENDAVEIS).optional(),
         status: z.enum(['AGENDADO', 'EM_EXECUCAO', 'CANCELADO']).optional(),
       })
       .parse(req.body);
@@ -254,6 +298,25 @@ rotasAgenda.patch(
     const atual = await prisma.agendamento.findUnique({ where: { id: req.params.id }, include: ESCALA });
     if (!atual) throw new ErroHttp(404, 'Serviço não encontrado');
     if (atual.status === 'CANCELADO') throw new ErroHttp(409, 'Este serviço já foi cancelado.');
+
+    // Trocar o tipo: só com o serviço ainda "Agendado". O tipo decide se o serviço move a
+    // situação do projeto, então a troca pode ter de levar o projeto junto (conferido aqui,
+    // aplicado na transação).
+    const tipoNovo = dados.tipo && dados.tipo !== atual.tipo ? dados.tipo : null;
+    let projetoComOTipoNovo: StatusProjeto | null = null;
+    if (tipoNovo) {
+      if (atual.status !== 'AGENDADO') throw new ErroHttp(409, 'O tipo do serviço só pode mudar antes de o técnico começar. Cancele este serviço e agende outro.');
+      const projeto = await prisma.projeto.findUniqueOrThrow({ where: { id: atual.projetoId }, select: { status: true, codigo: true } });
+      // a situação em que o projeto estaria sem este serviço
+      const repouso = moveOProjeto(atual.tipo) ? await situacaoDeRepouso(prisma, atual.projetoId) : projeto.status;
+      if (tipoNovo === 'VISITA_TECNICA' && repouso !== 'AGUARDANDO_AGENDAMENTO') {
+        throw new ErroHttp(409, `Visita técnica só antes da instalação: o projeto ${projeto.codigo} já tem instalação validada. Use manutenção ou retrabalho.`);
+      }
+      if (tipoNovo === 'INSTALACAO' && repouso === 'CONCLUIDO') {
+        throw new ErroHttp(409, `O projeto ${projeto.codigo} está concluído. Use manutenção ou retrabalho, ou reabra o projeto na ficha dele.`);
+      }
+      if (moveOProjeto(atual.tipo) !== moveOProjeto(tipoNovo)) projetoComOTipoNovo = moveOProjeto(tipoNovo) ? 'AGENDADO' : repouso;
+    }
 
     // remarcar: confere a equipe e o período novos, sem contar o próprio serviço
     const equipeId = dados.equipeId ?? atual.equipeId;
@@ -285,30 +348,42 @@ rotasAgenda.patch(
       if (saiu.length) await tx.escalaServico.deleteMany({ where: { agendamentoId: atual.id, usuarioId: { in: saiu.map((t) => t.id) } } });
       if (entrou.length) await tx.escalaServico.createMany({ data: entrou.map((t) => ({ agendamentoId: atual.id, usuarioId: t.id })) });
       const ag = await tx.agendamento.update({ where: { id: atual.id }, data: campos, include: { equipe: { select: { nome: true } }, ...ESCALA } });
-      // cancelado: o projeto volta para "A agendar" para ganhar outra data
-      if (dados.status === 'CANCELADO') {
-        await tx.projeto.update({ where: { id: atual.projetoId }, data: { status: 'AGUARDANDO_AGENDAMENTO' } });
-      }
       // histórico do projeto: o que mudou, com os valores de antes
       const servico = rotuloDoServico(atual.tipo);
       const evento = (tipo: 'SERVICO_REMARCADO' | 'SERVICO_INICIADO' | 'SERVICO_CANCELADO', descricao: string) =>
         registrarEvento(tx, { projetoId: atual.projetoId, agendamentoId: atual.id, tipo, descricao, usuarioId: req.usuario!.id });
       if (dados.status === 'CANCELADO') {
-        await evento('SERVICO_CANCELADO', `${servico} de ${periodoDoServico(atual.dataInicio, atual.dataFim)} cancelada`);
+        // o projeto volta ao repouso para ganhar outra data: "A agendar" ou, se já tem instalação
+        // validada, "Aguardando conclusão" (manutenção e retrabalho não mexem na situação)
+        await passoDoServico(tx, {
+          servico: atual,
+          para: await situacaoDeRepouso(tx, atual.projetoId),
+          evento: 'SERVICO_CANCELADO',
+          descricao: `${servico} de ${periodoDoServico(atual.dataInicio, atual.dataFim)} cancelad${oa(atual.tipo)}`,
+          usuarioId: req.usuario!.id,
+        });
       } else {
         const antes = periodoDoServico(atual.dataInicio, atual.dataFim);
         const depois = periodoDoServico(ag.dataInicio, ag.dataFim);
         const mudancas: string[] = [];
         if (antes !== depois) mudancas.push(`de ${antes} para ${depois}`);
         if (ag.equipeId !== atual.equipeId) mudancas.push(`equipe: ${ag.equipe.nome}`);
-        if (mudancas.length) await evento('SERVICO_REMARCADO', `${servico} remarcada: ${mudancas.join(' · ')}`);
+        if (mudancas.length) await evento('SERVICO_REMARCADO', `${servico} remarcad${oa(atual.tipo)}: ${mudancas.join(' · ')}`);
+        if (tipoNovo) {
+          const troca = `Tipo do serviço alterado: de ${servico} para ${rotuloDoServico(tipoNovo)}`;
+          if (projetoComOTipoNovo) {
+            await mudarSituacaoDoProjeto(tx, { projetoId: atual.projetoId, agendamentoId: atual.id, para: projetoComOTipoNovo, evento: 'SERVICO_REMARCADO', descricao: troca, usuarioId: req.usuario!.id });
+          } else {
+            await evento('SERVICO_REMARCADO', troca);
+          }
+        }
         // quem foi escalado fica no histórico: é o que responde depois "quem fez esta obra"
         if (saiu.length || entrou.length) {
           const partes = [saiu.length ? `saiu ${nomesDe(saiu)}` : '', entrou.length ? `entrou ${nomesDe(entrou)}` : ''].filter(Boolean);
           await evento('SERVICO_REMARCADO', `Escala alterada: ${partes.join(', ')}. Vão: ${nomesDe(ag.escala.map((e) => e.usuario))}`);
         }
         if (dados.status === 'EM_EXECUCAO' && atual.status !== 'EM_EXECUCAO') {
-          await evento('SERVICO_INICIADO', `${servico} marcada como em execução`);
+          await evento('SERVICO_INICIADO', `${servico} marcad${oa(atual.tipo)} como em execução`);
         }
       }
       return ag;
@@ -430,19 +505,32 @@ rotasValidacao.post(
         where: { agendamentoId: servico.id, revisao: { not: 'OK' } },
         data: { revisao: 'OK' },
       });
-      await tx.projeto.update({
-        where: { id: servico.projetoId },
-        data: { status: 'CONCLUIDO', concluidoEm: new Date() },
-      });
+      // O TIPO decide o efeito da validação (compartilhado/roteiroDoServico.ts). Nenhum tipo
+      // conclui o projeto: quem conclui é o gestor, na ficha (POST /api/projetos/:id/concluir).
       const aceitas = marcadas > 0 ? ` (${marcadas} ${marcadas === 1 ? 'foto marcada para refazer foi aceita' : 'fotos marcadas para refazer foram aceitas'})` : '';
-      await registrarEvento(tx, {
-        projetoId: servico.projetoId,
-        agendamentoId: servico.id,
-        tipo: 'SERVICO_APROVADO',
-        descricao: `${rotuloDoServico(servico.tipo)} aprovada na validação${aceitas}`,
-        usuarioId: req.usuario!.id,
-      });
-      await registrarEvento(tx, { projetoId: servico.projetoId, tipo: 'PROJETO_CONCLUIDO', descricao: 'Projeto concluído', usuarioId: req.usuario!.id });
+      const validada = `${rotuloDoServico(servico.tipo)} validad${oa(servico.tipo)}${aceitas}`;
+      const efeito = ROTEIRO_DO_SERVICO[servico.tipo].aoValidar;
+      if (efeito === 'A_AGENDAR') {
+        await passoDoServico(tx, {
+          servico,
+          para: 'AGUARDANDO_AGENDAMENTO',
+          evento: 'SERVICO_APROVADO',
+          descricao: `${validada}: visita concluída, falta agendar a instalação`,
+          usuarioId: req.usuario!.id,
+          dados: { visitaTecnicaConcluidaEm: new Date() },
+        });
+      } else if (efeito === 'AGUARDANDO_CONCLUSAO') {
+        await passoDoServico(tx, {
+          servico,
+          para: 'AGUARDANDO_CONCLUSAO',
+          evento: 'SERVICO_APROVADO',
+          descricao: `${validada}: aguardando o gestor concluir o projeto`,
+          usuarioId: req.usuario!.id,
+        });
+      } else {
+        // manutenção e retrabalho: a situação do projeto fica como está
+        await registrarEvento(tx, { projetoId: servico.projetoId, agendamentoId: servico.id, tipo: 'SERVICO_APROVADO', descricao: validada, usuarioId: req.usuario!.id });
+      }
       return ag;
     });
 
@@ -480,12 +568,11 @@ rotasValidacao.post(
         where: { id: { in: fotosParaRefazer }, agendamentoId: servico.id },
         data: { revisao: 'REFAZER', comentario: motivo },
       });
-      await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
-      await registrarEvento(tx, {
-        projetoId: servico.projetoId,
-        agendamentoId: servico.id,
-        tipo: 'SERVICO_DEVOLVIDO',
-        descricao: `${rotuloDoServico(servico.tipo)} devolvida ao técnico (${fotosParaRefazer.length} ${fotosParaRefazer.length === 1 ? 'foto' : 'fotos'} para refazer): ${motivo}`,
+      await passoDoServico(tx, {
+        servico,
+        para: 'EM_EXECUCAO',
+        evento: 'SERVICO_DEVOLVIDO',
+        descricao: `${rotuloDoServico(servico.tipo)} devolvid${oa(servico.tipo)} ao técnico (${fotosParaRefazer.length} ${fotosParaRefazer.length === 1 ? 'foto' : 'fotos'} para refazer): ${motivo}`,
         usuarioId: req.usuario!.id,
       });
       return tx.agendamento.update({
@@ -699,11 +786,10 @@ rotasTecnico.post(
         }
         if (servico.status === 'AGENDADO') {
           await tx.agendamento.update({ where: { id: servico.id }, data: { status: 'EM_EXECUCAO' } });
-          await tx.projeto.update({ where: { id: servico.projetoId }, data: { status: 'EM_EXECUCAO' } });
-          await registrarEvento(tx, {
-            projetoId: servico.projetoId,
-            agendamentoId: servico.id,
-            tipo: 'SERVICO_INICIADO',
+          await passoDoServico(tx, {
+            servico,
+            para: 'EM_EXECUCAO',
+            evento: 'SERVICO_INICIADO',
             descricao: `${rotuloDoServico(servico.tipo)} em execução: primeira foto enviada`,
             usuarioId: req.usuario!.id,
           });
@@ -787,10 +873,15 @@ rotasTecnico.post(
     const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
     conferirServicoAberto(servico.status);
     const { observacoesTecnico, sistemaTestado } = z
-      .object({ observacoesTecnico: z.string().optional(), sistemaTestado: z.boolean() })
+      .object({ observacoesTecnico: z.string().max(4000, 'Use até 4.000 caracteres').optional(), sistemaTestado: z.boolean().default(false) })
       .parse(req.body);
 
-    if (!sistemaTestado) throw new ErroHttp(400, 'Confirme o teste do sistema antes de enviar');
+    // o que o roteiro deste tipo exige (compartilhado/roteiroDoServico.ts)
+    const roteiro = ROTEIRO_DO_SERVICO[servico.tipo];
+    if (roteiro.exigeTesteDoSistema && !sistemaTestado) throw new ErroHttp(400, 'Confirme o teste do sistema antes de enviar');
+    if (roteiro.observacoes.obrigatorias && (observacoesTecnico ?? '').trim().length < 10) {
+      throw new ErroHttp(400, `Preencha o campo "${roteiro.observacoes.rotulo}" antes de enviar (${roteiro.observacoes.dica.charAt(0).toLowerCase()}${roteiro.observacoes.dica.slice(1)})`);
+    }
 
     const obrigatorias = await prisma.checklistFoto.findMany({
       where: { tipoServico: servico.tipo, obrigatoria: true, ativo: true },
@@ -819,15 +910,11 @@ rotasTecnico.post(
           motivoDevolucao: null,
         },
       });
-      await tx.projeto.update({
-        where: { id: servico.projetoId },
-        data: { status: 'AGUARDANDO_VALIDACAO' },
-      });
-      await registrarEvento(tx, {
-        projetoId: servico.projetoId,
-        agendamentoId: servico.id,
-        tipo: 'SERVICO_ENVIADO',
-        descricao: `${rotuloDoServico(servico.tipo)} ${servico.status === 'DEVOLVIDO' ? 'reenviada' : 'enviada'} para validação com o teste do sistema confirmado`,
+      await passoDoServico(tx, {
+        servico,
+        para: 'AGUARDANDO_VALIDACAO',
+        evento: 'SERVICO_ENVIADO',
+        descricao: `${rotuloDoServico(servico.tipo)} ${servico.status === 'DEVOLVIDO' ? 'reenviad' : 'enviad'}${oa(servico.tipo)} para validação${roteiro.exigeTesteDoSistema ? ' com o teste do sistema confirmado' : ''}`,
         usuarioId: req.usuario!.id,
       });
       return ag;

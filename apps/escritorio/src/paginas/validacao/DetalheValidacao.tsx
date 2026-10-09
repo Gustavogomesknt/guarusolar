@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ImageOff, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatarDataHora, formatarHora, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
+import { formatarDataHora, formatarHora, ROTEIRO_DO_SERVICO, ROTULO_TIPO_SERVICO, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
 import { api, ErroApi, urlDaFoto } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
@@ -23,14 +23,21 @@ import { FotoAmpliada } from './FotoAmpliada';
 import { CHAVE_FILA } from './fila';
 import { BotoesMarcacao, marcacaoInicial, rotuloDaFoto, type Marcacao } from './marcacao';
 
+/** O que acontece com o PROJETO depois de validar, conforme o tipo. Validar nunca conclui o projeto. */
+const DEPOIS_DE_VALIDAR: Record<(typeof ROTEIRO_DO_SERVICO)[keyof typeof ROTEIRO_DO_SERVICO]['aoValidar'], string> = {
+  A_AGENDAR: 'O projeto volta para "A agendar": falta agendar a instalação.',
+  AGUARDANDO_CONCLUSAO: 'O projeto fica "Aguardando conclusão": quando a obra terminar, conclua na ficha do projeto.',
+  NAO_MEXE: 'A situação do projeto não muda.',
+};
+
 const linkDoMapa = (f: FotoEmValidacao) =>
   f.latitude && f.longitude ? `https://www.google.com/maps/search/?api=1&query=${f.latitude},${f.longitude}` : null;
 
 /**
  * Serviço aberto na validação (protótipo "Gestor — validação do serviço"). O gestor marca
  * cada foto como OK ou Refazer; com alguma para refazer, o botão principal vira "Devolver ao
- * técnico (N)" e pede o motivo. Sem nenhuma, "Aprovar e concluir serviço" (com confirmação:
- * conclui o projeto). O componente é recriado a cada serviço (key), zerando as marcações.
+ * técnico (N)" e pede o motivo. Sem nenhuma, "Validar serviço" (com confirmação, que diz o que
+ * acontece com o projeto conforme o TIPO do serviço; validar nunca conclui o projeto). O componente é recriado a cada serviço (key), zerando as marcações.
  */
 export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido: (id: string) => void }) {
   const clienteConsultas = useQueryClient();
@@ -78,7 +85,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
     meta: { erroTratadoNoFormulario: true },
     onSuccess: () => {
       setConfirmarAprovacao(false);
-      resolvido(`Serviço de ${dados?.projeto.cliente.nome} aprovado. Projeto ${dados?.projeto.codigo} concluído.`, 'APROVADO');
+      resolvido(`${dados ? ROTULO_TIPO_SERVICO[dados.tipo] : 'Serviço'} de ${dados?.projeto.cliente.nome} validada. ${dados ? DEPOIS_DE_VALIDAR[ROTEIRO_DO_SERVICO[dados.tipo].aoValidar] : ''}`, 'APROVADO');
     },
     onError: (e) => {
       setConfirmarAprovacao(false);
@@ -115,6 +122,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
   const cliente = dados.projeto.cliente;
   const cidade = [cliente.cidade, cliente.uf].filter(Boolean).join('/');
   const devolvido = dados.status === 'DEVOLVIDO';
+  const roteiro = ROTEIRO_DO_SERVICO[dados.tipo];
   // quem foi escalado; quem enviou para validação (em serviço antigo, quem mandou a última foto)
   const escalados = dados.escala.map((e) => e.usuario.nome).join(', ');
   const enviadoPor = dados.enviadoPor?.nome ?? dados.fotos.at(-1)?.enviadaPor.nome;
@@ -197,9 +205,13 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">Teste do sistema</dt>
-          <dd className={cn('font-medium', dados.sistemaTestado ? 'text-[#17653E]' : 'text-[#A3231B]')}>
-            {dados.sistemaTestado ? 'Confirmado pelo técnico' : 'Não confirmado'}
-          </dd>
+          {roteiro.exigeTesteDoSistema ? (
+            <dd className={cn('font-medium', dados.sistemaTestado ? 'text-[#17653E]' : 'text-[#A3231B]')}>
+              {dados.sistemaTestado ? 'Confirmado pelo técnico' : 'Não confirmado'}
+            </dd>
+          ) : (
+            <dd className="text-muted-foreground">Não se aplica a {tipo.rotulo.toLowerCase()}</dd>
+          )}
         </div>
       </dl>
 
@@ -226,7 +238,9 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
 
       {dados.observacoesTecnico && (
         <div className="flex flex-col gap-1.5 rounded-xl border px-4 py-3.5">
-          <span className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">Observações do técnico</span>
+          <span className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            {roteiro.observacoes.obrigatorias ? roteiro.observacoes.rotulo : 'Observações do técnico'}
+          </span>
           <p className="text-sm leading-relaxed whitespace-pre-line">{dados.observacoesTecnico}</p>
         </div>
       )}
@@ -286,7 +300,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
           )}
         >
           {ocupado && <Loader2 className="animate-spin" aria-hidden />}
-          {paraRefazer.length > 0 ? `Devolver ao técnico (${paraRefazer.length})` : 'Aprovar e concluir serviço'}
+          {paraRefazer.length > 0 ? `Devolver ao técnico (${paraRefazer.length})` : `Validar ${tipo.rotulo.toLowerCase()}`}
         </Button>
       </div>
 
@@ -302,10 +316,10 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
       <Dialog open={confirmarAprovacao} onOpenChange={(aberto) => !aberto && !aprovar.isPending && setConfirmarAprovacao(false)}>
         <DialogContent className="bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Aprovar e concluir o serviço?</DialogTitle>
+            <DialogTitle>Validar as fotos da {tipo.rotulo.toLowerCase()}?</DialogTitle>
             <DialogDescription>
-              {cliente.nome} · o projeto <span className="font-mono">{dados.projeto.codigo}</span> passa a{' '}
-              <strong>Concluído</strong> e sai da fila de validação.
+              {cliente.nome} · projeto <span className="font-mono">{dados.projeto.codigo}</span>. O serviço fica{' '}
+              <strong>Validado</strong> e sai da fila. {DEPOIS_DE_VALIDAR[roteiro.aoValidar]}
               {marcadasNoBanco > 0 &&
                 ` ${marcadasNoBanco === 1 ? 'A foto que estava marcada' : `As ${marcadasNoBanco} fotos que estavam marcadas`} para refazer ${marcadasNoBanco === 1 ? 'será aceita' : 'serão aceitas'} como estão.`}
             </DialogDescription>
@@ -316,7 +330,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
             </Button>
             <Button className="h-11 rounded-[10px] font-semibold" onClick={() => aprovar.mutate(marcadasNoBanco > 0)} disabled={aprovar.isPending}>
               {aprovar.isPending && <Loader2 className="animate-spin" aria-hidden />}
-              Aprovar e concluir
+              Validar
             </Button>
           </DialogFooter>
         </DialogContent>

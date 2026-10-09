@@ -15,6 +15,7 @@ import { rotasUsuarios } from './rotas/usuarios';
 import { conferirArmazenamentoAoIniciar } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
+import { sincronizarRoteiroDeFotos } from './lib/roteiroDeFotos';
 import { bancoDeProducao } from './lib/ambienteDoBanco';
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
@@ -85,6 +86,12 @@ app.use(tratadorDeErros);
 
 const porta = Number(process.env.PORT ?? 3333);
 app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localhost:${porta}`));
+
+// O roteiro de fotos de cada tipo de serviço é editado no código (compartilhado/roteiroDoServico.ts):
+// ao subir, a tabela ChecklistFoto é acertada por ele. Sem travar a subida.
+sincronizarRoteiroDeFotos(prisma)
+  .then((mudancas) => mudancas && console.log(`[roteiro] checklist de fotos atualizado pelo código: ${mudancas} item(ns).`))
+  .catch((erro) => console.error(`[roteiro] não foi possível atualizar o checklist de fotos: ${(erro as Error).message.split('\n').pop()}`));
 
 // Produção ligada num banco sem a marca de produção = string de conexão errada (ex.: a de
 // desenvolvimento). Não derruba a API, mas grita no log; o /saude mostra producao: false.

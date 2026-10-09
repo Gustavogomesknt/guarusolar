@@ -14,4 +14,5 @@ export const TIPOS_SERVICO_AGENDA: Record<TipoServico, { rotulo: string; fundo: 
     borda: 'border-[#7A52A8]',
     texto: 'text-[#4E2F75]',
   },
+  RETRABALHO: { rotulo: ROTULO_TIPO_SERVICO.RETRABALHO, fundo: 'bg-[#FFF1C7]', borda: 'border-[#C99A00]', texto: 'text-[#6E4E00]' },
 };

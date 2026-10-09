@@ -98,7 +98,9 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/validacao/fila` | gestor | aguardando validação (mais antigos primeiro) e, depois, os devolvidos |
 | GET | `/api/validacao/versao` | gestor | versão da operação, sem banco: muda quando a fila, a agenda ou a situação de um serviço muda (o escritório pergunta a cada 20 s) |
 | GET | `/api/validacao/:id` | gestor | serviço com fotos na ordem do checklist, materiais, técnico e equipe |
-| POST | `/api/validacao/:id/aprovar` | gestor | conclui serviço e projeto; foto marcada para refazer exige `confirmarFotosMarcadas` |
+| POST | `/api/validacao/:id/aprovar` | gestor | valida o serviço (nunca conclui o projeto): visita técnica devolve o projeto para "A agendar", instalação leva a "Aguardando conclusão", manutenção e retrabalho não mexem; foto marcada para refazer exige `confirmarFotosMarcadas` |
+| POST | `/api/projetos/:id/concluir` | gestor | ÚNICA forma de concluir um projeto; só com ele "Aguardando conclusão" |
+| POST | `/api/projetos/:id/reabrir` | gestor | reabre um projeto concluído (`justificativa` obrigatória); volta para "Aguardando conclusão" |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
 | GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico | a foto (ou miniatura de 480 px); técnico só dos serviços em que está escalado |
 | GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |

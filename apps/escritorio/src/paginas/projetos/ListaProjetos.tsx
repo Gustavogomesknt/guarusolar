@@ -22,7 +22,7 @@ import { SeloProjeto } from './SeloProjeto';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 
 type Filtro = 'EM_ANDAMENTO' | StatusProjeto;
-const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'CONCLUIDO'];
+const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'AGUARDANDO_CONCLUSAO', 'CONCLUIDO'];
 const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_150px_130px_150px_minmax(0,1.2fr)]';
 
 const dia = (iso: string) => iso.slice(0, 10);
@@ -188,7 +188,24 @@ function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor:
     ) : null;
   switch (p.status) {
     case 'AGUARDANDO_AGENDAMENTO':
+      // visita técnica validada: o projeto voltou para cá, agora para a instalação
+      if (p.visitaTecnicaConcluidaEm) {
+        return (
+          <span className="flex flex-col">
+            <span className="font-medium text-[#0E3F7E]">Visita concluída — agendar instalação</span>
+            {gestor && atalho(`/agenda?projeto=${p.id}`, 'Agendar instalação')}
+          </span>
+        );
+      }
       return gestor ? atalho(`/agenda?projeto=${p.id}`, 'Agendar') : <span className="text-muted-foreground">Aguardando data</span>;
+    case 'AGUARDANDO_CONCLUSAO':
+      // instalação validada: quem conclui é o gestor, na ficha
+      return (
+        <span className="flex flex-col">
+          <span className="text-muted-foreground">Instalação validada</span>
+          {gestor && atalho(`/projetos/${p.id}`, 'Concluir projeto')}
+        </span>
+      );
     case 'AGENDADO':
       return s ? (
         <span className="flex flex-col">

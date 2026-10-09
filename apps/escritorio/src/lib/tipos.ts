@@ -64,6 +64,8 @@ export type EquipeNaAgenda = {
 /** Projeto aprovado sem data (GET /api/agenda/pendentes). */
 export type ProjetoPendente = {
   id: string;
+  /** "A agendar" ou, quando aberto pela ficha para outro serviço, aguardando conclusão ou concluído */
+  status: StatusProjeto;
   codigo: string;
   cliente: { nome: string; cidade: string | null; uf: string | null };
   orcamento: { codigo: string; valorTotal: string };
@@ -261,6 +263,8 @@ export type ProjetoNaLista = {
   status: StatusProjeto;
   criadoEm: string;
   concluidoEm: string | null;
+  /** visita técnica validada: "Visita concluída — agendar instalação" */
+  visitaTecnicaConcluidaEm: string | null;
   canceladoEm: string | null;
   clienteNome: string;
   clienteCidade: string | null;
@@ -340,6 +344,10 @@ export type FichaDoProjeto = {
     _count: { fotos: number };
     fotos?: FotoDoProjeto[];
   }[];
+  /** visita técnica validada (o projeto voltou para "A agendar") */
+  visitaTecnicaConcluidaEm: string | null;
+  /** a conclusão é sempre uma ação do gestor */
+  concluidoPor: { nome: string } | null;
   eventos: {
     id: string;
     tipo: TipoEventoProjeto;
@@ -348,6 +356,9 @@ export type FichaDoProjeto = {
     criadoEm: string;
     agendamentoId: string | null;
     usuario: { nome: string } | null;
+    /** quando o evento mudou a situação do projeto: de qual para qual */
+    statusAnterior: StatusProjeto | null;
+    statusNovo: StatusProjeto | null;
   }[];
 };
 

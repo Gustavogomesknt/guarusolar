@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Loader2, LocateFixed, MapPin } from 'lucide-react';
-import { diaDaApi, diaDeHoje, diaMes, nomeLongo, somarDias } from '@guarusolar/compartilhado';
+import { diaDaApi, diaDeHoje, diaMes, nomeLongo, ROTEIRO_DO_SERVICO, somarDias } from '@guarusolar/compartilhado';
 import { toast } from 'sonner';
 import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
@@ -99,7 +99,8 @@ export function Servico() {
     mutationFn: () =>
       api.post(`/api/tecnico/servicos/${id}/concluir`, {
         observacoesTecnico: rascunho?.observacoes.trim() || undefined,
-        sistemaTestado: rascunho?.testado ?? false,
+        // só vale para os tipos que pedem o teste (visita técnica não tem sistema para testar)
+        sistemaTestado: servico.data && ROTEIRO_DO_SERVICO[servico.data.tipo].exigeTesteDoSistema ? (rascunho?.testado ?? false) : false,
       }),
     meta: { erroTratadoNaTela: true },
     // sem sinal, falha na hora com a mensagem (não fica pausado esperando): nesta versão o
@@ -123,6 +124,7 @@ export function Servico() {
 
   const primeiroQueFalta = useRef<HTMLDivElement>(null);
   const caixaTeste = useRef<HTMLInputElement>(null);
+  const campoObservacoes = useRef<HTMLTextAreaElement>(null);
 
   if (servico.isPending) {
     return (
@@ -204,14 +206,20 @@ export function Servico() {
   const prontas = obrigatorios.filter((b) => b.item.enviada).length;
   const faltam = obrigatorios.length - prontas;
   const emAndamento = fotos.locais.filter((f) => f.estado !== 'erro').length;
+  // o que este tipo de serviço exige (compartilhado/roteiroDoServico.ts); a API confere de novo
+  const roteiro = ROTEIRO_DO_SERVICO[s.tipo];
+  const precisaTestar = roteiro.exigeTesteDoSistema;
   const testado = rascunho?.testado ?? false;
-  const bloqueado = faltam > 0 || !testado || emAndamento > 0 || concluir.isPending;
+  const faltaTeste = precisaTestar && !testado;
+  const faltaObservacao = roteiro.observacoes.obrigatorias && (rascunho?.observacoes ?? '').trim().length < 10;
+  const bloqueado = faltam > 0 || faltaObservacao || faltaTeste || emAndamento > 0 || concluir.isPending;
 
   let rotuloBotao = 'Enviar para validação';
   const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
   if (emAndamento > 0) rotuloBotao = fotos.semConexao ? `Sem sinal: ${fotosEscritas} na fila` : `Enviando ${fotosEscritas}…`;
   else if (faltam > 0) rotuloBotao = faltam === 1 ? 'Falta 1 foto obrigatória' : `Faltam ${faltam} fotos obrigatórias`;
-  else if (!testado) rotuloBotao = 'Confirme o teste do sistema';
+  else if (faltaObservacao) rotuloBotao = `Preencha: ${roteiro.observacoes.rotulo.toLowerCase()}`;
+  else if (faltaTeste) rotuloBotao = 'Confirme o teste do sistema';
 
   const extrasEnviadas = s.fotos.filter((f) => f.chave === null);
   const extrasLocais = fotos.locais.filter((f) => f.chave === null);
@@ -234,6 +242,12 @@ export function Servico() {
       <input ref={galeria} type="file" accept="image/*" onChange={aoEscolher} className="sr-only" tabIndex={-1} aria-hidden />
 
       <main className="flex flex-col gap-3.5 px-4 pt-4 pb-44">
+        {/* o tipo em destaque: é ele que define as fotos pedidas e o que o técnico veio fazer */}
+        <p className={cn('flex flex-col rounded-2xl border-l-[6px] px-4 py-3', tipo.fundo, tipo.borda, tipo.texto)}>
+          <span className="text-[11px] font-semibold tracking-[0.08em] uppercase">Serviço agendado</span>
+          <span className="font-titulo text-2xl leading-tight font-bold">{tipo.rotulo}</span>
+        </p>
+
         <section className="flex flex-col gap-1 rounded-2xl border bg-card p-4">
           <h2 className="font-sans text-base font-semibold tracking-normal">{cliente.nome}</h2>
           {endereco && (
@@ -243,9 +257,6 @@ export function Servico() {
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
-              {tipo.rotulo}
-            </span>
             <SituacaoServico status={s.status} />
             <span className="rounded-full bg-[#EDF1F6] px-2.5 py-1 text-xs text-[#3A4A5E]">
               {quando(diaDaApi(s.dataInicio), diaDaApi(s.dataFim))}
@@ -318,16 +329,22 @@ export function Servico() {
         />
 
         <label className="flex flex-col gap-1.5 text-sm font-medium text-[#3A4A5E]">
-          Observações do técnico
+          <span>
+            {roteiro.observacoes.rotulo}
+            {roteiro.observacoes.obrigatorias && <span className="font-normal text-destaque-texto"> (obrigatório)</span>}
+          </span>
           <textarea
-            rows={3}
+            ref={campoObservacoes}
+            rows={roteiro.observacoes.obrigatorias ? 5 : 3}
             value={rascunho?.observacoes ?? ''}
             onChange={(e) => mudarRascunho({ observacoes: e.target.value })}
-            placeholder="Ex.: ajuste no telhado, cabo extra usado, orientação ao cliente…"
+            placeholder={roteiro.observacoes.obrigatorias ? roteiro.observacoes.dica : 'Ex.: ajuste no telhado, cabo extra usado, orientação ao cliente…'}
+            aria-required={roteiro.observacoes.obrigatorias}
             className="resize-y rounded-xl border border-input bg-card p-3 leading-snug text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
           />
         </label>
 
+        {precisaTestar && (
         <label className="flex min-h-12 cursor-pointer items-start gap-3 py-1 text-sm leading-snug">
           <input
             ref={caixaTeste}
@@ -340,6 +357,7 @@ export function Servico() {
             ? 'Sistema testado, inversor gerando e cliente orientado'
             : 'Serviço conferido e cliente orientado'}
         </label>
+        )}
       </main>
 
       <footer className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-card px-4 pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
@@ -357,7 +375,7 @@ export function Servico() {
             // bloqueado: leva o técnico direto ao que falta, em vez de só não fazer nada
             if (emAndamento > 0 || concluir.isPending) return;
             const suave = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const alvo = faltam > 0 ? primeiroQueFalta.current : caixaTeste.current;
+            const alvo = faltam > 0 ? primeiroQueFalta.current : faltaObservacao ? campoObservacoes.current : caixaTeste.current;
             alvo?.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'center' });
             // o foco vai junto, para quem usa leitor de tela ou teclado
             (faltam > 0 ? alvo?.querySelector('button') : alvo)?.focus({ preventScroll: true });
