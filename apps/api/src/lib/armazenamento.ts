@@ -74,7 +74,25 @@ export function conferirArmazenamentoAoIniciar() {
     throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco", "sharepoint" ou "supabase".`);
   }
   if (!appTecnicoLiberado()) {
-    console.warn('[armazenamento] ATENÇÃO: produção sem armazenamento persistente de fotos (STORAGE_PROVIDER não é "supabase"). O app de campo abre, mas a API NÃO RECEBE FOTOS até configurar o Supabase Storage. /saude mostra "fotos".');
+    // Não derruba o servidor (o escritório continua funcionando), mas tem de GRITAR: sem isto a
+    // falha só aparece quando um técnico tenta enviar foto. Repete a cada hora no log.
+    const gritar = () =>
+      console.error(
+        [
+          '',
+          '################################################################################',
+          '##  [armazenamento] AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS                      ##',
+          '################################################################################',
+          `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}).`,
+          '  O disco deste servidor é apagado a cada publicação: a API RECUSA as fotos dos técnicos (503).',
+          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
+          '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET, e publique de novo. Confira em /saude: "recebendo":true.',
+          '################################################################################',
+          '',
+        ].join('\n'),
+      );
+    gritar();
+    setInterval(gritar, 60 * 60 * 1000).unref();
   }
   if (destinoAtual() === 'supabase') {
     const faltam = variaveisDoSupabaseFaltando();

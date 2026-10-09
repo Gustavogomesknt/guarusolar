@@ -22,7 +22,7 @@ As senhas desses painéis ficam em: **[ONDE ESTÃO AS SENHAS: gerenciador de sen
 ## 1. O sistema não abre
 
 1. **Espere 1 minuto.** O plano gratuito "dorme" depois de 15 minutos sem uso, e a primeira
-   abertura demora de 30 a 60 segundos. A tela mostra "Conectando ao sistema…". **Não fique
+   abertura demora de 30 a 60 segundos. A tela mostra "Conectando ao servidor…". **Não fique
    recarregando**: isso não acelera.
 2. Passou de 2 minutos? Abra o endereço com **`/saude`** no fim:
    - `"ok":true,"banco":"ok"` → o sistema está no ar. O problema é na máquina de quem está
@@ -58,12 +58,12 @@ painel. O que procurar:
 | Aparece no log | Significa | O que fazer |
 |---|---|---|
 | `[saude] banco inacessível` ou `Can't reach database server` | o banco não responde | item 3 (Supabase pausado) ou status.supabase.com |
-| "O espaço das fotos do sistema está cheio" (no celular do técnico) | o armazenamento provisório das fotos chegou a 95% | README, "Fotos no Supabase Storage": migrar para o SharePoint |
+| "O espaço das fotos do sistema está cheio" (no celular do técnico) | o espaço das fotos chegou a 95% do teto | ligue para o desenvolvedor (README, "Espaço das fotos") |
 | `Tenant or user not found` | banco pausado ou senha do banco trocada | item 3; se não for pausa, ligue para o desenvolvedor |
 | `Authentication failed ... credentials for ... are not valid` | o banco recusou a senha da string de conexão (num comando rodado no computador) | rodar `npm run db:diagnostico` na mesma janela; conferir a senha; depois de várias recusas o Supabase bloqueia o IP por um tempo |
 | `[banco] ATENÇÃO: ... NÃO tem a marca de produção` | o sistema está ligado no banco errado | **pare** e ligue para o desenvolvedor |
 | `login_falhou`, `login_bloqueado` | alguém errou a senha (normal em pequena quantidade) | só preocupe se forem dezenas seguidas |
-| `[armazenamento] ... app dos técnicos BLOQUEADO` | aviso esperado sem SharePoint | nada (ver fim da página) |
+| `AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS` (bloco com `####`) | a hospedagem perdeu a configuração de onde guardar as fotos | **é problema**: item 7 |
 
 ## 3. O Supabase pausou
 
@@ -155,22 +155,41 @@ com a pasta do projeto (**[QUAL COMPUTADOR: ex. o do Gustavo]**):
    primeira linha da resposta deve dizer **Banco: PRODUÇÃO**.
 4. **Feche a janela** do PowerShell ao terminar.
 
-## 7. Quem contatar
+## 7. Técnico não consegue enviar foto, ou o app de campo reclama de armazenamento
+
+Sinais: o técnico vê "As fotos ainda não estão sendo recebidas" ou "Aguardando o servidor: N fotos
+na fila" que não anda; no escritório aparece a faixa vermelha "As fotos não estão sendo
+armazenadas". **As fotos não se perdem**: ficam guardadas no celular do técnico e sobem sozinhas
+quando isto for resolvido. Peça para ele não limpar os dados do navegador nem desinstalar o app.
+
+1. Abra o endereço do sistema com **`/saude`** no fim e procure `"fotos"`:
+   - `"recebendo":true` → o armazenamento está certo. O problema é o sinal do celular ou o espaço
+     das fotos (mensagem "espaço cheio": tabela do item 2).
+   - `"recebendo":false` → a hospedagem está sem a configuração das fotos. Siga.
+2. Painel da Render → serviço **guarusolar** → **Environment**. Confira:
+   - `STORAGE_PROVIDER` tem de ser exatamente `supabase`;
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` e `SUPABASE_BUCKET` têm de estar preenchidas.
+   Corrija o que estiver diferente e salve.
+3. **Republique**: GitHub → **Actions** → **Publicar** → **Run workflow** (ou, no painel da Render,
+   **Manual Deploy**). Espere terminar.
+4. Abra o `/saude` de novo: tem de mostrar `"recebendo":true`. A faixa vermelha some sozinha em
+   até 10 minutos (ou recarregando a página) e as fotos dos celulares começam a subir.
+5. Se `STORAGE_PROVIDER` voltar sozinho para outro valor, ou a publicação falhar, ligue para o
+   desenvolvedor.
+
+## 8. Quem contatar
 
 | Quem | Para quê | Contato |
 |---|---|---|
 | Desenvolvedor | qualquer coisa fora deste guia | **[NOME · TELEFONE · E-MAIL]** |
 | Responsável na Guarusolar | decidir, avisar a equipe, dados da empresa | **[NOME · TELEFONE · E-MAIL]** |
-| Administrador do Microsoft 365 | SharePoint e fotos | **[NOME · TELEFONE · E-MAIL]** |
 
 ---
 
 ## É normal, não é problema
 
 - **A primeira abertura depois de um tempo parado demora até 1 minuto** ("Conectando ao
-  sistema…"). É o plano gratuito da hospedagem.
-- **O app dos técnicos diz que ainda não foi liberado.** Ele fica bloqueado até o SharePoint
-  (lugar seguro para as fotos) ser configurado. Sem isso, as fotos se perderiam.
+  servidor…"). É o plano gratuito da hospedagem.
 - **O PDF da proposta mostra `[PRAZO]` e `[GARANTIA]`.** São textos que ainda não foram
   preenchidos pelo desenvolvedor; não é erro do orçamento.
 - **O sistema às vezes desconecta e pede login.** O acesso vence sozinho (12 horas no

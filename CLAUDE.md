@@ -583,6 +583,18 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   publicação, reinício e sono (sem disco persistente no plano gratuito). O envio de foto responde
   503 com o motivo (a fila do celular guarda e reenvia sozinha) e a tela do serviço avisa antes
   (`fotosBloqueadas`). Não contorne isso. `/saude` mostra `fotos: { destino, recebendo }`.
+  **Essa falha tem de GRITAR** (em 09/10/2026 ela ficou muda até um técnico tentar entrar): bloco
+  `AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS` no log ao subir e a cada hora; faixa vermelha no
+  escritório para ADMIN e GESTOR (`AvisoDoArmazenamento`, campo `recebendo` de
+  `/api/armazenamento/uso`); passo a passo no SOCORRO.md, item 7.
+- **`render.yaml`: todo `value:` é REAPLICADO pela Render a cada sincronização do Blueprint**
+  (quando o arquivo muda no main), por cima do que estiver no painel. Foi o que derrubou as
+  fotos em 09/10/2026: o arquivo dizia `STORAGE_PROVIDER: disco`, o painel dizia `supabase`, e
+  uma edição do render.yaml (o teto do Storage) devolveu a produção para `disco`. Regra: o que é
+  ajustado no painel fica no arquivo com o VALOR DE PRODUÇÃO (`STORAGE_PROVIDER: supabase`) ou
+  com `sync: false` (segredos e as `SUPABASE_*`: a Render pede uma vez e não toca mais). Nunca
+  ponha no render.yaml um valor "de desenvolvimento" ou "provisório". Ao editar o arquivo,
+  confira depois o `/saude` de produção.
   **O LOGIN NUNCA é barrado por isso, nem por o técnico não ter serviço** (bug de 09/10/2026:
   essa condição barrava o login com "O app dos técnicos ainda não foi liberado. Fale com o gestor
   para combinar os serviços", que mandava procurar o problema na agenda quando ele estava na

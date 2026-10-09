@@ -1,7 +1,11 @@
 # Render — Guarusolar em produção (README, "Publicar em produção (Render)").
 # Blueprint: na Render, New › Blueprint › escolha este repositório. Um serviço só: API +
 # escritório (/) + app dos técnicos (/campo/). Plano gratuito: dorme após 15 min parado e o
-# primeiro pedido leva de 30 a 60 s (as telas avisam: AvisoServidorAcordando).
+# primeiro pedido leva de 30 a 60 s (as telas avisam: AvisoDeConexao).
+#
+# ATENÇÃO ao editar: todo "value:" deste arquivo é REAPLICADO na Render a cada sincronização do
+# Blueprint, por cima do que estiver no painel. O que é ajustado no painel tem de estar aqui com
+# o valor de produção ou com "sync: false" (a Render não toca).
 services:
   - type: web
     name: guarusolar
@@ -29,12 +33,22 @@ services:
         value: 12h
       - key: JWT_EXPIRES_IN_TECNICO
         value: 7d
-      # Sem Supabase Storage, a API não recebe fotos (o app de campo abre, mas avisa; o disco da
-      # Render é apagado a cada publicação e não há disco persistente no plano gratuito).
-      # Para liberar, troque no painel para "supabase" (destino definitivo das fotos: SUPABASE_URL,
-      # SUPABASE_SERVICE_KEY e SUPABASE_BUCKET). README, "Fotos no Supabase Storage".
+      # DESTINO DAS FOTOS. O valor aqui é o de PRODUÇÃO, de propósito: a Render reaplica os valores
+      # literais deste arquivo a cada sincronização do Blueprint (toda vez que o render.yaml muda no
+      # main), por cima do que estiver no painel. Até 09/10/2026 estava "disco": uma sincronização
+      # devolveu a produção para "disco" e a API parou de receber fotos sem avisar ninguém.
+      # NUNCA volte este valor para "disco". Com "supabase", a API só sobe se as três SUPABASE_*
+      # abaixo estiverem no painel (senão a publicação falha e a versão anterior continua no ar).
       - key: STORAGE_PROVIDER
-        value: disco
+        value: supabase
+      # Do projeto do Supabase de produção. "sync: false" = gerenciadas SÓ pelo painel: a Render
+      # pede o valor ao criar o Blueprint e depois nunca mais mexe nelas.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        sync: false
       # Teto do Storage, em MB (plano gratuito do Supabase: cerca de 1 GB). A API avisa em 70% e
       # recusa fotos novas em 95%. Mude aqui e no painel se o plano mudar.
       - key: SUPABASE_STORAGE_LIMITE_MB

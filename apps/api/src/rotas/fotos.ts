@@ -5,7 +5,7 @@ import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { tecnicoPodeVer } from '../lib/acesso';
 import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA, usoDoStorage } from '../lib/supabaseStorage';
-import { ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura } from '../lib/armazenamento';
+import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura } from '../lib/armazenamento';
 
 /*
  * Única saída das fotos dos serviços (casa e telhado do cliente, com localização): exige login
@@ -77,10 +77,13 @@ rotasArmazenamento.get(
   '/uso',
   rota(async (_req, res) => {
     const provedor = destinoAtual();
+    // false = produção sem lugar seguro para as fotos: a API as recusa (faixa vermelha no escritório)
+    const recebendo = appTecnicoLiberado();
     const uso = provedor === 'supabase' ? await usoDoStorage() : null;
-    if (!uso) return res.json({ provedor, limitado: false });
+    if (!uso) return res.json({ provedor, recebendo, limitado: false });
     res.json({
       provedor,
+      recebendo,
       limitado: true,
       usadoBytes: uso.usadoBytes,
       limiteBytes: uso.limiteBytes,
