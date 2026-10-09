@@ -587,6 +587,14 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   `AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS` no log ao subir e a cada hora; faixa vermelha no
   escritório para ADMIN e GESTOR (`AvisoDoArmazenamento`, campo `recebendo` de
   `/api/armazenamento/uso`); passo a passo no SOCORRO.md, item 7.
+  **A API NUNCA encerra o processo por causa do armazenamento** (decisão de 09/10/2026): no plano
+  gratuito a Render derruba o serviço por inatividade e ele sobe de novo a cada primeiro acesso,
+  sem publicação; uma recusa de inicialização por variável ausente deixaria o sistema INTEIRO
+  fora do ar por causa das fotos. Provedor inexistente ou `SUPABASE_*`/`MS_*` faltando =
+  `configuracaoIncompleta()` -> a API sobe em MODO DEGRADADO (`recebendo: false`, envio de foto
+  503 com o motivo, leitura de foto 503). Não reintroduza `throw` na inicialização por
+  configuração opcional. A única variável cuja falta impede a subida é `JWT_SECRET` (sem ela não
+  há como assinar nem conferir login; inventar um segredo padrão seria uma brecha).
 - **`render.yaml`: todo `value:` é REAPLICADO pela Render a cada sincronização do Blueprint**
   (quando o arquivo muda no main), por cima do que estiver no painel. Foi o que derrubou as
   fotos em 09/10/2026: o arquivo dizia `STORAGE_PROVIDER: disco`, o painel dizia `supabase`, e

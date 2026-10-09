@@ -20,7 +20,8 @@ import { bancoDeProducao } from './lib/ambienteDoBanco';
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
 
-// armazenamento mal configurado para a API ao subir, com a mensagem (não no primeiro upload em campo)
+// Armazenamento mal configurado NÃO impede a API de subir: ela sobe em modo degradado (não recebe
+// fotos) e grita no log. Único motivo para não subir: faltar o JWT_SECRET (lib/auth.ts).
 conferirArmazenamentoAoIniciar();
 
 const app = express();

@@ -37,8 +37,9 @@ services:
       # literais deste arquivo a cada sincronização do Blueprint (toda vez que o render.yaml muda no
       # main), por cima do que estiver no painel. Até 09/10/2026 estava "disco": uma sincronização
       # devolveu a produção para "disco" e a API parou de receber fotos sem avisar ninguém.
-      # NUNCA volte este valor para "disco". Com "supabase", a API só sobe se as três SUPABASE_*
-      # abaixo estiverem no painel (senão a publicação falha e a versão anterior continua no ar).
+      # NUNCA volte este valor para "disco". Se faltar alguma das três SUPABASE_* abaixo no painel, a
+      # API sobe do mesmo jeito, em modo degradado: não recebe fotos, grita no log, mostra a faixa
+      # vermelha no escritório e "recebendo": false no /saude.
       - key: STORAGE_PROVIDER
         value: supabase
       # Do projeto do Supabase de produção. "sync: false" = gerenciadas SÓ pelo painel: a Render

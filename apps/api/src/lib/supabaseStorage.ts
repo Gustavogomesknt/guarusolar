@@ -48,6 +48,9 @@ const ESPERAS_MS = [400, 1500];
 
 /** Chamada ao Storage com novas tentativas em falha de rede, 429 e 5xx. */
 async function chamar(metodo: string, rota: string, opcoes: { corpo?: Buffer | string; cabecalhos?: Record<string, string> } = {}): Promise<Response> {
+  // a API sobe mesmo sem estas variáveis (modo degradado): aqui a falta vira "indisponível" (503)
+  const faltam = variaveisDoSupabaseFaltando();
+  if (faltam.length) throw new ArmazenamentoIndisponivel(`Supabase Storage sem configuração: faltam ${faltam.join(', ')}`);
   let ultimo = '';
   for (let tentativa = 0; tentativa <= ESPERAS_MS.length; tentativa++) {
     if (tentativa > 0) await new Promise((r) => setTimeout(r, ESPERAS_MS[tentativa - 1]));

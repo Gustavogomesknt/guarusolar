@@ -56,7 +56,7 @@ const TIPOS: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jp
 export type Destino = 'disco' | 'sharepoint' | 'supabase';
 export const destinoAtual = (): Destino => {
   // maiúsculas e aspas digitadas no painel da hospedagem não mudam o destino
-  const valor = process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
+  const valor = provedorDeclarado();
   return valor === 'sharepoint' || valor === 'supabase' ? valor : 'disco';
 };
 
@@ -64,41 +64,66 @@ export const destinoAtual = (): Destino => {
 export const destinoDaChave = (chave: string): Destino =>
   chave.startsWith(PREFIXO_SHAREPOINT) ? 'sharepoint' : chave.startsWith(PREFIXO_SUPABASE) ? 'supabase' : 'disco';
 
+const provedorDeclarado = () => process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
+
 /**
- * Confere a configuração ao subir a API: STORAGE_PROVIDER desconhecido ou SharePoint sem as
- * variáveis param o servidor com a mensagem (melhor que falhar no primeiro upload em campo).
+ * O que falta na configuração do destino escolhido, ou null se está tudo no lugar. Nome de
+ * provedor que não existe e destino sem as variáveis dele NÃO derrubam a API: ela sobe em modo
+ * degradado (não recebe fotos) e avisa. Ver conferirArmazenamentoAoIniciar.
+ */
+export function configuracaoIncompleta(): string | null {
+  const valor = provedorDeclarado();
+  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase') {
+    return `STORAGE_PROVIDER="${valor}" não existe (use "supabase"; em desenvolvimento, "disco").`;
+  }
+  if (destinoAtual() === 'supabase') {
+    const faltam = variaveisDoSupabaseFaltando();
+    if (faltam.length) return `STORAGE_PROVIDER=supabase, mas faltam: ${faltam.join(', ')}.`;
+  }
+  if (destinoAtual() === 'sharepoint') {
+    const faltam = variaveisFaltando();
+    if (faltam.length) return `STORAGE_PROVIDER=sharepoint, mas faltam: ${faltam.join(', ')}.`;
+  }
+  return null;
+}
+
+/**
+ * Confere o armazenamento ao subir a API. NUNCA encerra o processo: no plano gratuito da Render
+ * o serviço é derrubado por inatividade e sobe de novo a cada primeiro acesso, sem publicação
+ * nenhuma; se uma variável faltasse nessa hora e a API se recusasse a subir, o SISTEMA INTEIRO
+ * (orçamentos, agenda, tudo) ficaria fora do ar por causa das fotos. Com a configuração errada
+ * ou incompleta ela sobe em MODO DEGRADADO: grita no log (agora e a cada hora), /saude mostra
+ * "recebendo": false, o escritório mostra a faixa vermelha e o envio de foto é recusado com o
+ * motivo (503: a fila do celular guarda e reenvia). Nenhuma foto se perde.
  */
 export function conferirArmazenamentoAoIniciar() {
-  const valor = process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
-  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase') {
-    throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco", "sharepoint" ou "supabase".`);
-  }
   if (!appTecnicoLiberado()) {
-    // Não derruba o servidor (o escritório continua funcionando), mas tem de GRITAR: sem isto a
-    // falha só aparece quando um técnico tenta enviar foto. Repete a cada hora no log.
-    const gritar = () =>
+    const gritar = () => {
+      const incompleta = configuracaoIncompleta();
       console.error(
         [
           '',
           '################################################################################',
           '##  [armazenamento] AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS                      ##',
           '################################################################################',
-          `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}).`,
-          '  O disco deste servidor é apagado a cada publicação: a API RECUSA as fotos dos técnicos (503).',
+          incompleta
+            ? `  ${incompleta}`
+            : `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}): o disco deste servidor é apagado a cada publicação.`,
+          '  A API está no ar em MODO DEGRADADO: tudo funciona, menos o envio de fotos, que é RECUSADO (503).',
           '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
           '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET, e publique de novo. Confira em /saude: "recebendo":true.',
           '################################################################################',
           '',
         ].join('\n'),
       );
+    };
     gritar();
     setInterval(gritar, 60 * 60 * 1000).unref();
+    return;
   }
   if (destinoAtual() === 'supabase') {
-    const faltam = variaveisDoSupabaseFaltando();
-    if (faltam.length) throw new Error(`STORAGE_PROVIDER=supabase, mas faltam: ${faltam.join(', ')}`);
-    // Sem travar a subida da API: confere o bucket e o espaço e deixa no log. Bucket público
-    // não derruba o servidor, mas nenhuma foto é gravada nele (conferirBucketPrivado ao gravar).
+    // Confere o bucket e o espaço e deixa no log. Bucket público não derruba o servidor, mas
+    // nenhuma foto é gravada nele (conferirBucketPrivado ao gravar).
     const conferir = async () => {
       try {
         await conferirBucketPrivado(true);
@@ -114,8 +139,6 @@ export function conferirArmazenamentoAoIniciar() {
     return;
   }
   if (destinoAtual() !== 'sharepoint') return;
-  const faltando = variaveisFaltando();
-  if (faltando.length) throw new Error(`STORAGE_PROVIDER=sharepoint, mas faltam: ${faltando.join(', ')}`);
   const avisar = () => {
     const aviso = avisoDeValidadeDoSegredo();
     if (aviso) console.warn(`[armazenamento] ${aviso}`);
@@ -137,10 +160,12 @@ export function conferirArmazenamentoAoIniciar() {
  * variável STORAGE_PROVIDER da hospedagem, onde ele estava.
  */
 export const appTecnicoLiberado = () =>
-  process.env.NODE_ENV !== 'production' ||
-  destinoAtual() === 'sharepoint' ||
-  destinoAtual() === 'supabase' ||
-  process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim';
+  // destino escolhido sem as variáveis dele (ou nome que não existe): não há onde gravar
+  configuracaoIncompleta() === null &&
+  (process.env.NODE_ENV !== 'production' ||
+    destinoAtual() === 'sharepoint' ||
+    destinoAtual() === 'supabase' ||
+    process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim');
 
 /** Para o técnico (tela do serviço e fila de fotos): o motivo de verdade, e a quem avisar. */
 export const AVISO_FOTOS_BLOQUEADAS =
