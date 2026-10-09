@@ -17,6 +17,8 @@
     "db:limpar": "tsx prisma/limpar.ts",
     "postinstall": "prisma generate",
     "sharepoint:conferir": "tsx scripts/sharepoint-conferir.ts",
+    "storage:conferir": "tsx scripts/storage-conferir.ts",
+    "fotos:migrar": "tsx scripts/migrar-fotos.ts",
     "db:seed:base": "tsx prisma/seed-base.ts",
     "db:marcar-producao": "tsx scripts/marcar-producao.ts",
     "db:conferir-producao": "tsx scripts/conferir-producao.ts",

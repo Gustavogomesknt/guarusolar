@@ -4,7 +4,8 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { tecnicoPodeVer } from '../lib/acesso';
-import { ArmazenamentoIndisponivel, ArquivoNaoEncontrado, lerArquivo, lerMiniatura } from '../lib/armazenamento';
+import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA, usoDoStorage } from '../lib/supabaseStorage';
+import { ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura } from '../lib/armazenamento';
 
 /*
  * Única saída das fotos dos serviços (casa e telhado do cliente, com localização): exige login
@@ -59,5 +60,36 @@ rotasFotos.get(
         'Content-Disposition': 'inline',
       })
       .send(arquivo.dados);
+  }),
+);
+
+/**
+ * Espaço das fotos (só GESTOR e ADMIN), para o aviso do escritório. Só há o que medir com o
+ * Supabase Storage (provisório, 1 GB no plano gratuito): com disco ou SharePoint, `limitado: false`.
+ */
+export const rotasArmazenamento = Router();
+rotasArmazenamento.use(autenticar, autorizar('GESTOR'));
+
+// tamanho médio de uma foto reduzida pelo app (400 KB a 1 MB) mais a miniatura
+const BYTES_POR_FOTO = 730 * 1024;
+
+rotasArmazenamento.get(
+  '/uso',
+  rota(async (_req, res) => {
+    const provedor = destinoAtual();
+    const uso = provedor === 'supabase' ? await usoDoStorage() : null;
+    if (!uso) return res.json({ provedor, limitado: false });
+    res.json({
+      provedor,
+      limitado: true,
+      usadoBytes: uso.usadoBytes,
+      limiteBytes: uso.limiteBytes,
+      percentual: Math.round(uso.fracao * 1000) / 10,
+      nivel: uso.nivel,
+      avisaEm: FRACAO_DE_AVISO * 100,
+      recusaEm: FRACAO_DE_RECUSA * 100,
+      // quantas fotos ainda cabem antes de a API recusar (estimativa)
+      fotosRestantes: Math.max(0, Math.floor((uso.limiteBytes * FRACAO_DE_RECUSA - uso.usadoBytes) / BYTES_POR_FOTO)),
+    });
   }),
 );

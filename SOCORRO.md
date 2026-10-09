@@ -58,6 +58,7 @@ painel. O que procurar:
 | Aparece no log | Significa | O que fazer |
 |---|---|---|
 | `[saude] banco inacessível` ou `Can't reach database server` | o banco não responde | item 3 (Supabase pausado) ou status.supabase.com |
+| "O espaço das fotos do sistema está cheio" (no celular do técnico) | o armazenamento provisório das fotos chegou a 95% | README, "Fotos no Supabase Storage": migrar para o SharePoint |
 | `Tenant or user not found` | banco pausado ou senha do banco trocada | item 3; se não for pausa, ligue para o desenvolvedor |
 | `Authentication failed ... credentials for ... are not valid` | o banco recusou a senha da string de conexão (num comando rodado no computador) | rodar `npm run db:diagnostico` na mesma janela; conferir a senha; depois de várias recusas o Supabase bloqueia o IP por um tempo |
 | `[banco] ATENÇÃO: ... NÃO tem a marca de produção` | o sistema está ligado no banco errado | **pare** e ligue para o desenvolvedor |

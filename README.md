@@ -251,6 +251,72 @@ em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e 
 precisa ser de um item do checklist daquele tipo de serviço (400). A agenda do técnico mostra,
 além de hoje a 7 dias, os serviços em aberto de dias anteriores, até serem enviados.
 
+### Fotos no Supabase Storage (provisório)
+
+Enquanto o SharePoint do cliente não fica pronto, as fotos podem ir para um bucket do Supabase
+Storage, no mesmo projeto do banco (`STORAGE_PROVIDER=supabase`). **É provisório: o destino final
+continua sendo o SharePoint.** Com esse provedor configurado, o app dos técnicos libera em produção.
+
+**Segurança.** O bucket tem de ser **privado**: a API confere e se recusa a gravar em bucket
+público. Só a API fala com o Storage, com a chave secreta, que fica só nas variáveis da hospedagem.
+Nenhum link do Supabase (público ou assinado) é gerado: as fotos continuam saindo só por
+`GET /api/fotos/:id`, com login e a conferência de papel e de escala.
+
+**No painel do Supabase** (projeto de produção):
+
+1. Storage › **New bucket** › nome `fotos-servicos` › **Public bucket desligado**. Opcional: limite
+   de 15 MB por arquivo e tipos `image/jpeg, image/png, image/webp`. Não crie políticas (policies):
+   sem política, só a chave secreta acessa.
+2. Anote os valores das variáveis:
+
+| Variável | Onde pegar |
+| --- | --- |
+| `STORAGE_PROVIDER` | escreva `supabase` |
+| `SUPABASE_URL` | Project Settings › Data API (ou API) › **Project URL**: `https://<id-do-projeto>.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | Project Settings › API Keys › **service_role** (aba "Legacy API keys") ou uma **Secret key** `sb_secret_…`. É segredo: nunca no repositório |
+| `SUPABASE_BUCKET` | o nome do bucket: `fotos-servicos` |
+| `SUPABASE_STORAGE_LIMITE_MB` | opcional; o limite do plano em MB (padrão 1024, o 1 GB do gratuito) |
+
+3. Confira antes de ligar, numa janela com essas variáveis e a `DATABASE_URL` de produção:
+   `npm run storage:conferir` (bucket privado, envio, leitura, prova de que o arquivo não abre sem
+   login, medição do espaço). Depois cadastre as variáveis na hospedagem e publique.
+
+**A Data API desativada não deve atrapalhar**: o Storage é outro serviço do Supabase, que fala com o
+banco por conta própria (a Data API é só o acesso às tabelas por REST). O `storage:conferir` prova
+isso no projeto de verdade. Se algum passo falhar dizendo que a API está desativada, **não ligue a
+Data API sem pensar**: as tabelas do sistema não têm RLS e ficariam legíveis por quem tivesse a
+chave pública; o caminho seria ligar com a lista de "Exposed schemas" vazia.
+
+**Espaço (1 GB no plano gratuito).** Cada foto chega do celular já reduzida (400 KB a 1 MB) e ganha
+uma miniatura de ~30 KB: cabem cerca de **1.300 fotos** (de ~950 a ~2.300, conforme o tamanho), algo
+como 130 a 160 serviços com 8 a 10 fotos. Fotos refeitas continuam ocupando espaço (nada é apagado).
+A API mede o uso na tabela `storage.objects` do próprio banco e:
+
+- a partir de **80%**: aviso no topo do escritório, para gestor e admin, e no log;
+- a partir de **95%**: recusa fotos novas com a mensagem "O espaço das fotos do sistema está cheio.
+  Avise o escritório…". A foto continua guardada no celular e o técnico reenvia depois.
+
+O que já foi enviado continua abrindo. A saída é migrar para o SharePoint (abaixo).
+
+**Migrar as fotos para o SharePoint, sem perder nada** (quando o administrador do Microsoft 365
+concluir o registro do aplicativo):
+
+1. Configure as variáveis `MS_*` e rode `npm run sharepoint:conferir`.
+2. Faça o Backup do banco (Actions › Backup do banco).
+3. Na hospedagem: `STORAGE_PROVIDER=sharepoint` e as `MS_*`, **mantendo as `SUPABASE_*`** (as fotos
+   antigas ainda são lidas de lá). Publique. Fotos novas já vão para o SharePoint; as antigas
+   continuam abrindo do Supabase, porque a leitura segue a chave de cada foto.
+4. Numa janela com a `DATABASE_URL` de produção e as variáveis dos **dois** destinos:
+   `npm run fotos:migrar` (só mostra quantas são) e depois `npm run fotos:migrar -- --executar`.
+   Cada foto é copiada, lida de volta para conferir o tamanho e só então a chave muda no banco.
+   Se parar no meio, rode de novo: as já migradas não entram mais.
+5. Confira no sistema (Validação e ficha de alguns projetos) e no SharePoint.
+6. Só depois de conferir, libere o espaço do Supabase: esvazie o bucket pelo painel. As fotos
+   "substituídas" (refeitas) não têm registro no banco e não são migradas: baixe a pasta antes, se
+   quiser guardá-las. (Quem preferir pode rodar o passo 4 já com `--apagar-origem`, que apaga do
+   Supabase cada foto logo depois de conferida no SharePoint.)
+7. Tire as `SUPABASE_*` da hospedagem. A partir daí o Supabase guarda só o banco.
+
 ### Fotos no SharePoint (produção)
 
 Em produção as fotos vão para uma biblioteca do SharePoint da Guarusolar (`STORAGE_PROVIDER=sharepoint`);

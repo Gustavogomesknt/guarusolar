@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { caminhoDaFoto, PASTA_DAS_SUBSTITUIDAS, type DestinoDaFoto } from './nomesDeArquivo';
 import {
   ArmazenamentoIndisponivel,
   ArquivoNaoEncontrado,
+  apagarDoSharepoint,
   avisoDeValidadeDoSegredo,
   baixarDoSharepoint,
   enviarAoSharepoint,
@@ -13,20 +14,32 @@ import {
   moverNoSharepoint,
   variaveisFaltando,
 } from './sharepoint';
+import {
+  apagarDoSupabase,
+  ArmazenamentoCheio,
+  baixarDoSupabase,
+  conferirBucketPrivado,
+  enviarAoSupabase,
+  moverNoSupabase,
+  usoDoStorage,
+  variaveisDoSupabaseFaltando,
+} from './supabaseStorage';
 
-export { ArmazenamentoIndisponivel, ArquivoNaoEncontrado };
+export { ArmazenamentoCheio, ArmazenamentoIndisponivel, ArquivoNaoEncontrado };
 export type { DestinoDaFoto };
 
 /**
- * Camada de armazenamento das fotos. Dois destinos:
+ * Camada de armazenamento das fotos. Três destinos:
  *
  * - "disco" (padrão, desenvolvimento): pasta STORAGE_DIR (uploads/). Chave = caminho relativo.
- * - "sharepoint" (produção): biblioteca do SharePoint do cliente (lib/sharepoint.ts).
- *   Chave = "sp:<id do arquivo no SharePoint>".
+ * - "sharepoint" (produção, destino FINAL): biblioteca do SharePoint do cliente
+ *   (lib/sharepoint.ts). Chave = "sp:<id do arquivo no SharePoint>".
+ * - "supabase" (produção, TEMPORÁRIO até o SharePoint ficar pronto): bucket PRIVADO do Supabase
+ *   Storage (lib/supabaseStorage.ts). Chave = "sb:<caminho no bucket>".
  *
  * STORAGE_PROVIDER escolhe onde as fotos NOVAS são gravadas. A leitura segue a chave, então
- * fotos gravadas no disco continuam abrindo depois de ligar o SharePoint (e vice-versa, desde
- * que o SharePoint esteja configurado).
+ * fotos de um destino continuam abrindo depois de trocar para outro, desde que o antigo
+ * continue configurado. `npm run fotos:migrar` leva as fotos antigas para o destino atual.
  *
  * O banco guarda só a chave, nunca uma URL: as fotos saem pela rota autenticada /api/fotos/:id.
  */
@@ -35,11 +48,19 @@ export type ArquivoSalvo = { chave: string; nome: string; tamanhoBytes: number }
 export type ArquivoLido = { dados: Buffer; tipo: string };
 
 const PREFIXO_SHAREPOINT = 'sp:';
+const PREFIXO_SUPABASE = 'sb:';
 const LADO_DA_MINIATURA = 480;
 const TIPOS: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 
-export type Destino = 'disco' | 'sharepoint';
-export const destinoAtual = (): Destino => (process.env.STORAGE_PROVIDER?.trim() === 'sharepoint' ? 'sharepoint' : 'disco');
+export type Destino = 'disco' | 'sharepoint' | 'supabase';
+export const destinoAtual = (): Destino => {
+  const valor = process.env.STORAGE_PROVIDER?.trim();
+  return valor === 'sharepoint' || valor === 'supabase' ? valor : 'disco';
+};
+
+/** Em qual destino está guardado o arquivo desta chave. */
+export const destinoDaChave = (chave: string): Destino =>
+  chave.startsWith(PREFIXO_SHAREPOINT) ? 'sharepoint' : chave.startsWith(PREFIXO_SUPABASE) ? 'supabase' : 'disco';
 
 /**
  * Confere a configuração ao subir a API: STORAGE_PROVIDER desconhecido ou SharePoint sem as
@@ -47,11 +68,30 @@ export const destinoAtual = (): Destino => (process.env.STORAGE_PROVIDER?.trim()
  */
 export function conferirArmazenamentoAoIniciar() {
   const valor = process.env.STORAGE_PROVIDER?.trim();
-  if (valor && valor !== 'disco' && valor !== 'sharepoint') {
-    throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco" ou "sharepoint".`);
+  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase') {
+    throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco", "sharepoint" ou "supabase".`);
   }
   if (!appTecnicoLiberado()) {
-    console.warn('[armazenamento] Produção sem armazenamento persistente de fotos: app dos técnicos BLOQUEADO até configurar o SharePoint.');
+    console.warn('[armazenamento] Produção sem armazenamento persistente de fotos: app dos técnicos BLOQUEADO até configurar o SharePoint ou o Supabase Storage.');
+  }
+  if (destinoAtual() === 'supabase') {
+    const faltam = variaveisDoSupabaseFaltando();
+    if (faltam.length) throw new Error(`STORAGE_PROVIDER=supabase, mas faltam: ${faltam.join(', ')}`);
+    // Sem travar a subida da API: confere o bucket e o espaço e deixa no log. Bucket público
+    // não derruba o servidor, mas nenhuma foto é gravada nele (conferirBucketPrivado ao gravar).
+    const conferir = async () => {
+      try {
+        await conferirBucketPrivado(true);
+        const uso = await usoDoStorage(true);
+        const espaco = uso ? `${(uso.fracao * 100).toFixed(1)}% de ${(uso.limiteBytes / 1024 / 1024).toFixed(0)} MB em uso` : 'uso não medido';
+        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] Supabase Storage (TEMPORÁRIO): bucket privado conferido; ${espaco}.`);
+      } catch (erro) {
+        console.error(`[armazenamento] Supabase Storage: ${(erro as Error).message}`);
+      }
+    };
+    void conferir();
+    setInterval(() => void conferir(), 24 * 60 * 60 * 1000).unref();
+    return;
   }
   if (destinoAtual() !== 'sharepoint') return;
   const faltando = variaveisFaltando();
@@ -65,7 +105,7 @@ export function conferirArmazenamentoAoIniciar() {
 }
 
 /**
- * As fotos sobrevivem a uma publicação? No SharePoint, sim. No disco, só se ele for persistente
+ * As fotos sobrevivem a uma publicação? No SharePoint e no Supabase Storage, sim. No disco, só se ele for persistente
  * (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco); o disco comum do servidor é apagado a cada
  * publicação. Em produção sem isso, o app dos técnicos fica bloqueado (login e rotas): melhor
  * não receber fotos do que perdê-las. Fora de produção, sempre liberado.
@@ -73,6 +113,7 @@ export function conferirArmazenamentoAoIniciar() {
 export const appTecnicoLiberado = () =>
   process.env.NODE_ENV !== 'production' ||
   destinoAtual() === 'sharepoint' ||
+  destinoAtual() === 'supabase' ||
   process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim';
 
 export const AVISO_APP_TECNICO_BLOQUEADO =
@@ -101,6 +142,20 @@ async function lerDoDisco(chave: string): Promise<Buffer> {
 }
 
 // ------------------------------------------------------------------------------------------
+// Supabase Storage: caminhos (só ASCII: o Storage recusa acento no nome do objeto)
+// ------------------------------------------------------------------------------------------
+
+const PASTA_SUBSTITUIDAS_NO_SUPABASE = 'substituidas';
+
+/** PRJ-2026-0015/<serviço>/01-20260929T170207123.jpg; o mesmo instante dá o mesmo nome (reenvio substitui). */
+function caminhoNoSupabase(destino: DestinoDaFoto, extensao: string) {
+  const quando = destino.capturadaEm.toISOString().replace(/[-:.Z]/g, '');
+  const item = destino.item ? String(destino.item.ordem + 1).padStart(2, '0') : 'extra';
+  return `${destino.projetoCodigo}/${destino.servico.id}/${item}-${quando}${extensao}`;
+}
+const miniaturaNoSupabase = (caminho: string) => `miniaturas/${caminho.replace(/\.[^./]+$/, '')}.jpg`;
+
+// ------------------------------------------------------------------------------------------
 // Operações
 // ------------------------------------------------------------------------------------------
 
@@ -112,6 +167,11 @@ export async function salvarFoto(dados: Buffer, destino: DestinoDaFoto): Promise
     return { chave: `${PREFIXO_SHAREPOINT}${id}`, nome: segmentos.at(-1)!, tamanhoBytes: dados.length };
   }
   const extensao = TIPOS[destino.extensao.toLowerCase()] ? destino.extensao.toLowerCase() : '.jpg';
+  if (destinoAtual() === 'supabase') {
+    const caminho = caminhoNoSupabase(destino, extensao);
+    await enviarAoSupabase(caminho, dados, tipo);
+    return { chave: `${PREFIXO_SUPABASE}${caminho}`, nome: path.posix.basename(caminho), tamanhoBytes: dados.length };
+  }
   const nome = `${randomUUID()}${extensao}`;
   const chave = `${destino.projetoCodigo}/${destino.servico.id}/${nome}`;
   const arquivo = caminhoDa(chave);
@@ -124,6 +184,10 @@ export async function salvarFoto(dados: Buffer, destino: DestinoDaFoto): Promise
 export async function lerArquivo(chave: string): Promise<ArquivoLido> {
   if (chave.startsWith(PREFIXO_SHAREPOINT)) {
     return { dados: await baixarDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length)), tipo: 'image/jpeg' };
+  }
+  if (chave.startsWith(PREFIXO_SUPABASE)) {
+    const caminho = chave.slice(PREFIXO_SUPABASE.length);
+    return { dados: await baixarDoSupabase(caminho), tipo: TIPOS[path.extname(caminho).toLowerCase()] ?? 'image/jpeg' };
   }
   return { dados: await lerDoDisco(chave), tipo: TIPOS[path.extname(chave).toLowerCase()] ?? 'application/octet-stream' };
 }
@@ -145,6 +209,21 @@ export async function lerMiniatura(chave: string): Promise<ArquivoLido> {
     const pronta = await miniaturaDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length));
     return { dados: pronta ?? (await reduzir((await lerArquivo(chave)).dados)), tipo: 'image/jpeg' };
   }
+  if (chave.startsWith(PREFIXO_SUPABASE)) {
+    // gerada uma vez e guardada no bucket (o Supabase gratuito não reduz imagens)
+    const miniatura = miniaturaNoSupabase(chave.slice(PREFIXO_SUPABASE.length));
+    try {
+      return { dados: await baixarDoSupabase(miniatura), tipo: 'image/jpeg' };
+    } catch (erro) {
+      if (!(erro instanceof ArquivoNaoEncontrado)) throw erro;
+    }
+    const dados = await reduzir((await lerArquivo(chave)).dados);
+    // se não der para guardar, a miniatura sai do mesmo jeito (e é refeita no próximo pedido)
+    await enviarAoSupabase(miniatura, dados, 'image/jpeg', { conferir: false }).catch((erro) =>
+      console.warn(`[armazenamento] miniatura não guardada (${miniatura}): ${(erro as Error).message}`),
+    );
+    return { dados, tipo: 'image/jpeg' };
+  }
   const guardada = caminhoDa(chave, path.join(pastaBase(), '.miniaturas'));
   try {
     return { dados: await readFile(guardada), tipo: 'image/jpeg' };
@@ -165,8 +244,29 @@ export async function guardarComoSubstituida(chave: string) {
     await moverNoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length), PASTA_DAS_SUBSTITUIDAS);
     return;
   }
+  if (chave.startsWith(PREFIXO_SUPABASE)) {
+    const caminho = chave.slice(PREFIXO_SUPABASE.length);
+    await moverNoSupabase(caminho, `${path.posix.dirname(caminho)}/${PASTA_SUBSTITUIDAS_NO_SUPABASE}/${path.posix.basename(caminho)}`);
+    // a miniatura da foto antiga só ocupa espaço
+    await apagarDoSupabase([miniaturaNoSupabase(caminho)]).catch(() => undefined);
+    return;
+  }
   const atual = caminhoDa(chave);
   const destino = path.join(path.dirname(atual), PASTA_DAS_SUBSTITUIDAS, path.basename(atual));
   await mkdir(path.dirname(destino), { recursive: true });
   await rename(atual, destino);
+}
+
+/**
+ * Apaga o arquivo de uma chave (e a miniatura guardada). Só para a migração entre destinos
+ * (scripts/migrar-fotos.ts), depois de a cópia no destino novo ter sido conferida.
+ */
+export async function apagarArquivo(chave: string) {
+  if (chave.startsWith(PREFIXO_SHAREPOINT)) return apagarDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length));
+  if (chave.startsWith(PREFIXO_SUPABASE)) {
+    const caminho = chave.slice(PREFIXO_SUPABASE.length);
+    return apagarDoSupabase([caminho, miniaturaNoSupabase(caminho)]);
+  }
+  await unlink(caminhoDa(chave));
+  await unlink(caminhoDa(chave, path.join(pastaBase(), '.miniaturas'))).catch(() => undefined);
 }

@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo";
 import { Selo } from "@/components/Selo";
 import { MENU, type ItemMenu } from "./menu";
 import { AcompanhamentoOperacao } from "./AcompanhamentoOperacao";
+import { AvisoDoArmazenamento } from "./AvisoDoArmazenamento";
 
 const GRUPOS: ItemMenu["grupo"][] = ["Comercial", "Operação", "Administração"];
 import { NOME_DO_PAPEL, podeAcessar } from "./permissoes";
@@ -102,6 +103,7 @@ export function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 px-8 py-8">
+        {podeAcessar(usuario.papel, ["GESTOR"]) && <AvisoDoArmazenamento />}
         {/* telas carregadas sob demanda (lazy) mostram isto enquanto o arquivo chega */}
         <Suspense
           fallback={

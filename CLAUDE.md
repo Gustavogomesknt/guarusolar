@@ -88,10 +88,20 @@ apps/api/                      API (Express + Prisma)
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
   src/lib/armazenamento.ts     camada das fotos: STORAGE_PROVIDER escolhe onde as NOVAS vão
-                               ("disco" padrão, "sharepoint" produção); a leitura segue a chave
-                               ("sp:<id>" = SharePoint; o resto, disco). O banco guarda a CHAVE
+                               ("disco" padrão, "sharepoint" produção e destino final, "supabase"
+                               provisório); a leitura segue a chave ("sp:<id>" = SharePoint,
+                               "sb:<caminho>" = Supabase Storage; o resto, disco). O banco guarda a CHAVE
                                (FotoServico.arquivoChave), nunca uma URL. Foto refeita: o arquivo
                                antigo vai para "Substituídas/". Chave que saia da pasta é recusada
+  src/lib/supabaseStorage.ts   Supabase Storage, PROVISÓRIO até o SharePoint ("sb:<caminho>"; README):
+                               bucket PRIVADO (recusa gravar em público), só a chave secreta no
+                               servidor, nenhum link público ou assinado. Mede o uso em
+                               storage.objects: avisa em 80%, recusa em 95% (ArmazenamentoCheio ->
+                               409, a fila do celular mostra). Caminhos só ASCII
+  scripts/storage-conferir.ts  npm run storage:conferir: bucket privado, envio, leitura, não abre sem login
+  scripts/migrar-fotos.ts      npm run fotos:migrar [-- --executar [--apagar-origem]]: leva as fotos
+                               de outro destino para o STORAGE_PROVIDER atual (copia, confere, troca
+                               a chave); para a troca Supabase -> SharePoint
   src/lib/sharepoint.ts        Microsoft Graph com credencial de aplicativo (Sites.Selected):
                                token em memória, novas tentativas (Retry-After), falha vira
                                ArmazenamentoIndisponivel -> 503 (a fila do celular reenvia)
@@ -453,6 +463,8 @@ npm run db:zerar-para-entrega -- --admin email  # zera os dados de TESTE, inclus
                          # deixa só esse ADMIN. Nunca rode por conta própria: quem roda é o usuário.
 npm run build            # compila todos os workspaces
 npm run sharepoint:conferir  # testa a configuração MS_* do SharePoint (envio e leitura reais)
+npm run storage:conferir     # testa o Supabase Storage (bucket privado, envio, leitura, sem link público)
+npm run fotos:migrar         # mostra as fotos que estão fora do STORAGE_PROVIDER atual; -- --executar migra
 ```
 
 Banco local rápido: `docker run --name guarusolar-db -e POSTGRES_PASSWORD=senha -p 5432:5432 -d postgres:16`
@@ -496,8 +508,8 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Migrations em produção funcionam com a versão anterior do código** (publicação sem queda
   roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
   publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).
-- **Produção sem SharePoint bloqueia o app dos técnicos** (`appTecnicoLiberado` em
-  armazenamento.ts): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
+- **Produção sem SharePoint nem Supabase Storage bloqueia o app dos técnicos** (`appTecnicoLiberado`
+  em armazenamento.ts; libera com `STORAGE_PROVIDER=sharepoint` ou `supabase`): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
   persistente no plano gratuito). Não contorne isso.
 - **Sessão confere o banco** (`autenticar` em `lib/auth.ts`): o token leva `versao`
   (`Usuario.sessaoVersao`); desativar, trocar papel ou equipe e gerar senha nova somam 1 e o login

@@ -9,6 +9,7 @@ import { autenticar, autorizar } from '../lib/auth';
 import { operacaoMudou, versaoDaOperacao } from '../lib/versaoDaOperacao';
 import path from 'node:path';
 import {
+  ArmazenamentoCheio,
   ArmazenamentoIndisponivel,
   appTecnicoLiberado,
   AVISO_APP_TECNICO_BLOQUEADO,
@@ -673,6 +674,12 @@ rotasTecnico.post(
         extensao: path.extname(req.file.originalname) || '.jpg',
       });
     } catch (erro) {
+      // Sem espaço (Supabase Storage, provisório): recusa com 4xx, que a fila do celular mostra na
+      // tela em vez de tentar de novo sozinha. A foto continua guardada no aparelho.
+      if (erro instanceof ArmazenamentoCheio) {
+        console.error(`[armazenamento] SEM ESPAÇO para fotos (serviço ${servico.id}): ${erro.message}`);
+        throw new ErroHttp(409, 'O espaço das fotos do sistema está cheio. Avise o escritório. A foto continua guardada no celular: toque em "Enviar de novo" depois que liberarem espaço.');
+      }
       if (!(erro instanceof ArmazenamentoIndisponivel)) throw erro;
       console.error(`[armazenamento] foto não gravada (serviço ${servico.id}): ${erro.message}`);
       throw new ErroHttp(503, 'Não foi possível guardar a foto agora. Ela continua no celular e será enviada de novo sozinha.');
