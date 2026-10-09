@@ -42,8 +42,9 @@ e não há CORS no navegador.
 - **API:** Node.js + TypeScript + Express + Zod (`apps/api`)
 - **Front:** React + Vite + Tailwind CSS + shadcn/ui
 - **Auth:** JWT com papéis
-- **Arquivos (fotos e PDFs):** hoje em disco local; em produção no **OneDrive/SharePoint do cliente**
-  via Microsoft Graph, aproveitando o plano Microsoft 365 que ele já paga
+- **Fotos dos serviços:** em disco local no desenvolvimento; em produção no **Supabase Storage**
+  (bucket privado, no mesmo projeto do banco), que é o **destino DEFINITIVO**. Ver "Onde ficam as
+  fotos", abaixo. O PDF do orçamento não é guardado: é gerado a cada pedido
 - **Hospedagem:** custo zero: Render (plano gratuito, região Virginia; dorme após 15 min) e
   Supabase (gratuito); backup noturno do banco pelo GitHub Actions. **Banco de produção em São
   Paulo por decisão do cliente (LGPD: dados de clientes brasileiros ficam no Brasil)**, aceitando
@@ -90,21 +91,26 @@ apps/api/                      API (Express + Prisma)
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
   src/lib/armazenamento.ts     camada das fotos: STORAGE_PROVIDER escolhe onde as NOVAS vão
-                               ("disco" padrão, "sharepoint" produção e destino final, "supabase"
-                               provisório); a leitura segue a chave ("sp:<id>" = SharePoint,
+                               ("disco" padrão, "supabase" produção e destino DEFINITIVO;
+                               "sharepoint" fora de escopo, mantido no código: exige tenant
+                               corporativo); a leitura segue a chave ("sp:<id>" = SharePoint,
                                "sb:<caminho>" = Supabase Storage; o resto, disco). O banco guarda a CHAVE
                                (FotoServico.arquivoChave), nunca uma URL. Foto refeita: o arquivo
                                antigo vai para "Substituídas/". Chave que saia da pasta é recusada
-  src/lib/supabaseStorage.ts   Supabase Storage, PROVISÓRIO até o SharePoint ("sb:<caminho>"; README):
+  src/lib/supabaseStorage.ts   Supabase Storage, destino DEFINITIVO das fotos ("sb:<caminho>"; README):
                                bucket PRIVADO (recusa gravar em público), só a chave secreta no
                                servidor, nenhum link público ou assinado. Mede o uso em
-                               storage.objects: avisa em 80%, recusa em 95% (ArmazenamentoCheio ->
-                               409, a fila do celular mostra). Caminhos só ASCII
-  scripts/storage-conferir.ts  npm run storage:conferir: bucket privado, envio, leitura, não abre sem login
+                               storage.objects contra o teto SUPABASE_STORAGE_LIMITE_MB: avisa em
+                               70%, recusa em 95% (ArmazenamentoCheio -> 409, a fila do celular
+                               mostra). Caminhos só ASCII
+  scripts/storage-conferir.ts  npm run storage:conferir: bucket privado, envio, leitura, não abre sem
+                               login. npm run storage:relatorio (só leitura): total, fotos, tamanho
+                               médio, crescimento por mês e meses até o teto no ritmo atual
   scripts/migrar-fotos.ts      npm run fotos:migrar [-- --executar [--apagar-origem]]: leva as fotos
                                de outro destino para o STORAGE_PROVIDER atual (copia, confere, troca
-                               a chave); para a troca Supabase -> SharePoint
-  src/lib/sharepoint.ts        Microsoft Graph com credencial de aplicativo (Sites.Selected):
+                               a chave); serve se um dia o destino das fotos mudar
+  src/lib/sharepoint.ts        FORA DE ESCOPO (exige tenant corporativo; o cliente tem conta pessoal).
+                               Microsoft Graph com credencial de aplicativo (Sites.Selected):
                                token em memória, novas tentativas (Retry-After), falha vira
                                ArmazenamentoIndisponivel -> 503 (a fila do celular reenvia)
   src/lib/nomesDeArquivo.ts    pastas e nomes no SharePoint: Cliente – Cidade / PRJ / data e tipo /
@@ -222,7 +228,8 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                motivo; 401 pausa até o novo login; acorda com `online`, com a volta
                                à tela, com o servidor respondendo e com consulta que dá certo. Leia o comentário do topo
                                antes de mexer
-  src/fotos/                   reduzir.ts (2000 px, JPEG 85), metadados.ts (EXIF + posição do
+  src/fotos/                   reduzir.ts (1600 px, JPEG 0,75, alvo de 300 KB, qualidade mínima 0,6;
+                               se falhar vai o original), metadados.ts (EXIF + posição do
                                navegador), useLocalizacao.ts (permissão pedida num toque próprio,
                                nunca junto com a câmera), envio.ts, useFotos.ts (a tela lê a fila)
   src/lib/consultas.ts         React Query persistido no localStorage (só agenda e serviços):
@@ -473,9 +480,9 @@ Próximos passos, nesta ordem:
 3. ~~Geração do **PDF** do orçamento~~ (feito; falta o arquivo do logo e os dados da empresa).
 4. ~~**PWA dos técnicos**: câmera, checklist de fotos e fila de envio offline~~ (feito; falta o
    teste no celular com HTTPS).
-5. ~~Trocar `armazenamento.ts` para o **OneDrive/SharePoint** via Microsoft Graph~~ (feito e testado
-   contra um simulador do Graph; falta o administrador criar o aplicativo e rodar
-   `npm run sharepoint:conferir` com as credenciais reais).
+5. ~~Fotos fora do disco do servidor~~ (feito: Supabase Storage, destino definitivo. O provedor
+   do SharePoint foi escrito e testado contra um simulador, mas saiu do escopo: ver "Onde ficam
+   as fotos").
 6. ~~Atualização em **tempo real** da fila de validação~~ (feito: versão da operação a cada 20 s).
 7. Comparativo **orçado × realizado** por projeto.
 
@@ -570,9 +577,29 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Migrations em produção funcionam com a versão anterior do código** (publicação sem queda
   roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
   publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).
-- **Produção sem SharePoint nem Supabase Storage bloqueia o app dos técnicos** (`appTecnicoLiberado`
-  em armazenamento.ts; libera com `STORAGE_PROVIDER=sharepoint` ou `supabase`): o disco da Render é apagado a cada publicação, reinício e sono (sem disco
-  persistente no plano gratuito). Não contorne isso.
+- **Produção sem Supabase Storage bloqueia o app dos técnicos** (`appTecnicoLiberado` em
+  armazenamento.ts; libera com `STORAGE_PROVIDER=supabase`): o disco da Render é apagado a cada
+  publicação, reinício e sono (sem disco persistente no plano gratuito). Não contorne isso.
+- **Onde ficam as fotos (decisão fechada em 09/10/2026).** O **Supabase Storage é o destino
+  DEFINITIVO**, não mais provisório. **O SharePoint está FORA DE ESCOPO**: a Guarusolar usa conta
+  PESSOAL da Microsoft, e conta pessoal não tem tenant, não tem Entra ID (onde se registra o
+  aplicativo) e não tem SharePoint. Não é pendência do administrador: não existe o que
+  configurar. **Não proponha "migrar para o SharePoint/OneDrive"** nem trate o Supabase como
+  temporário. O provedor `sharepoint` (lib/sharepoint.ts, `sharepoint:conferir`) continua no
+  código de propósito, com o comentário de que exige tenant corporativo: só volta a servir se a
+  empresa contratar o Microsoft 365 empresarial.
+  **Teto:** o plano gratuito do Supabase dá cerca de 1 GB de Storage. O número vem da variável
+  `SUPABASE_STORAGE_LIMITE_MB` (render.yaml e painel), nunca fixo em regra de negócio. Por isso
+  o app do técnico comprime cada foto (1600 px, JPEG 0,75, alvo de 300 KB: `reduzir.ts`; não
+  afrouxe sem motivo): com a miniatura, cada foto ocupa uns 330 KB, e 1 GB guarda cerca de
+  3.000 fotos (umas 500 instalações de 6 fotos). A API avisa gestor e admin em 70% e recusa
+  fotos novas em 95%. `npm run storage:relatorio` mostra o crescimento e os meses que faltam.
+  **Quando vale migrar/ampliar:** ao aparecer o aviso de 70% ou quando o relatório mostrar menos
+  de 6 meses até o teto. Caminho mais simples: plano pago do Supabase (Pro, perto de US$ 25 por
+  mês, com 100 GB de Storage; confira o preço atual) e só mudar `SUPABASE_STORAGE_LIMITE_MB`,
+  sem migração nenhuma. Alternativa sem mensalidade: outro armazenamento (um provedor novo em
+  `armazenamento.ts`) e `npm run fotos:migrar`. Apagar fotos antigas para liberar espaço é
+  decisão do cliente, nunca automática (regra 3: nada é apagado).
 - **Sessão confere o banco** (`autenticar` em `lib/auth.ts`): o token leva `versao`
   (`Usuario.sessaoVersao`); desativar, trocar papel ou equipe e gerar senha nova somam 1 e o login
   antigo cai na hora. A conferência fica 1 minuto em memória por usuário (cada ida ao banco custa

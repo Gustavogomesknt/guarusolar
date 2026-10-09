@@ -32,10 +32,11 @@ export type { DestinoDaFoto };
  * Camada de armazenamento das fotos. Três destinos:
  *
  * - "disco" (padrão, desenvolvimento): pasta STORAGE_DIR (uploads/). Chave = caminho relativo.
- * - "sharepoint" (produção, destino FINAL): biblioteca do SharePoint do cliente
- *   (lib/sharepoint.ts). Chave = "sp:<id do arquivo no SharePoint>".
- * - "supabase" (produção, TEMPORÁRIO até o SharePoint ficar pronto): bucket PRIVADO do Supabase
- *   Storage (lib/supabaseStorage.ts). Chave = "sb:<caminho no bucket>".
+ * - "supabase" (produção, destino DEFINITIVO): bucket PRIVADO do Supabase Storage
+ *   (lib/supabaseStorage.ts). Chave = "sb:<caminho no bucket>".
+ * - "sharepoint" (FORA DE ESCOPO, mantido no código): biblioteca do SharePoint pelo Microsoft
+ *   Graph (lib/sharepoint.ts). EXIGE TENANT CORPORATIVO da Microsoft (Entra ID + SharePoint);
+ *   o cliente usa conta pessoal, que não tem nenhum dos dois. Chave = "sp:<id do arquivo>".
  *
  * STORAGE_PROVIDER escolhe onde as fotos NOVAS são gravadas. A leitura segue a chave, então
  * fotos de um destino continuam abrindo depois de trocar para outro, desde que o antigo
@@ -84,7 +85,7 @@ export function conferirArmazenamentoAoIniciar() {
         await conferirBucketPrivado(true);
         const uso = await usoDoStorage(true);
         const espaco = uso ? `${(uso.fracao * 100).toFixed(1)}% de ${(uso.limiteBytes / 1024 / 1024).toFixed(0)} MB em uso` : 'uso não medido';
-        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] Supabase Storage (TEMPORÁRIO): bucket privado conferido; ${espaco}.`);
+        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] Supabase Storage: bucket privado conferido; ${espaco}.`);
       } catch (erro) {
         console.error(`[armazenamento] Supabase Storage: ${(erro as Error).message}`);
       }

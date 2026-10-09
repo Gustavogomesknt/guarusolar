@@ -16,7 +16,9 @@ export type DadosDoEnvio = {
 /** POST /api/tecnico/servicos/:id/fotos (multipart, campo "arquivo"). */
 export function enviarFoto(dados: DadosDoEnvio, signal?: AbortSignal) {
   const formulario = new FormData();
-  formulario.append('arquivo', dados.blob, `${dados.chave ?? 'extra'}.jpg`);
+  // quase sempre JPEG (a foto comprimida); o original, quando a compressão falhou, vai como veio
+  const extensao = { 'image/png': 'png', 'image/webp': 'webp' }[dados.blob.type] ?? 'jpg';
+  formulario.append('arquivo', dados.blob, `${dados.chave ?? 'extra'}.${extensao}`);
   formulario.append('idLocal', dados.idLocal);
   formulario.append('capturadaEm', dados.capturadaEm.toISOString());
   if (dados.chave) formulario.append('chave', dados.chave);

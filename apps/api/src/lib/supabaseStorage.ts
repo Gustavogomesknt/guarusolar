@@ -2,9 +2,9 @@ import { ArmazenamentoIndisponivel, ArquivoNaoEncontrado } from './sharepoint';
 import { prisma } from './prisma';
 
 /*
- * Fotos no Supabase Storage — provedor TEMPORÁRIO, até o SharePoint do cliente ficar pronto
- * (STORAGE_PROVIDER=supabase). O destino final continua sendo o SharePoint: ver "Migrar as fotos
- * para o SharePoint" no README (npm run fotos:migrar).
+ * Fotos no Supabase Storage — o destino DEFINITIVO das fotos (STORAGE_PROVIDER=supabase).
+ * O SharePoint saiu do escopo: o cliente usa conta PESSOAL da Microsoft (sem tenant, sem Entra,
+ * sem SharePoint), e o provedor "sharepoint" exige tenant corporativo (CLAUDE.md).
  *
  * Segurança (regra 6 do CLAUDE.md):
  * - o bucket tem de ser PRIVADO: a API confere e RECUSA gravar se ele estiver público;
@@ -23,9 +23,11 @@ import { prisma } from './prisma';
  * O horário vai até os segundos: reenviar a mesma foto gera o mesmo nome e substitui o arquivo
  * (x-upsert), em vez de duplicar.
  *
- * Espaço: o plano gratuito do Supabase dá 1 GB de Storage. A API mede o uso (tabela
- * storage.objects do próprio banco), AVISA a partir de 80% e RECUSA fotos novas a partir de 95%,
- * com mensagem para o técnico, antes de o Supabase recusar por conta própria.
+ * Espaço: o plano gratuito do Supabase dá cerca de 1 GB de Storage. O teto vem da variável
+ * SUPABASE_STORAGE_LIMITE_MB (mude-a se o plano mudar). A API mede o uso (tabela storage.objects
+ * do próprio banco), AVISA a partir de 70% e RECUSA fotos novas a partir de 95%, com mensagem
+ * para o técnico, antes de o Supabase recusar por conta própria. `npm run storage:relatorio`
+ * mostra o crescimento por mês e quantos meses faltam para o teto.
  */
 
 export class ArmazenamentoCheio extends Error {}
@@ -111,9 +113,12 @@ export async function conferirBucketPrivado(forcar = false) {
 // ------------------------------------------------------------------------------------------
 
 const MB = 1024 * 1024;
-/** Limite do plano (MB). Gratuito = 1 GB; mude se o plano mudar. */
-export const limiteDoStorageBytes = () => (Number(process.env.SUPABASE_STORAGE_LIMITE_MB) > 0 ? Number(process.env.SUPABASE_STORAGE_LIMITE_MB) : 1024) * MB;
-export const FRACAO_DE_AVISO = 0.8;
+/** Usado só se SUPABASE_STORAGE_LIMITE_MB não estiver definida: o plano gratuito (1 GB). */
+const LIMITE_SEM_A_VARIAVEL_MB = 1024;
+/** Teto do plano: variável SUPABASE_STORAGE_LIMITE_MB (render.yaml e .env.example). */
+export const limiteDoStorageBytes = () =>
+  (Number(process.env.SUPABASE_STORAGE_LIMITE_MB) > 0 ? Number(process.env.SUPABASE_STORAGE_LIMITE_MB) : LIMITE_SEM_A_VARIAVEL_MB) * MB;
+export const FRACAO_DE_AVISO = 0.7;
 export const FRACAO_DE_RECUSA = 0.95;
 
 export type UsoDoStorage = { usadoBytes: number; limiteBytes: number; fracao: number; arquivos: number; nivel: 'ok' | 'atencao' | 'cheio' };
@@ -146,6 +151,87 @@ export async function usoDoStorage(forcar = false): Promise<UsoDoStorage | null>
   return montarUso(usoEmCache.usadoBytes, usoEmCache.arquivos);
 }
 
+// ------------------------------------------------------------------------------------------
+// Relatório (npm run storage:relatorio)
+// ------------------------------------------------------------------------------------------
+
+type Grupo = { arquivos: number; bytes: number };
+export type RelatorioDoStorage = {
+  usadoBytes: number;
+  limiteBytes: number;
+  fracao: number;
+  arquivos: number;
+  /** as fotos dos serviços (o que o técnico enviou e está valendo) */
+  fotos: Grupo & { mediaBytes: number };
+  /** miniaturas de 480 px, geradas na primeira vez que a foto é vista */
+  miniaturas: Grupo;
+  /** fotos refeitas: a versão anterior fica guardada (nada é apagado) */
+  substituidas: Grupo;
+  /** o que entrou em cada mês (pela data de criação do arquivo), do mais antigo ao mais novo */
+  porMes: { mes: string; arquivos: number; bytes: number }[];
+  /** ritmo atual: o que entrou nos últimos 90 dias (ou desde o primeiro arquivo), por mês */
+  ritmoMensalBytes: number | null;
+  diasMedidos: number;
+  /** meses até o teto nesse ritmo; null sem ritmo (bucket vazio ou parado) */
+  mesesAteOTeto: number | null;
+};
+
+/** Lê tudo de storage.objects (só leitura). null se a tabela não existir (banco fora do Supabase). */
+export async function relatorioDoStorage(): Promise<RelatorioDoStorage | null> {
+  type Linha = { mes: string; tipo: 'fotos' | 'miniaturas' | 'substituidas'; arquivos: bigint | number; bytes: bigint | number | null };
+  type Recente = { primeiro: Date | null; recentes: bigint | number | null };
+  let linhas: Linha[];
+  let recente: Recente[];
+  try {
+    [linhas, recente] = await Promise.all([
+      prisma.$queryRaw<Linha[]>`
+        select to_char(created_at at time zone 'America/Sao_Paulo', 'YYYY-MM') as mes,
+               case when name like 'miniaturas/%' then 'miniaturas' when name like '%/substituidas/%' then 'substituidas' else 'fotos' end as tipo,
+               count(*) as arquivos, coalesce(sum((metadata->>'size')::bigint), 0) as bytes
+        from storage.objects group by 1, 2 order by 1`,
+      prisma.$queryRaw<Recente[]>`
+        select min(created_at) as primeiro,
+               coalesce(sum((metadata->>'size')::bigint) filter (where created_at >= now() - interval '90 days'), 0) as recentes
+        from storage.objects`,
+    ]);
+  } catch {
+    return null;
+  }
+  const soma = (tipo: Linha['tipo']): Grupo =>
+    linhas.filter((l) => l.tipo === tipo).reduce((t, l) => ({ arquivos: t.arquivos + Number(l.arquivos), bytes: t.bytes + Number(l.bytes ?? 0) }), { arquivos: 0, bytes: 0 });
+  const fotos = soma('fotos');
+  const miniaturas = soma('miniaturas');
+  const substituidas = soma('substituidas');
+  const usadoBytes = fotos.bytes + miniaturas.bytes + substituidas.bytes;
+  const limiteBytes = limiteDoStorageBytes();
+
+  const meses = new Map<string, { mes: string; arquivos: number; bytes: number }>();
+  for (const l of linhas) {
+    const m = meses.get(l.mes) ?? { mes: l.mes, arquivos: 0, bytes: 0 };
+    m.arquivos += Number(l.arquivos);
+    m.bytes += Number(l.bytes ?? 0);
+    meses.set(l.mes, m);
+  }
+
+  const primeiro = recente[0]?.primeiro ?? null;
+  const diasMedidos = primeiro ? Math.min(90, Math.max(1, (Date.now() - primeiro.getTime()) / 864e5)) : 0;
+  const recentes = Number(recente[0]?.recentes ?? 0);
+  const ritmoMensalBytes = diasMedidos > 0 && recentes > 0 ? (recentes / diasMedidos) * 30.44 : null;
+  return {
+    usadoBytes,
+    limiteBytes,
+    fracao: usadoBytes / limiteBytes,
+    arquivos: fotos.arquivos + miniaturas.arquivos + substituidas.arquivos,
+    fotos: { ...fotos, mediaBytes: fotos.arquivos ? fotos.bytes / fotos.arquivos : 0 },
+    miniaturas,
+    substituidas,
+    porMes: [...meses.values()],
+    ritmoMensalBytes,
+    diasMedidos,
+    mesesAteOTeto: ritmoMensalBytes ? Math.max(0, limiteBytes - usadoBytes) / ritmoMensalBytes : null,
+  };
+}
+
 /** Recusa a foto nova se ela não couber abaixo dos 95% do limite. */
 async function conferirEspaco(bytesNovos: number) {
   const uso = await usoDoStorage();
@@ -154,7 +240,7 @@ async function conferirEspaco(bytesNovos: number) {
     throw new ArmazenamentoCheio(`Storage em ${(uso.fracao * 100).toFixed(1)}% de ${(uso.limiteBytes / MB).toFixed(0)} MB`);
   }
   if (uso.nivel === 'atencao') {
-    console.warn(`[armazenamento] ATENÇÃO: Storage em ${(uso.fracao * 100).toFixed(1)}% do limite. Migre as fotos para o SharePoint (README).`);
+    console.warn(`[armazenamento] ATENÇÃO: Storage em ${(uso.fracao * 100).toFixed(1)}% do limite. Rode npm run storage:relatorio e veja "Espaço das fotos" no README.`);
   }
 }
 

@@ -217,9 +217,13 @@ O técnico usa o próprio celular pelo navegador (`apps/tecnico`), muitas vezes 
 móvel fraca. Por isso o app **reduz cada foto no aparelho antes do envio**
 (`apps/tecnico/src/fotos/reduzir.ts`):
 
-- **Lado maior com 2000 px**, mantendo a proporção e já girada conforme o EXIF. Fotos menores
-  mantêm o tamanho.
-- **JPEG com qualidade 85.** Uma foto assim costuma ficar entre 400 KB e 1 MB.
+- **Lado maior com 1600 px**, mantendo a proporção e já girada conforme o EXIF (foto tirada em
+  pé não chega deitada). Fotos menores mantêm o tamanho.
+- **JPEG com qualidade 0,75 e alvo de 300 KB.** Se a foto passar muito do alvo (mais de 15%),
+  a qualidade desce em passos de 0,05 até 0,6, nunca abaixo. Medido com fotos reais de celular:
+  6.593 KB viraram 177 KB e 2.902 KB viraram 336 KB.
+- **Se a compressão falhar, vai o arquivo original**: nunca se perde uma foto por causa dela.
+  O técnico não vê nada disso; só a foto no checklist.
 - **Uma foto por vez.** Decodificar uma foto de 12 MP ocupa uns 50 MB de memória; várias ao
   mesmo tempo derrubam a aba em celular simples.
 - **Data/hora e localização da captura** vão nos campos `capturadaEm`, `latitude` e
@@ -254,11 +258,13 @@ em execução ou devolvido (409 se já foi enviado, concluído ou cancelado), e 
 precisa ser de um item do checklist daquele tipo de serviço (400). A agenda do técnico mostra,
 além de hoje a 7 dias, os serviços em aberto de dias anteriores, até serem enviados.
 
-### Fotos no Supabase Storage (provisório)
+### Fotos no Supabase Storage
 
-Enquanto o SharePoint do cliente não fica pronto, as fotos podem ir para um bucket do Supabase
-Storage, no mesmo projeto do banco (`STORAGE_PROVIDER=supabase`). **É provisório: o destino final
-continua sendo o SharePoint.** Com esse provedor configurado, o app dos técnicos libera em produção.
+Em produção as fotos ficam num bucket do Supabase Storage, no mesmo projeto do banco
+(`STORAGE_PROVIDER=supabase`). **É o destino definitivo.** O SharePoint saiu do escopo: a
+Guarusolar usa conta pessoal da Microsoft, que não tem tenant, Entra ID nem SharePoint (a seção
+"Fotos no SharePoint", abaixo, fica só como referência do provedor que continua no código).
+Com o Supabase configurado, o app dos técnicos libera em produção.
 
 **Segurança.** O bucket tem de ser **privado**: a API confere e se recusa a gravar em bucket
 público. Só a API fala com o Storage, com a chave secreta, que fica só nas variáveis da hospedagem.
@@ -295,14 +301,33 @@ uma miniatura de ~30 KB: cabem cerca de **1.300 fotos** (de ~950 a ~2.300, confo
 como 130 a 160 serviços com 8 a 10 fotos. Fotos refeitas continuam ocupando espaço (nada é apagado).
 A API mede o uso na tabela `storage.objects` do próprio banco e:
 
-- a partir de **80%**: aviso no topo do escritório, para gestor e admin, e no log;
+- a partir de **70%**: aviso no topo do escritório, para gestor e admin, e no log;
 - a partir de **95%**: recusa fotos novas com a mensagem "O espaço das fotos do sistema está cheio.
   Avise o escritório…". A foto continua guardada no celular e o técnico reenvia depois.
 
-O que já foi enviado continua abrindo. A saída é migrar para o SharePoint (abaixo).
+O que já foi enviado continua abrindo.
 
-**Migrar as fotos para o SharePoint, sem perder nada** (quando o administrador do Microsoft 365
-concluir o registro do aplicativo):
+#### Espaço das fotos
+
+O plano gratuito do Supabase dá cerca de 1 GB de Storage. O teto que o sistema usa vem da variável
+`SUPABASE_STORAGE_LIMITE_MB` (em MB; mude-a se o plano mudar). Cada foto comprimida ocupa perto de
+300 KB, mais uns 30 KB de miniatura: 1 GB guarda cerca de 3.000 fotos.
+
+```bash
+npm run storage:relatorio   # só leitura; precisa da DATABASE_URL do projeto do Supabase
+```
+
+Mostra o total ocupado, o número de fotos, o tamanho médio, o que entrou em cada mês e quantos
+meses faltam para o teto no ritmo dos últimos 90 dias. `npm run storage:conferir` mostra o mesmo
+relatório no fim.
+
+**Quando ampliar:** ao aparecer o aviso de 70%, ou quando o relatório mostrar menos de 6 meses até
+o teto. O caminho mais simples é o plano pago do Supabase (mais Storage no mesmo lugar): basta
+mudar `SUPABASE_STORAGE_LIMITE_MB`, sem migrar nada. Apagar fotos antigas é decisão do cliente.
+
+**Referência: migrar as fotos para outro destino, sem perder nada.** O roteiro abaixo foi escrito
+para o SharePoint, que saiu do escopo (exige Microsoft 365 empresarial); o `npm run fotos:migrar`
+serve do mesmo jeito para qualquer destino novo:
 
 1. Configure as variáveis `MS_*` e rode `npm run sharepoint:conferir`.
 2. Faça o Backup do banco (Actions › Backup do banco).
@@ -320,7 +345,11 @@ concluir o registro do aplicativo):
    Supabase cada foto logo depois de conferida no SharePoint.)
 7. Tire as `SUPABASE_*` da hospedagem. A partir daí o Supabase guarda só o banco.
 
-### Fotos no SharePoint (produção)
+### Fotos no SharePoint (fora de escopo)
+
+**Não se aplica à Guarusolar**: este provedor exige um tenant corporativo da Microsoft (Microsoft
+365 empresarial, com Entra ID e SharePoint), e a empresa usa conta pessoal. O código continua no
+repositório e o texto abaixo fica como referência, caso isso mude.
 
 Em produção as fotos vão para uma biblioteca do SharePoint da Guarusolar (`STORAGE_PROVIDER=sharepoint`);
 em desenvolvimento ficam no disco (`STORAGE_PROVIDER=disco`, o padrão). A leitura segue a chave de

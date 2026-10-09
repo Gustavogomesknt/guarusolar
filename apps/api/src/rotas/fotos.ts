@@ -70,8 +70,8 @@ rotasFotos.get(
 export const rotasArmazenamento = Router();
 rotasArmazenamento.use(autenticar, autorizar('GESTOR'));
 
-// tamanho médio de uma foto reduzida pelo app (400 KB a 1 MB) mais a miniatura
-const BYTES_POR_FOTO = 730 * 1024;
+// tamanho de uma foto comprimida pelo app (alvo de 300 KB) mais a miniatura
+const BYTES_POR_FOTO = 330 * 1024;
 
 rotasArmazenamento.get(
   '/uso',

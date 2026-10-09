@@ -9,9 +9,10 @@ type Uso =
 const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
 /**
- * Aviso do espaço das fotos para o gestor e o admin (montado no Layout). Só aparece com o
- * Supabase Storage (provisório, 1 GB no plano gratuito) e a partir de 80% de uso: antes de a API
- * começar a recusar fotos novas (95%). A saída é migrar as fotos para o SharePoint (README).
+ * Aviso do espaço das fotos para o gestor e o admin (montado no Layout, em todas as telas deles).
+ * As fotos ficam no Supabase Storage, em definitivo, com um teto (cerca de 1 GB no plano
+ * gratuito; variável SUPABASE_STORAGE_LIMITE_MB na API). Aparece a partir de 70% de uso, bem
+ * antes de a API começar a recusar fotos novas (95%): dá tempo de decidir (README, "Espaço das fotos").
  */
 export function AvisoDoArmazenamento() {
   const uso = useQuery({
@@ -37,7 +38,7 @@ export function AvisoDoArmazenamento() {
         </strong>{' '}
         {mb(d.usadoBytes)} de {mb(d.limiteBytes)} em uso
         {cheio ? '.' : `; cabem cerca de ${d.fotosRestantes.toLocaleString('pt-BR')} fotos até o sistema recusar novas (em ${d.recusaEm}%).`} Avise o
-        responsável pelo sistema: é hora de migrar as fotos para o SharePoint.
+        responsável pelo sistema: é hora de ampliar o espaço das fotos.
       </p>
     </div>
   );

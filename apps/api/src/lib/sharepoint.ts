@@ -1,4 +1,10 @@
 /*
+ * FORA DE ESCOPO (mantido para quem um dia tiver o que ele exige): este provedor precisa de um
+ * TENANT CORPORATIVO da Microsoft (Microsoft 365 empresarial, com Entra ID para registrar o
+ * aplicativo e SharePoint para a biblioteca). A Guarusolar usa conta PESSOAL da Microsoft, que
+ * não tem tenant, Entra nem SharePoint: por isso as fotos ficam no Supabase Storage, em
+ * definitivo (lib/supabaseStorage.ts; CLAUDE.md). Não proponha "migrar para o SharePoint".
+ *
  * Fotos no SharePoint do cliente, pelo Microsoft Graph, com credencial de APLICATIVO
  * (client credentials: sem login de pessoa). Permissão Sites.Selected, liberada só para o
  * site da Guarusolar (README, "Fotos no SharePoint").

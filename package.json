@@ -29,6 +29,7 @@
     "db:studio": "npm run db:studio -w @guarusolar/api --",
     "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --",
     "storage:conferir": "npm run storage:conferir -w @guarusolar/api --",
+    "storage:relatorio": "npm run storage:relatorio -w @guarusolar/api --",
     "fotos:migrar": "npm run fotos:migrar -w @guarusolar/api --",
     "pdf:exemplo": "npm run pdf:exemplo -w @guarusolar/api --",
     "produtos:importar": "npm run produtos:importar -w @guarusolar/api --"

@@ -31,10 +31,14 @@ services:
         value: 7d
       # Sem SharePoint nem Supabase Storage, o app dos técnicos fica bloqueado sozinho (o disco da
       # Render é apagado a cada publicação e não há disco persistente no plano gratuito).
-      # Para liberar, troque no painel para "supabase" (provisório: SUPABASE_URL,
-      # SUPABASE_SERVICE_KEY e SUPABASE_BUCKET) ou "sharepoint" (MS_*). README, "Fotos no …".
+      # Para liberar, troque no painel para "supabase" (destino definitivo das fotos: SUPABASE_URL,
+      # SUPABASE_SERVICE_KEY e SUPABASE_BUCKET). README, "Fotos no Supabase Storage".
       - key: STORAGE_PROVIDER
         value: disco
+      # Teto do Storage, em MB (plano gratuito do Supabase: cerca de 1 GB). A API avisa em 70% e
+      # recusa fotos novas em 95%. Mude aqui e no painel se o plano mudar.
+      - key: SUPABASE_STORAGE_LIMITE_MB
+        value: 1024
       # Endereço do serviço (o nome pode ganhar um sufixo se "guarusolar" já existir na Render):
       # confira no painel e ajuste os dois abaixo.
       - key: API_URL_PUBLICA

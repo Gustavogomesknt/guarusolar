@@ -48,8 +48,9 @@ type Registro = {
   criadoEm: number;
   /** a foto como veio da câmera; sai depois do preparo */
   original?: { dados: ArrayBuffer; tipo: string; nome: string; modificadoEm: number };
-  /** a foto pronta para envio (2000 px, JPEG 85) */
-  foto?: { dados: ArrayBuffer; capturadaEm: string; latitude?: number; longitude?: number };
+  /** a foto pronta para envio (comprimida: reduzir.ts). `tipo` só existe quando a compressão
+   *  falhou e o que vai é o arquivo original (sem `tipo` = JPEG) */
+  foto?: { dados: ArrayBuffer; tipo?: string; capturadaEm: string; latitude?: number; longitude?: number };
   tentativas: number;
   proximaTentativa: number;
   /** o envio estourou o tempo: a foto foi para o fim da fila (ordena por aqui, não por criadoEm) */
@@ -111,7 +112,7 @@ function urlDe(r: Registro) {
   if (!r.foto) return null;
   let url = urls.get(r.idLocal);
   if (!url) {
-    url = URL.createObjectURL(new Blob([r.foto.dados], { type: 'image/jpeg' }));
+    url = URL.createObjectURL(new Blob([r.foto.dados], { type: r.foto.tipo ?? 'image/jpeg' }));
     urls.set(r.idLocal, url);
   }
   return url;
@@ -287,8 +288,10 @@ async function prepararProximas() {
           type: r.original.tipo,
           lastModified: r.original.modificadoEm,
         });
+        // A compressão não pode custar a foto: se falhar por qualquer motivo (formato que o
+        // navegador não abre, falta de memória no aparelho), vai o arquivo ORIGINAL.
         const [reduzida, metadados] = await Promise.all([
-          reduzirFoto(arquivo),
+          reduzirFoto(arquivo).catch(() => null),
           lerMetadados(arquivo, posicoes.get(r.idLocal) ?? Promise.resolve(null)),
         ]);
         // o técnico pode ter refeito ou descartado a foto enquanto ela era preparada
@@ -297,7 +300,8 @@ async function prepararProximas() {
           ...r,
           original: undefined,
           foto: {
-            dados: await reduzida.blob.arrayBuffer(),
+            dados: reduzida ? await reduzida.blob.arrayBuffer() : r.original.dados,
+            ...(reduzida ? {} : { tipo: r.original.tipo || 'image/jpeg' }),
             capturadaEm: metadados.capturadaEm.toISOString(),
             latitude: metadados.posicao?.latitude,
             longitude: metadados.posicao?.longitude,
@@ -350,7 +354,7 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
         servicoId: r.servicoId,
         chave: r.chave,
         idLocal: r.idLocal,
-        blob: new Blob([foto.dados], { type: 'image/jpeg' }),
+        blob: new Blob([foto.dados], { type: foto.tipo ?? 'image/jpeg' }),
         capturadaEm: new Date(foto.capturadaEm),
         latitude: foto.latitude,
         longitude: foto.longitude,
