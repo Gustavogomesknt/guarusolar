@@ -1,4 +1,4 @@
-import type { TipoServico } from './enums.js';
+import type { StatusAgendamento, TipoServico } from './enums.js';
 
 /*
  * ROTEIRO DE CADA TIPO DE SERVIÇO — edite aqui. É o ÚNICO lugar: os nomes das fotos, se as
@@ -24,7 +24,9 @@ export type RoteiroDoServico = {
    * O que a APROVAÇÃO do gestor faz com o projeto (regra em apps/api/src/lib/situacaoDoProjeto.ts):
    * - 'A_AGENDAR': visita técnica; o projeto volta para "A agendar" (falta a instalação);
    * - 'AGUARDANDO_CONCLUSAO': instalação; fica esperando o gestor concluir o projeto;
-   * - 'NAO_MEXE': manutenção e retrabalho; a situação do projeto fica como está.
+   * - 'NAO_MEXE': vistoria, manutenção e retrabalho; a situação do projeto fica como está.
+   * Os dois primeiros valem quando não sobra outro serviço pendente (visita ou instalação) no
+   * projeto: enquanto sobrar, o projeto segue a situação deles (situacaoPelosServicos, na API).
    * NENHUM tipo conclui o projeto: isso é sempre uma ação do gestor.
    */
   aoValidar: 'A_AGENDAR' | 'AGUARDANDO_CONCLUSAO' | 'NAO_MEXE';
@@ -70,16 +72,51 @@ export const ROTEIRO_DO_SERVICO: Record<TipoServico, RoteiroDoServico> = {
   },
   // retrabalho refaz parte de uma instalação: mesmo roteiro dela
   RETRABALHO: { fotos: FOTOS_DA_INSTALACAO, observacoes: OBSERVACOES_LIVRES, exigeTesteDoSistema: true, aoValidar: 'NAO_MEXE' },
-  // não é mais oferecida na agenda; fica para registros antigos
-  VISTORIA_CONCESSIONARIA: { fotos: [], observacoes: OBSERVACOES_LIVRES, exigeTesteDoSistema: false, aoValidar: 'NAO_MEXE' },
+  // depois da instalação vem a homologação: a concessionária vistoria antes de trocar o medidor
+  VISTORIA_CONCESSIONARIA: {
+    fotos: [
+      { chave: 'medidor_padrao_entrada', rotulo: 'Medidor / padrão de entrada' },
+      { chave: 'placa_inversor', rotulo: 'Placa de identificação do inversor' },
+      { chave: 'vista_geral_sistema', rotulo: 'Vista geral do sistema instalado' },
+    ],
+    observacoes: {
+      rotulo: 'Observações da vistoria',
+      obrigatorias: true,
+      dica: 'O que a concessionária conferiu, pendências apontadas e o resultado da vistoria.',
+    },
+    exigeTesteDoSistema: false,
+    aoValidar: 'NAO_MEXE',
+  },
 };
 
 /** Tipos que o gestor pode escolher ao agendar, na ordem do seletor (instalação é o padrão). */
-export const TIPOS_SERVICO_AGENDAVEIS = ['INSTALACAO', 'VISITA_TECNICA', 'MANUTENCAO', 'RETRABALHO'] as const satisfies readonly TipoServico[];
+export const TIPOS_SERVICO_AGENDAVEIS = ['INSTALACAO', 'VISITA_TECNICA', 'VISTORIA_CONCESSIONARIA', 'MANUTENCAO', 'RETRABALHO'] as const satisfies readonly TipoServico[];
 
 /**
  * O serviço move a situação do projeto ao longo da execução (agendado, em execução, em
- * validação)? Só visita técnica e instalação. Manutenção e retrabalho correm "por fora": um
- * projeto concluído continua concluído enquanto a manutenção é agendada, feita e validada.
+ * validação)? Só visita técnica e instalação. Vistoria, manutenção e retrabalho correm "por
+ * fora": um projeto concluído continua concluído enquanto a manutenção é agendada, feita e validada.
  */
 export const moveOProjeto = (tipo: TipoServico) => ROTEIRO_DO_SERVICO[tipo].aoValidar !== 'NAO_MEXE';
+
+/** Com o técnico ou com o gestor: no máximo UM serviço por projeto fica assim de cada vez. */
+export const SERVICO_ANDANDO = ['EM_EXECUCAO', 'DEVOLVIDO', 'AGUARDANDO_VALIDACAO'] as const satisfies readonly StatusAgendamento[];
+/** Ainda não validado nem cancelado. Um projeto pode ter vários "Agendado" ao mesmo tempo. */
+export const SERVICO_PENDENTE = ['AGENDADO', ...SERVICO_ANDANDO] as const satisfies readonly StatusAgendamento[];
+
+const dia = (d: string | Date) => (typeof d === 'string' ? d : d.toISOString()).slice(0, 10);
+
+/**
+ * O serviço "da vez" de um projeto com vários: o que está andando; senão o próximo agendado
+ * (a data mais próxima); senão o último validado. Cancelados não contam.
+ */
+export function servicoDaVez<T extends { status: StatusAgendamento; dataInicio: string | Date }>(servicos: readonly T[]): T | null {
+  const porData = [...servicos].sort((a, b) => dia(a.dataInicio).localeCompare(dia(b.dataInicio)));
+  const andando: readonly StatusAgendamento[] = SERVICO_ANDANDO;
+  return (
+    porData.find((s) => andando.includes(s.status)) ??
+    porData.find((s) => s.status === 'AGENDADO') ??
+    porData.reverse().find((s) => s.status === 'APROVADO') ??
+    null
+  );
+}

@@ -257,6 +257,10 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
                                faz o Tailwind de cada app gerar as classes escritas no pacote
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
+  src/recarga.tsx              lazyComRecarga (no lugar de React.lazy) e ErroDeRota (errorElement da
+                               raiz, nos dois apps): tela aberta durante uma publicação pede um
+                               arquivo que não existe mais; recarrega UMA vez (marca no
+                               sessionStorage) e, se falhar de novo, pede a recarga manual
   src/SituacaoServico.tsx      situação do serviço IGUAL em todas as telas (bolinha + texto; "Refazer
                                fotos" vira selo laranja). O selo preenchido é só do TIPO de serviço
   src/FormularioTrocaSenha.tsx troca da própria senha (escritório /conta/senha, técnico /senha);
@@ -333,8 +337,9 @@ O `.env` da API fica em `apps/api/.env`.
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
 7. **Enviar o serviço exige o roteiro completo do TIPO** (`packages/compartilhado/src/roteiroDoServico.ts`,
    o único lugar onde ele é editado): as fotos obrigatórias; a confirmação do teste do sistema
-   (instalação, manutenção e retrabalho; visita técnica não tem sistema para testar); e, na visita
-   técnica, as "Observações de medição" (obrigatórias). A tabela `ChecklistFoto` é acertada pelo
+   (instalação, manutenção e retrabalho; visita técnica e vistoria da concessionária não têm o que
+   testar); e as observações obrigatórias: "Observações de medição" na visita técnica e
+   "Observações da vistoria" na vistoria. A tabela `ChecklistFoto` é acertada pelo
    código ao subir a API (`lib/roteiroDeFotos.ts`): item que sai do roteiro é desativado, não apagado.
    Nunca mude a `chave` de um item que já tem fotos.
    Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
@@ -348,13 +353,25 @@ O `.env` da API fica em `apps/api/.env`.
    mesma dupla faz duas ou três no mesmo dia. `avisosDeConflito` (operacao.ts) diz onde a equipe
    e cada pessoa escalada já estão, com projeto e cliente; vem em `GET /api/agenda/conflitos` e
    na resposta de agendar e remarcar. Serviços cancelados não contam. Não reintroduza bloqueio.
-   Cancelar um serviço devolve o projeto ao repouso (`situacaoDeRepouso`): "A agendar" ou, se já
-   tem instalação validada, "Aguardando conclusão".
+   Cancelar um serviço faz o projeto seguir os que sobraram; sem nenhum pendente, ele volta ao
+   repouso: "A agendar" ou, se já tem instalação validada, "Aguardando conclusão".
 9. **Nenhum caminho conclui um projeto sozinho.** O TIPO do serviço decide o efeito da validação
    (`aoValidar` em `roteiroDoServico.ts`): VISITA_TECNICA devolve o projeto para "A agendar" e grava
    `visitaTecnicaConcluidaEm` (aviso "Visita concluída — agendar instalação"); INSTALACAO leva a
-   `AGUARDANDO_CONCLUSAO`; MANUTENCAO e RETRABALHO não mexem na situação em NENHUM passo (um
-   projeto concluído continua concluído enquanto a manutenção é agendada, feita e validada).
+   `AGUARDANDO_CONCLUSAO`; VISTORIA_CONCESSIONARIA, MANUTENCAO e RETRABALHO não mexem na situação
+   em NENHUM passo (um projeto concluído continua concluído enquanto a manutenção é agendada, feita
+   e validada), e por isso cabem também em projeto aguardando conclusão ou concluído, sem reabrir.
+   **Um projeto pode ter VÁRIOS serviços agendados** (o gestor planeja a semana: os dois dias de
+   uma instalação entram de uma vez), mas **só um ANDA por vez** (em execução, devolvido ou em
+   validação): a primeira foto de outro é recusada com o motivo (`conferirQuePodeComecar`) e o app
+   do técnico avisa antes (`aguardandoOutro`). No máximo uma visita técnica não validada por projeto.
+   Por isso a situação do projeto DECORRE dos serviços dele (`situacaoPelosServicos` em
+   `lib/situacaoDoProjeto.ts`; só visita e instalação contam): um em validação -> "Em validação";
+   um em execução -> "Em execução"; só agendados -> "Agendado" ou, se já há instalação validada,
+   "Em execução"; nenhum pendente -> "Aguardando conclusão" (com instalação validada) ou "A
+   agendar". Ou seja: só chega a "Aguardando conclusão" quando a instalação foi validada E não
+   sobra visita nem instalação pendente. `passoDoServico` (operacao.ts) grava a mudança do
+   agendamento, relê a situação devida e a aplica; não passe a situação "na mão".
    Só `POST /api/projetos/:id/concluir` grava `CONCLUIDO` (GESTOR ou ADMIN, a partir de
    `AGUARDANDO_CONCLUSAO`, com `concluidoEm` e `concluidoPorId`); `POST .../reabrir` devolve a
    `AGUARDANDO_CONCLUSAO`, com justificativa obrigatória. Motivo: uma instalação pode levar vários
@@ -362,10 +379,9 @@ O `.env` da API fica em `apps/api/.env`.
    concluem nem reabrem. **Toda mudança de situação passa por `mudarSituacaoDoProjeto`**
    (`lib/situacaoDoProjeto.ts`): confere a passagem (tabela `PASSAGENS`), muda e grava no histórico
    autor, situação anterior, nova e data. Não escreva `projeto.update({ status })` em outro lugar.
-   Um projeto tem um serviço "em curso" por vez. O que cabe agendar: visita técnica só antes da
-   instalação; instalação não em projeto concluído (reabrir antes); manutenção e retrabalho também
-   em projeto aguardando conclusão ou concluído (pela ficha: "Agendar outro serviço").
-   `VISTORIA_CONCESSIONARIA` ficou no enum para registros antigos, fora da lista da agenda.
+   O que cabe agendar: visita técnica só antes de a instalação começar; instalação não em projeto
+   concluído (reabrir antes). Agendar mais um serviço num projeto que não está "A agendar": pela
+   ficha ou pelo detalhe do serviço na Agenda ("Agendar outro serviço", `/agenda?projeto=`).
 
 ## Convenções de código
 

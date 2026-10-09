@@ -27,8 +27,8 @@ export type PreAgendamento = { projetoId?: string; equipeId?: string; dia?: Dia 
 
 /** O que a validação das fotos faz com o projeto, conforme o tipo (o gestor escolhe sabendo). */
 export const EFEITO_DA_VALIDACAO: Record<(typeof ROTEIRO_DO_SERVICO)[TipoServico]['aoValidar'], string> = {
-  A_AGENDAR: 'Ao validar: o projeto volta para "A agendar", para a instalação.',
-  AGUARDANDO_CONCLUSAO: 'Ao validar: o projeto fica "Aguardando conclusão"; quem conclui é você.',
+  A_AGENDAR: 'Ao validar: sem instalação agendada, o projeto volta para "A agendar".',
+  AGUARDANDO_CONCLUSAO: 'Ao validar o último serviço pendente: o projeto fica "Aguardando conclusão"; quem conclui é você.',
   NAO_MEXE: 'Ao validar: a situação do projeto não muda.',
 };
 

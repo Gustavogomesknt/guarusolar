@@ -274,6 +274,17 @@ export function Servico() {
           </section>
         )}
 
+        {/* só um serviço do projeto anda por vez: a API recusa a primeira foto enquanto isso */}
+        {s.status === 'AGENDADO' && s.aguardandoOutro && (
+          <section role="status" className="flex gap-2.5 rounded-2xl border border-destaque bg-destaque-suave p-4 text-destaque-texto">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold">Este serviço ainda não pode começar</p>
+              <p className="text-sm">{s.aguardandoOutro}</p>
+            </div>
+          </section>
+        )}
+
         <AvisoLocalizacao estado={localizacao.estado} onPermitir={localizacao.pedir} />
 
         {obrigatorios.length > 0 && (

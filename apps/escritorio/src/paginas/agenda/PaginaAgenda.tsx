@@ -79,9 +79,9 @@ export function PaginaAgenda() {
     queryKey: ['agenda', 'semana', segunda],
     queryFn: ({ signal }) => api.get<EquipeNaAgenda[]>(`/api/agenda?inicio=${segunda}&fim=${sabado}`, { signal }),
   });
-  // /agenda?projeto=<id> pode trazer um projeto que NÃO está "A agendar" (aguardando conclusão
-  // ou concluído), aberto pela ficha para ganhar outro serviço: ele entra na faixa enquanto a
-  // tela estiver aberta
+  // /agenda?projeto=<id> pode trazer um projeto que NÃO está "A agendar" (já agendado, em
+  // execução, aguardando conclusão ou concluído), aberto pela ficha ou por "Agendar outro
+  // serviço" para ganhar mais um: ele entra na faixa enquanto a tela estiver aberta
   const projetoNaUrl = parametros.get('projeto');
   const [incluido, setIncluido] = useState<string | null>(null);
   const incluir = projetoNaUrl ?? incluido;

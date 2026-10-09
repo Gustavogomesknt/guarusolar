@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Prisma, StatusProjeto } from '@prisma/client';
-import { STATUS_PROJETO, TIPOS_EVENTO_PROJETO } from '@guarusolar/compartilhado';
+import type { Prisma, StatusAgendamento, StatusProjeto } from '@prisma/client';
+import { SERVICO_PENDENTE, servicoDaVez, STATUS_PROJETO, TIPOS_EVENTO_PROJETO } from '@guarusolar/compartilhado';
 import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
@@ -22,6 +22,7 @@ rotasProjetos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
 /** "Em andamento" = tudo que ainda não terminou (o filtro padrão da tela). */
 const EM_ANDAMENTO: StatusProjeto[] = ['AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'AGUARDANDO_CONCLUSAO'];
 const ordemDoStatus = (s: StatusProjeto) => STATUS_PROJETO.indexOf(s);
+const PENDENTES: StatusAgendamento[] = [...SERVICO_PENDENTE];
 
 rotasProjetos.get(
   '/',
@@ -51,11 +52,9 @@ rotasProjetos.get(
         include: {
           cliente: { select: { nome: true, cidade: true, uf: true } },
           orcamento: { select: { codigo: true, valorTotal: true, valorTotalCliente: true, clienteNome: true, clienteCidade: true, clienteUf: true } },
-          // o serviço que vale: o mais recente que não foi cancelado
+          // um projeto pode ter vários serviços: a lista mostra o da vez (servicoDaVez)
           agendamentos: {
             where: { status: { not: 'CANCELADO' } },
-            orderBy: { criadoEm: 'desc' },
-            take: 1,
             include: { equipe: { select: { nome: true } } },
           },
         },
@@ -76,7 +75,9 @@ rotasProjetos.get(
     const contagem = Object.fromEntries(STATUS_PROJETO.map((s) => [s, porStatus.find((p) => p.status === s)?._count ?? 0])) as Record<StatusProjeto, number>;
     res.json({
       contagem: { ...contagem, EM_ANDAMENTO: EM_ANDAMENTO.reduce((t, s) => t + contagem[s], 0) },
-      itens: projetos.map(({ agendamentos, cliente, orcamento, ...p }) => ({
+      itens: projetos.map(({ agendamentos, cliente, orcamento, ...p }) => {
+        const daVez = servicoDaVez(agendamentos);
+        return {
         ...p,
         // o documento usa a cópia gravada no orçamento; a ficha do cliente segue o cadastro
         clienteNome: orcamento.clienteNome ?? cliente.nome,
@@ -85,18 +86,21 @@ rotasProjetos.get(
         orcamentoCodigo: orcamento.codigo,
         valorTotal: orcamento.valorTotal,
         valorTotalCliente: orcamento.valorTotalCliente ?? orcamento.valorTotal,
-        servicoAtual: agendamentos[0]
+        servicoAtual: daVez
           ? {
-              id: agendamentos[0].id,
-              tipo: agendamentos[0].tipo,
-              status: agendamentos[0].status,
-              dataInicio: agendamentos[0].dataInicio,
-              dataFim: agendamentos[0].dataFim,
-              equipe: agendamentos[0].equipe.nome,
-              enviadoEm: agendamentos[0].enviadoEm,
+              id: daVez.id,
+              tipo: daVez.tipo,
+              status: daVez.status,
+              dataInicio: daVez.dataInicio,
+              dataFim: daVez.dataFim,
+              equipe: daVez.equipe.nome,
+              enviadoEm: daVez.enviadoEm,
             }
           : null,
-      })),
+        // quantos serviços ainda não foram validados (agendados, em execução ou em validação)
+        servicosPendentes: agendamentos.filter((a) => PENDENTES.includes(a.status)).length,
+        };
+      }),
     });
   }),
 );
@@ -136,7 +140,8 @@ rotasProjetos.get(
           },
         },
         agendamentos: {
-          orderBy: { criadoEm: 'asc' },
+          // em ordem de data (um projeto pode ter vários agendados de uma vez)
+          orderBy: [{ dataInicio: 'asc' }, { criadoEm: 'asc' }],
           include: {
             equipe: { select: { nome: true } },
             escala: { select: { usuario: { select: { id: true, nome: true } } }, orderBy: { usuario: { nome: 'asc' } } },
@@ -256,8 +261,8 @@ rotasProjetos.post(
     if (atual.status !== 'AGUARDANDO_CONCLUSAO') {
       const porque: Partial<Record<StatusProjeto, string>> = {
         AGUARDANDO_AGENDAMENTO: 'a instalação ainda não foi agendada',
-        AGENDADO: 'há um serviço agendado que ainda não foi feito',
-        EM_EXECUCAO: 'há um serviço em execução',
+        AGENDADO: 'há serviço agendado que ainda não foi feito',
+        EM_EXECUCAO: 'ainda há serviço agendado ou em execução',
         AGUARDANDO_VALIDACAO: 'há um serviço esperando a validação das fotos',
         CONCLUIDO: 'ele já está concluído',
         CANCELADO: 'ele foi cancelado',

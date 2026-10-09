@@ -180,6 +180,8 @@ export function ListaProjetos() {
 /** O que falta acontecer e, para o gestor, o atalho para a tela que resolve. */
 function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor: boolean }) {
   const s = p.servicoAtual;
+  // um projeto pode ter vários serviços agendados: a linha mostra o da vez e quantos mais faltam
+  const mais = p.servicosPendentes > 1 ? ` · mais ${p.servicosPendentes - 1} ${p.servicosPendentes === 2 ? 'serviço' : 'serviços'}` : '';
   const atalho = (para: string, texto: string) =>
     gestor ? (
       <Link to={para} onClick={(e) => e.stopPropagation()} className="font-semibold text-primary underline-offset-2 hover:underline">
@@ -212,14 +214,27 @@ function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor:
           <span className="font-medium">
             {ROTULO_TIPO_SERVICO[s.tipo]} · {intervaloEscrito(dia(s.dataInicio), dia(s.dataFim))}
           </span>
-          <span className="text-muted-foreground">{s.equipe}</span>
+          <span className="text-muted-foreground">
+            {s.equipe}
+            {mais}
+          </span>
         </span>
       ) : null;
     case 'EM_EXECUCAO':
       return s ? (
         <span className="flex flex-col">
-          <span className="font-medium">{s.status === 'DEVOLVIDO' ? 'Técnico refazendo fotos' : `${ROTULO_TIPO_SERVICO[s.tipo]} em execução`}</span>
-          <span className="text-muted-foreground">{s.equipe}</span>
+          <span className="font-medium">
+            {s.status === 'DEVOLVIDO'
+              ? 'Técnico refazendo fotos'
+              : s.status === 'AGENDADO'
+                ? // obra em andamento: um dia já foi validado e este é o próximo
+                  `Próximo: ${ROTULO_TIPO_SERVICO[s.tipo]} · ${intervaloEscrito(dia(s.dataInicio), dia(s.dataFim))}`
+                : `${ROTULO_TIPO_SERVICO[s.tipo]} em execução`}
+          </span>
+          <span className="text-muted-foreground">
+            {s.equipe}
+            {mais}
+          </span>
         </span>
       ) : null;
     case 'AGUARDANDO_VALIDACAO':

@@ -7,6 +7,7 @@ import { Servico } from '@/paginas/Servico';
 import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
 import { definirUsuarioDaFila } from '@/fotos/fila';
 import { AvisoAtualizacao } from '@/components/AvisoAtualizacao';
+import { ErroDeRota } from '@guarusolar/web/recarga';
 import { RotaProtegida } from './RotaProtegida';
 
 // Só o técnico entra aqui; os demais papéis recebem este aviso no login.
@@ -33,7 +34,7 @@ function RaizDoApp() {
 
 export const roteador = createBrowserRouter(
   createRoutesFromElements(
-    <Route element={<RaizDoApp />}>
+    <Route element={<RaizDoApp />} errorElement={<ErroDeRota />}>
       <Route path="/login" element={<Login />} />
       <Route element={<RotaProtegida />}>
         <Route index element={<Navigate to="/agenda" replace />} />

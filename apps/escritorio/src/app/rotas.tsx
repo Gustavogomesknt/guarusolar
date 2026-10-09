@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { ErroDeRota, lazyComRecarga } from '@guarusolar/web/recarga';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
 import { SessaoProvider } from '@guarusolar/web/sessao';
 import { Login } from '@/paginas/Login';
@@ -10,17 +10,18 @@ import { RotaProtegida } from './RotaProtegida';
 import { PAPEIS_DO_ESCRITORIO } from './permissoes';
 
 // Telas carregadas sob demanda: ficam fora do JavaScript inicial (a lista é a tela de entrada).
-// O <Suspense> fica no Layout.
-const PaginaOrcamento = lazy(() => import('@/paginas/orcamentos/PaginaOrcamento').then((m) => ({ default: m.PaginaOrcamento })));
-const Pipeline = lazy(() => import('@/paginas/orcamentos/Pipeline').then((m) => ({ default: m.Pipeline })));
-const ListaClientes = lazy(() => import('@/paginas/clientes/ListaClientes').then((m) => ({ default: m.ListaClientes })));
-const FichaCliente = lazy(() => import('@/paginas/clientes/FichaCliente').then((m) => ({ default: m.FichaCliente })));
-const PaginaCatalogo = lazy(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
-const PaginaAgenda = lazy(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
-const ListaProjetos = lazy(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
-const FichaProjeto = lazy(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
-const PaginaUsuarios = lazy(() => import('@/paginas/usuarios/PaginaUsuarios').then((m) => ({ default: m.PaginaUsuarios })));
-const PaginaValidacao = lazy(() =>
+// O <Suspense> fica no Layout. lazyComRecarga: depois de uma publicação, os arquivos antigos somem e a
+// página se recarrega sozinha uma vez (packages/web/src/recarga.tsx).
+const PaginaOrcamento = lazyComRecarga(() => import('@/paginas/orcamentos/PaginaOrcamento').then((m) => ({ default: m.PaginaOrcamento })));
+const Pipeline = lazyComRecarga(() => import('@/paginas/orcamentos/Pipeline').then((m) => ({ default: m.Pipeline })));
+const ListaClientes = lazyComRecarga(() => import('@/paginas/clientes/ListaClientes').then((m) => ({ default: m.ListaClientes })));
+const FichaCliente = lazyComRecarga(() => import('@/paginas/clientes/FichaCliente').then((m) => ({ default: m.FichaCliente })));
+const PaginaCatalogo = lazyComRecarga(() => import('@/paginas/catalogo/PaginaCatalogo').then((m) => ({ default: m.PaginaCatalogo })));
+const PaginaAgenda = lazyComRecarga(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
+const ListaProjetos = lazyComRecarga(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
+const FichaProjeto = lazyComRecarga(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
+const PaginaUsuarios = lazyComRecarga(() => import('@/paginas/usuarios/PaginaUsuarios').then((m) => ({ default: m.PaginaUsuarios })));
+const PaginaValidacao = lazyComRecarga(() =>
   import('@/paginas/validacao/PaginaValidacao').then((m) => ({ default: m.PaginaValidacao })),
 );
 
@@ -42,7 +43,7 @@ function RaizDoApp() {
  */
 export const roteador = createBrowserRouter(
   createRoutesFromElements(
-    <Route element={<RaizDoApp />}>
+    <Route element={<RaizDoApp />} errorElement={<ErroDeRota />}>
       <Route path="/login" element={<Login />} />
       <Route path="/sair" element={<Sair />} />
 

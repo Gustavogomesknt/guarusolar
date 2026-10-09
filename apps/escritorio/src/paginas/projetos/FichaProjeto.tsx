@@ -10,6 +10,7 @@ import {
   ROTULO_STATUS_PROJETO,
   ROTULO_TIPO_SERVICO,
   segundaDaSemana,
+  servicoDaVez,
   type TipoEventoProjeto,
 } from '@guarusolar/compartilhado';
 import { api, ErroApi, urlDaApi, urlDaFoto } from '@guarusolar/web/api';
@@ -42,6 +43,8 @@ const periodo = (s: Pick<Servico, 'dataInicio' | 'dataFim'>) => {
   return `${inicio.slice(0, 4) === fim.slice(0, 4) ? diaBr(inicio).slice(0, 5) : diaBr(inicio)} a ${diaBr(fim)}`;
 };
 const agendaDaSemana = (s: Servico) => `/agenda?semana=${segundaDaSemana(dia(s.dataInicio))}`;
+/** ainda não validado nem cancelado */
+const pendente = (s: Servico) => s.status !== 'APROVADO' && s.status !== 'CANCELADO';
 
 /**
  * Ficha do projeto (a obra do começo ao fim). Agendar e validar continuam na Agenda e na
@@ -85,7 +88,10 @@ export function FichaProjeto() {
   }
 
   const p = ficha.data;
-  const atual = [...p.agendamentos].reverse().find((s) => s.status !== 'CANCELADO') ?? null;
+  // um projeto pode ter vários serviços: o da vez é o que anda, senão o próximo agendado
+  const atual = servicoDaVez(p.agendamentos);
+  const pendentes = p.agendamentos.filter(pendente);
+  const instalado = p.agendamentos.some((s) => s.tipo === 'INSTALACAO' && s.status === 'APROVADO');
   const podeCancelar = gestor && (p.status === 'AGUARDANDO_AGENDAMENTO' || p.status === 'AGENDADO');
   const nomeCliente = p.orcamento.clienteNome ?? p.cliente.nome;
 
@@ -124,6 +130,14 @@ export function FichaProjeto() {
           <ClipboardCheck className="size-4 shrink-0" aria-hidden />
           Visita concluída — agendar instalação
           <span className="font-normal text-foreground/70">· visita validada em {formatarData(p.visitaTecnicaConcluidaEm)}</span>
+        </p>
+      )}
+      {/* instalação validada, mas ainda há serviço para fazer: o projeto espera o último */}
+      {instalado && pendentes.length > 0 && p.status !== 'AGUARDANDO_CONCLUSAO' && p.status !== 'CONCLUIDO' && p.status !== 'CANCELADO' && (
+        <p role="status" className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-[#0E3F7E]">
+          <strong className="font-semibold">Instalação validada, obra em andamento.</strong> Ainda{' '}
+          {pendentes.length === 1 ? 'há 1 serviço' : `há ${pendentes.length} serviços`} para fazer ou validar. O projeto passa a "Aguardando
+          conclusão" quando o último for validado.
         </p>
       )}
       {p.status === 'AGUARDANDO_CONCLUSAO' && (
@@ -200,8 +214,8 @@ function AcaoPrincipal({
   // botão aparece desde o começo, desabilitado, para ficar claro que o projeto não se conclui sozinho.
   const porQueNao: Partial<Record<Ficha['status'], string>> = {
     AGUARDANDO_AGENDAMENTO: 'Só depois de a instalação ser feita e validada',
-    AGENDADO: 'Só depois de o serviço ser feito e validado',
-    EM_EXECUCAO: 'Só depois de o serviço ser enviado e validado',
+    AGENDADO: 'Só depois de os serviços agendados serem feitos e validados',
+    EM_EXECUCAO: 'Ainda há serviço agendado ou em execução neste projeto',
     AGUARDANDO_VALIDACAO: 'Valide as fotos da instalação primeiro',
   };
   const concluir =
@@ -222,9 +236,10 @@ function AcaoPrincipal({
     <div className="flex flex-wrap items-center justify-end gap-2.5">
       {p.status === 'AGUARDANDO_AGENDAMENTO' && botao(`/agenda?projeto=${p.id}`, p.visitaTecnicaConcluidaEm ? 'Agendar instalação' : 'Agendar na agenda')}
       {doServico}
-      {/* mais um dia de obra, retrabalho ou manutenção: o projeto não precisa estar "A agendar" */}
-      {!emCurso && p.status === 'AGUARDANDO_CONCLUSAO' && botao(`/agenda?projeto=${p.id}`, 'Agendar outro serviço', true)}
-      {!emCurso && p.status === 'CONCLUIDO' && botao(`/agenda?projeto=${p.id}`, 'Agendar manutenção ou retrabalho', true)}
+      {/* mais um dia de obra, vistoria, retrabalho ou manutenção: um projeto pode ter vários
+          serviços agendados e não precisa estar "A agendar" para ganhar outro */}
+      {p.status !== 'AGUARDANDO_AGENDAMENTO' && p.status !== 'CONCLUIDO' && p.status !== 'CANCELADO' && botao(`/agenda?projeto=${p.id}`, 'Agendar outro serviço', true)}
+      {p.status === 'CONCLUIDO' && botao(`/agenda?projeto=${p.id}`, 'Agendar vistoria, manutenção ou retrabalho', true)}
       {concluir}
       {p.status === 'CONCLUIDO' && (
         <Button type="button" variant="outline" className="h-11 rounded-[10px] bg-card font-semibold" onClick={onReabrir}>
@@ -410,8 +425,9 @@ function Servicos({ projeto: p, gestor }: { projeto: Ficha; gestor: boolean }) {
           Nenhum serviço agendado ainda.{gestor && p.status === 'AGUARDANDO_AGENDAMENTO' && ' O projeto está na faixa "A agendar" da Agenda.'}
         </p>
       ) : (
+        // em ordem de data (a API já manda assim): tipo e data, equipe, situação
         <ul className="flex flex-col divide-y">
-          {[...p.agendamentos].reverse().map((s) => (
+          {p.agendamentos.map((s) => (
             <li key={s.id} className={cn('grid gap-3 py-3.5 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)]', s.status === 'CANCELADO' && 'opacity-60')}>
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-semibold">
@@ -476,7 +492,7 @@ function Fotos({ projeto: p }: { projeto: Ficha }) {
   }
   return (
     <Cartao titulo={`Fotos do serviço (${total})`}>
-      {[...p.agendamentos].reverse().map((s) =>
+      {p.agendamentos.map((s) =>
         s.fotos && s.fotos.length > 0 ? (
           <div key={s.id} className="flex flex-col gap-2.5">
             <h3 className="text-sm font-semibold">
@@ -776,6 +792,8 @@ function DialogConcluir({ projeto: p, aberto, onAbertoChange }: { projeto: Ficha
     },
   });
   const validados = p.agendamentos.filter((s) => s.status === 'APROVADO');
+  // vistoria, manutenção ou retrabalho ainda em aberto não impedem a conclusão, mas o gestor é avisado
+  const emAberto = p.agendamentos.filter(pendente);
   return (
     <Dialog open={aberto} onOpenChange={onAbertoChange}>
       <DialogContent className="bg-card sm:max-w-md">
@@ -785,6 +803,11 @@ function DialogConcluir({ projeto: p, aberto, onAbertoChange }: { projeto: Ficha
             Confirme que a obra terminou: não falta nenhum dia de instalação nem retrabalho. Serviços validados neste projeto:{' '}
             {validados.length ? validados.map((s) => `${ROTULO_TIPO_SERVICO[s.tipo]} (${periodo(s)})`).join(', ') : 'nenhum'}. Dá para reabrir
             depois, com justificativa.
+            {emAberto.length > 0 && (
+              <strong className="mt-2 block font-semibold text-destaque-texto">
+                Ainda em aberto: {emAberto.map((s) => `${ROTULO_TIPO_SERVICO[s.tipo]} (${periodo(s)})`).join(', ')}. Eles continuam na agenda depois da conclusão.
+              </strong>
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

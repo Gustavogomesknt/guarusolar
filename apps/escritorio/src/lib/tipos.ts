@@ -281,6 +281,8 @@ export type ProjetoNaLista = {
     equipe: string;
     enviadoEm: string | null;
   } | null;
+  /** serviços ainda não validados (agendados, em execução ou em validação) */
+  servicosPendentes: number;
 };
 
 export type ListaDeProjetos = {

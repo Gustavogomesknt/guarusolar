@@ -82,7 +82,7 @@ export function DialogServico({
       const cliente = servico!.projeto.cliente.nome;
       toast.success(
         corpo.status === 'CANCELADO'
-          ? `Serviço de ${cliente} cancelado. O projeto voltou para "A agendar".`
+          ? `Serviço de ${cliente} cancelado.`
           : corpo.tecnicos
             ? `Escala de ${cliente} atualizada`
             : `Serviço de ${cliente} atualizado: ${nomeLongo(dia)}`,
@@ -255,6 +255,12 @@ export function DialogServico({
             <>
               <Button variant="ghost" className="h-11 rounded-[10px] text-muted-foreground" onClick={() => setModo('cancelar')}>
                 Cancelar serviço
+              </Button>
+              {/* um projeto pode ter vários serviços agendados: o projeto entra na faixa de cima */}
+              <Button asChild variant="outline" className="h-11 rounded-[10px] bg-card">
+                <Link to={`/agenda?projeto=${servico.projetoId}`} onClick={onFechar}>
+                  Agendar outro serviço
+                </Link>
               </Button>
               <Button className="h-11 rounded-[10px] font-semibold" onClick={() => setModo('remarcar')}>
                 Remarcar

@@ -25,8 +25,8 @@ import { BotoesMarcacao, marcacaoInicial, rotuloDaFoto, type Marcacao } from './
 
 /** O que acontece com o PROJETO depois de validar, conforme o tipo. Validar nunca conclui o projeto. */
 const DEPOIS_DE_VALIDAR: Record<(typeof ROTEIRO_DO_SERVICO)[keyof typeof ROTEIRO_DO_SERVICO]['aoValidar'], string> = {
-  A_AGENDAR: 'O projeto volta para "A agendar": falta agendar a instalação.',
-  AGUARDANDO_CONCLUSAO: 'O projeto fica "Aguardando conclusão": quando a obra terminar, conclua na ficha do projeto.',
+  A_AGENDAR: 'Sem instalação agendada, o projeto volta para "A agendar".',
+  AGUARDANDO_CONCLUSAO: 'Sem outro serviço pendente, o projeto fica "Aguardando conclusão": quando a obra terminar, conclua na ficha do projeto.',
   NAO_MEXE: 'A situação do projeto não muda.',
 };
 
