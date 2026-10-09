@@ -19,16 +19,19 @@ export function SemAcesso() {
             ) : (
               <ShieldAlert className="size-5 text-destaque" aria-hidden />
             )}
-            {tecnico ? 'Use o app dos técnicos' : 'Sem acesso'}
+            {tecnico ? 'Esta área é do escritório' : 'Sem acesso'}
           </CardTitle>
           <CardDescription>
-            {tecnico
-              ? 'Este programa é do escritório. A sua agenda e o envio das fotos ficam no site dos técnicos, pelo navegador do celular.'
-              : 'Seu usuário não tem acesso a esta tela.'}
+            {tecnico ? 'Esta área é do escritório. Acesse o aplicativo de campo.' : 'Seu usuário não tem acesso a esta tela.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          {!tecnico && (
+          {tecnico ? (
+            // o app de campo mora em /campo/, no mesmo endereço (outra aplicação: link comum, não <Link>)
+            <Button asChild>
+              <a href="/campo/">Abrir o aplicativo de campo</a>
+            </Button>
+          ) : (
             <Button asChild>
               <Link to="/">Voltar ao início</Link>
             </Button>

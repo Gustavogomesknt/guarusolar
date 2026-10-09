@@ -66,4 +66,6 @@ export type ServicoDetalhe = Omit<ServicoNaAgenda, 'projeto'> & {
   checklist: ItemChecklist[];
   /** outro serviço do mesmo projeto está em execução ou em validação: este ainda não pode começar */
   aguardandoOutro?: string | null;
+  /** o servidor não está recebendo fotos (armazenamento não configurado): o motivo, para avisar antes */
+  fotosBloqueadas?: string | null;
 };

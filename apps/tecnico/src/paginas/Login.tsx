@@ -5,9 +5,17 @@ import { ErroApi } from '@guarusolar/web/api';
 import { useSessao, type EstadoLogin } from '@guarusolar/web/sessao';
 import { Button } from '@/components/ui/button';
 import { TelaCheia } from '@/components/TelaCheia';
+import { AVISO_PERFIL_COMERCIAL, ENDERECO_DO_ESCRITORIO } from '@/app/acesso';
 
 const CLASSE_CAMPO =
   'h-12 w-full rounded-xl border border-input bg-card px-3.5 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 aria-invalid:border-destructive';
+
+/** Para quem entrou no app errado (perfil Comercial): o caminho do escritório. */
+const LinkDoEscritorio = () => (
+  <a href={ENDERECO_DO_ESCRITORIO} className="mt-1.5 block font-semibold text-primary underline underline-offset-2">
+    Abrir o sistema do escritório
+  </a>
+);
 
 export function Login() {
   const { usuario, aviso, entrar } = useSessao();
@@ -46,7 +54,10 @@ export function Login() {
         {aviso && (
           <p role="status" className="flex gap-2 rounded-xl border border-primary/30 bg-secondary px-3 py-2.5 text-secondary-foreground">
             <Info className="mt-0.5 size-5 shrink-0" aria-hidden />
-            {aviso}
+            <span>
+              {aviso}
+              {aviso === AVISO_PERFIL_COMERCIAL && <LinkDoEscritorio />}
+            </span>
           </p>
         )}
 
@@ -79,6 +90,7 @@ export function Login() {
           {erro && (
             <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-destructive">
               {erro}
+              {erro === AVISO_PERFIL_COMERCIAL && <LinkDoEscritorio />}
             </p>
           )}
 

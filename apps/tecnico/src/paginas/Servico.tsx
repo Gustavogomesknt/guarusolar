@@ -284,6 +284,17 @@ export function Servico() {
           </section>
         )}
 
+        {/* o servidor não tem onde guardar as fotos (configuração da hospedagem): avisa antes */}
+        {s.fotosBloqueadas && (
+          <section role="status" className="flex gap-2.5 rounded-2xl border border-destaque bg-destaque-suave p-4 text-destaque-texto">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold">As fotos ainda não estão sendo recebidas</p>
+              <p className="text-sm">{s.fotosBloqueadas}</p>
+            </div>
+          </section>
+        )}
+
         {/* só um serviço do projeto anda por vez: a API recusa a primeira foto enquanto isso */}
         {s.status === 'AGENDADO' && s.aguardandoOutro && (
           <section role="status" className="flex gap-2.5 rounded-2xl border border-destaque bg-destaque-suave p-4 text-destaque-texto">

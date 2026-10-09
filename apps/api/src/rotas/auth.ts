@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, conferirSenha, gerarHash, gerarToken } from '../lib/auth';
-import { appTecnicoLiberado, AVISO_APP_TECNICO_BLOQUEADO } from '../lib/armazenamento';
 import { problemaNaSenhaNova } from '../lib/senha';
 import { bloqueioAtual, registrarFalha, registrarSucesso } from '../lib/limiteLogin';
 
@@ -46,9 +45,9 @@ rotasAuth.post(
     }
     registrarSucesso(email);
 
-    // o técnico só entra quando as fotos têm onde ficar (produção sem SharePoint: bloqueado)
-    if (usuario.papel === 'TECNICO' && !appTecnicoLiberado()) throw new ErroHttp(403, AVISO_APP_TECNICO_BLOQUEADO);
-
+    // Nenhum bloqueio aqui além de e-mail, senha e conta ativa: ter ou não serviço agendado não
+    // impede o login (a agenda só aparece vazia), e a falta de armazenamento das fotos barra só
+    // o envio delas (rotas do técnico), não a entrada.
     const dados = { id: usuario.id, nome: usuario.nome, papel: usuario.papel, equipeId: usuario.equipeId };
     res.json({ token: gerarToken({ ...dados, versao: usuario.sessaoVersao }), usuario: { ...dados, senhaTemporaria: usuario.senhaTemporaria } });
   }),

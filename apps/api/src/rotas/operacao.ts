@@ -12,7 +12,7 @@ import {
   ArmazenamentoCheio,
   ArmazenamentoIndisponivel,
   appTecnicoLiberado,
-  AVISO_APP_TECNICO_BLOQUEADO,
+  AVISO_FOTOS_BLOQUEADAS,
   guardarComoSubstituida,
   salvarFoto,
 } from '../lib/armazenamento';
@@ -612,14 +612,13 @@ rotasValidacao.post(
 );
 
 // ===========================================================================
-// TÉCNICO — PWA no celular (único acesso do técnico)
+// APP DE CAMPO — PWA no celular (único acesso do técnico)
 // ===========================================================================
+// GESTOR e ADMIN também entram (para ver o que o técnico vê). O que cada um enxerga é sempre
+// "os serviços em que está escalado" (filtroDoTecnico, regra 6), de QUALQUER tipo e sem olhar a
+// situação do projeto: quem não está escalado em nada vê a agenda vazia.
 export const rotasTecnico = Router();
-rotasTecnico.use(autenticar, autorizar('TECNICO'), (_req, _res, next) => {
-  // sem lugar seguro para as fotos em produção, o app dos técnicos fica fechado (armazenamento.ts)
-  if (!appTecnicoLiberado()) throw new ErroHttp(403, AVISO_APP_TECNICO_BLOQUEADO);
-  next();
-});
+rotasTecnico.use(autenticar, autorizar('TECNICO', 'GESTOR'));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -719,6 +718,8 @@ rotasTecnico.get(
     res.json({
       ...servico,
       aguardandoOutro: outro ? avisoDeOutroAndando(outro) : null,
+      // produção sem lugar seguro para as fotos: o app avisa antes de o técnico fotografar
+      fotosBloqueadas: appTecnicoLiberado() ? null : AVISO_FOTOS_BLOQUEADAS,
       checklist: checklist.map((item) => {
         const foto = servico.fotos.find((f) => f.chave === item.chave && f.revisao !== 'REFAZER');
         return { ...item, enviada: Boolean(foto), foto: foto ?? null };
@@ -733,6 +734,9 @@ rotasTecnico.post(
   upload.single('arquivo'),
   rota(async (req, res) => {
     const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
+    // Sem lugar seguro para guardar (produção com STORAGE_PROVIDER=disco), a API não recebe a
+    // foto: 503, para a fila do celular guardar e reenviar sozinha quando for configurado.
+    if (!appTecnicoLiberado()) throw new ErroHttp(503, AVISO_FOTOS_BLOQUEADAS);
     if (!req.file) throw new ErroHttp(400, 'Envie o arquivo da foto');
 
     const { chave, latitude, longitude, capturadaEm, idLocal } = z

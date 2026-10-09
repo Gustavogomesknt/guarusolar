@@ -9,6 +9,7 @@ import {
   formatarHora,
   ROTULO_STATUS_PROJETO,
   ROTULO_TIPO_SERVICO,
+  moveOProjeto,
   segundaDaSemana,
   servicoDaVez,
   type TipoEventoProjeto,
@@ -90,7 +91,8 @@ export function FichaProjeto() {
   const p = ficha.data;
   // um projeto pode ter vários serviços: o da vez é o que anda, senão o próximo agendado
   const atual = servicoDaVez(p.agendamentos);
-  const pendentes = p.agendamentos.filter(pendente);
+  // só visita técnica e instalação seguram o projeto fora de "Aguardando conclusão" (regra 9)
+  const pendentes = p.agendamentos.filter((s) => pendente(s) && moveOProjeto(s.tipo));
   const instalado = p.agendamentos.some((s) => s.tipo === 'INSTALACAO' && s.status === 'APROVADO');
   const podeCancelar = gestor && (p.status === 'AGUARDANDO_AGENDAMENTO' || p.status === 'AGENDADO');
   const nomeCliente = p.orcamento.clienteNome ?? p.cliente.nome;
@@ -136,8 +138,8 @@ export function FichaProjeto() {
       {instalado && pendentes.length > 0 && p.status !== 'AGUARDANDO_CONCLUSAO' && p.status !== 'CONCLUIDO' && p.status !== 'CANCELADO' && (
         <p role="status" className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-[#0E3F7E]">
           <strong className="font-semibold">Instalação validada, obra em andamento.</strong> Ainda{' '}
-          {pendentes.length === 1 ? 'há 1 serviço' : `há ${pendentes.length} serviços`} para fazer ou validar. O projeto passa a "Aguardando
-          conclusão" quando o último for validado.
+          {pendentes.length === 1 ? 'há 1 dia de instalação' : `há ${pendentes.length} dias de instalação`} para fazer ou validar. O projeto passa a
+          "Aguardando conclusão" quando o último for validado.
         </p>
       )}
       {p.status === 'AGUARDANDO_CONCLUSAO' && (

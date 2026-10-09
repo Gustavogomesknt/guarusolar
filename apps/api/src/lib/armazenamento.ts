@@ -55,7 +55,8 @@ const TIPOS: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jp
 
 export type Destino = 'disco' | 'sharepoint' | 'supabase';
 export const destinoAtual = (): Destino => {
-  const valor = process.env.STORAGE_PROVIDER?.trim();
+  // maiúsculas e aspas digitadas no painel da hospedagem não mudam o destino
+  const valor = process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
   return valor === 'sharepoint' || valor === 'supabase' ? valor : 'disco';
 };
 
@@ -68,12 +69,12 @@ export const destinoDaChave = (chave: string): Destino =>
  * variáveis param o servidor com a mensagem (melhor que falhar no primeiro upload em campo).
  */
 export function conferirArmazenamentoAoIniciar() {
-  const valor = process.env.STORAGE_PROVIDER?.trim();
+  const valor = process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
   if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase') {
     throw new Error(`STORAGE_PROVIDER="${valor}" não existe. Use "disco", "sharepoint" ou "supabase".`);
   }
   if (!appTecnicoLiberado()) {
-    console.warn('[armazenamento] Produção sem armazenamento persistente de fotos: app dos técnicos BLOQUEADO até configurar o SharePoint ou o Supabase Storage.');
+    console.warn('[armazenamento] ATENÇÃO: produção sem armazenamento persistente de fotos (STORAGE_PROVIDER não é "supabase"). O app de campo abre, mas a API NÃO RECEBE FOTOS até configurar o Supabase Storage. /saude mostra "fotos".');
   }
   if (destinoAtual() === 'supabase') {
     const faltam = variaveisDoSupabaseFaltando();
@@ -106,10 +107,16 @@ export function conferirArmazenamentoAoIniciar() {
 }
 
 /**
- * As fotos sobrevivem a uma publicação? No SharePoint e no Supabase Storage, sim. No disco, só se ele for persistente
- * (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco); o disco comum do servidor é apagado a cada
- * publicação. Em produção sem isso, o app dos técnicos fica bloqueado (login e rotas): melhor
- * não receber fotos do que perdê-las. Fora de produção, sempre liberado.
+ * As fotos sobrevivem a uma publicação? No Supabase Storage (e no SharePoint), sim. No disco, só
+ * se ele for persistente (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco): o
+ * disco comum do servidor é apagado a cada publicação, reinício e sono. Em produção sem isso, a
+ * API NÃO RECEBE FOTOS (melhor não receber do que perder), e só isso: o login e a agenda do app
+ * de campo funcionam. Fora de produção, sempre liberado.
+ *
+ * Isto NADA tem a ver com o técnico ter ou não serviço agendado. Até 09/10/2026 esta condição
+ * barrava o LOGIN do técnico com "O app dos técnicos ainda não foi liberado. Fale com o gestor
+ * para combinar os serviços", texto que mandava procurar o problema na agenda, e não na
+ * variável STORAGE_PROVIDER da hospedagem, onde ele estava.
  */
 export const appTecnicoLiberado = () =>
   process.env.NODE_ENV !== 'production' ||
@@ -117,8 +124,9 @@ export const appTecnicoLiberado = () =>
   destinoAtual() === 'supabase' ||
   process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim';
 
-export const AVISO_APP_TECNICO_BLOQUEADO =
-  'O app dos técnicos ainda não foi liberado. Fale com o gestor para combinar os serviços.';
+/** Para o técnico (tela do serviço e fila de fotos): o motivo de verdade, e a quem avisar. */
+export const AVISO_FOTOS_BLOQUEADAS =
+  'O servidor ainda não está pronto para receber fotos: falta configurar onde elas ficam guardadas. Avise o escritório. As fotos que você tirar ficam guardadas no celular e sobem sozinhas quando isso for resolvido.';
 
 // ------------------------------------------------------------------------------------------
 // Disco

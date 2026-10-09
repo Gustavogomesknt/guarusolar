@@ -10,11 +10,8 @@ import { AvisoAtualizacao } from '@/components/AvisoAtualizacao';
 import { ErroDeRota } from '@guarusolar/web/recarga';
 import { AvisoDeConexao } from '@guarusolar/web/AvisoDeConexao';
 import { RotaProtegida } from './RotaProtegida';
+import { AVISO_PERFIL_COMERCIAL, PAPEIS_ACEITOS } from './acesso';
 
-// Só o técnico entra aqui; os demais papéis recebem este aviso no login.
-const PAPEIS_ACEITOS = ['TECNICO'] as const;
-const AVISO_OUTROS_PAPEIS =
-  'Este aplicativo é para os técnicos em campo. Use o sistema do escritório.';
 
 /** A fila de fotos acompanha quem está logado (sem ninguém, ela pausa). */
 function FilaDoUsuario() {
@@ -25,7 +22,7 @@ function FilaDoUsuario() {
 
 function RaizDoApp() {
   return (
-    <SessaoProvider papeisAceitos={PAPEIS_ACEITOS} avisoPapelRecusado={AVISO_OUTROS_PAPEIS} abrirSemConexao>
+    <SessaoProvider papeisAceitos={PAPEIS_ACEITOS} avisoPapelRecusado={AVISO_PERFIL_COMERCIAL} abrirSemConexao>
       <FilaDoUsuario />
       <AvisoDeConexao aparelho="celular" />
       <AvisoAtualizacao />

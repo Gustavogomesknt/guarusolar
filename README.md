@@ -264,7 +264,8 @@ Em produção as fotos ficam num bucket do Supabase Storage, no mesmo projeto do
 (`STORAGE_PROVIDER=supabase`). **É o destino definitivo.** O SharePoint saiu do escopo: a
 Guarusolar usa conta pessoal da Microsoft, que não tem tenant, Entra ID nem SharePoint (a seção
 "Fotos no SharePoint", abaixo, fica só como referência do provedor que continua no código).
-Com o Supabase configurado, o app dos técnicos libera em produção.
+Sem ele, em produção, a API não recebe fotos (o login e a agenda do app de campo funcionam; a tela do
+serviço avisa e as fotos ficam guardadas no celular). `/saude` mostra `"fotos":{"destino":…,"recebendo":…}`.
 
 **Segurança.** O bucket tem de ser **privado**: a API confere e se recusa a gravar em bucket
 público. Só a API fala com o Storage, com a chave secreta, que fica só nas variáveis da hospedagem.
@@ -527,8 +528,8 @@ domínio próprio, ele entra em Settings › Custom Domains (também no plano gr
 - **0,1 de CPU e 512 MB.** Login (bcrypt) e PDF ficam mais lentos que na sua máquina.
 - **O limite de tentativas de login zera** quando o serviço dorme ou reinicia (fica em memória).
 - **Disco apagado a cada publicação, reinício e sono**, e o plano gratuito não tem disco
-  persistente (só os pagos). Por isso, **o app dos técnicos segue bloqueado** até o SharePoint:
-  login do técnico e `/api/tecnico` respondem "O app dos técnicos ainda não foi liberado".
+  persistente (só os pagos). Por isso, **a API não recebe fotos** enquanto `STORAGE_PROVIDER` não
+  for `supabase`: o técnico entra e vê a agenda, mas o envio de foto responde 503 com o motivo.
   Libera sozinho com `STORAGE_PROVIDER=sharepoint` e os segredos `MS_*`.
 - **Minutos de compilação limitados por mês** (cada publicação leva uns 5–10 min): publique
   quando houver o que publicar, não a cada commit.

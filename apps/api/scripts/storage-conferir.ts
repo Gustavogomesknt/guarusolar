@@ -149,7 +149,7 @@ async function main() {
   console.log('');
   await relatorio();
   console.log('\nTudo certo. Para usar: STORAGE_PROVIDER=supabase (com as três variáveis SUPABASE_*).');
-  console.log('O app dos técnicos libera sozinho em produção com esse provedor configurado.');
+  console.log('Com esse provedor configurado, a API passa a receber as fotos em produção (confira "fotos" no /saude).');
 }
 
 main()

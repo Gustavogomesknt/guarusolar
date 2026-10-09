@@ -132,8 +132,8 @@ export function Agenda() {
         ) : servicos.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card px-6 py-10 text-center">
             <CalendarX2 className="size-8 text-muted-foreground" aria-hidden />
-            <p className="font-semibold">Nenhum serviço nos próximos dias</p>
-            <p className="text-sm text-muted-foreground">Quando o gestor agendar sua equipe, o serviço aparece aqui.</p>
+            <p className="font-semibold">Nenhum serviço agendado para você no momento.</p>
+            <p className="text-sm text-muted-foreground">Quando o escritório agendar, ele aparece aqui.</p>
           </div>
         ) : (
           <>

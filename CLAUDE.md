@@ -210,8 +210,9 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
   src/paginas/                 Login, Inicio, SemAcesso
 apps/tecnico/                  app do técnico (PWA no navegador do celular; mesmo stack do escritório).
                                Build com base /campo/ (BASE_TECNICO troca); dev na raiz (5174)
-  src/app/rotas.tsx            SessaoProvider com papeisAceitos=['TECNICO']: outros papéis recebem
-                               o aviso para usar o escritório
+  src/app/rotas.tsx            SessaoProvider com papeisAceitos de app/acesso.ts: TECNICO, GESTOR e
+                               ADMIN entram (cada um vê só os serviços em que está escalado; sem
+                               nenhum, a agenda vazia); COMERCIAL recebe o aviso com link para o escritório
   src/paginas/Agenda.tsx       hoje e os próximos 7 dias; serviço de vários dias aparece em cada
                                dia; no topo, os devolvidos pelo gestor e os em aberto de dias
                                anteriores; WhatsApp e "Como chegar"
@@ -577,9 +578,24 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Migrations em produção funcionam com a versão anterior do código** (publicação sem queda
   roda as duas juntas por um instante; voltar atrás não desfaz o banco): só adições numa
   publicação; renomear/apagar coluna em duas (adiciona e passa a usar; depois remove).
-- **Produção sem Supabase Storage bloqueia o app dos técnicos** (`appTecnicoLiberado` em
+- **Produção sem Supabase Storage NÃO RECEBE FOTOS, e só isso** (`appTecnicoLiberado` em
   armazenamento.ts; libera com `STORAGE_PROVIDER=supabase`): o disco da Render é apagado a cada
-  publicação, reinício e sono (sem disco persistente no plano gratuito). Não contorne isso.
+  publicação, reinício e sono (sem disco persistente no plano gratuito). O envio de foto responde
+  503 com o motivo (a fila do celular guarda e reenvia sozinha) e a tela do serviço avisa antes
+  (`fotosBloqueadas`). Não contorne isso. `/saude` mostra `fotos: { destino, recebendo }`.
+  **O LOGIN NUNCA é barrado por isso, nem por o técnico não ter serviço** (bug de 09/10/2026:
+  essa condição barrava o login com "O app dos técnicos ainda não foi liberado. Fale com o gestor
+  para combinar os serviços", que mandava procurar o problema na agenda quando ele estava na
+  variável da hospedagem). Login só confere e-mail, senha e conta ativa. Quem não está escalado
+  em nada entra e vê a agenda vazia. A agenda do técnico lista TODOS os tipos de serviço, sem
+  olhar a situação do projeto: o filtro "só visita técnica e instalação" (`moveOProjeto`) serve
+  EXCLUSIVAMENTE para calcular a situação do projeto (regra 9) e não pode aparecer em login,
+  agenda, contagens ou permissões.
+- **Quem entra em qual app:** app de campo (`/campo/`): TECNICO, GESTOR e ADMIN; COMERCIAL é
+  barrado com "Esta é a área dos técnicos. Sua conta é do perfil Comercial — acesse o sistema do
+  escritório." e link para `/`. Escritório (`/`): ADMIN, GESTOR e COMERCIAL; TECNICO vê "Esta
+  área é do escritório. Acesse o aplicativo de campo." com link para `/campo/`. As rotas
+  `/api/tecnico` aceitam TECNICO, GESTOR e ADMIN, sempre filtradas pela escala (regra 6).
 - **Onde ficam as fotos (decisão fechada em 09/10/2026).** O **Supabase Storage é o destino
   DEFINITIVO**, não mais provisório. **O SharePoint está FORA DE ESCOPO**: a Guarusolar usa conta
   PESSOAL da Microsoft, e conta pessoal não tem tenant, não tem Entra ID (onde se registra o

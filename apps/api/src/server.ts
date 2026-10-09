@@ -12,7 +12,7 @@ import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
 import { rotasArmazenamento, rotasFotos } from './rotas/fotos';
 import { rotasProjetos } from './rotas/projetos';
 import { rotasUsuarios } from './rotas/usuarios';
-import { conferirArmazenamentoAoIniciar } from './lib/armazenamento';
+import { appTecnicoLiberado, conferirArmazenamentoAoIniciar, destinoAtual } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
 import { sincronizarRoteiroDeFotos } from './lib/roteiroDeFotos';
@@ -58,7 +58,10 @@ app.get('/saude', async (req, res) => {
       bancoDeProducao(prisma),
       new Promise<never>((_ok, falhar) => setTimeout(() => falhar(new Error('tempo esgotado')), 3000)),
     ]);
-    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, versao, hora: new Date().toISOString() });
+    // `fotos`: onde as fotos novas são gravadas e se a API as está recebendo (em produção, só com
+    // armazenamento persistente). Responde "por que o app de campo não aceita fotos?" sem abrir o painel.
+    const fotos = { destino: destinoAtual(), recebendo: appTecnicoLiberado() };
+    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
     res.status(503).set('Cache-Control', 'no-store').json({ ok: false, banco: 'inacessível', versao });

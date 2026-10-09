@@ -29,7 +29,7 @@ services:
         value: 12h
       - key: JWT_EXPIRES_IN_TECNICO
         value: 7d
-      # Sem SharePoint nem Supabase Storage, o app dos técnicos fica bloqueado sozinho (o disco da
+      # Sem Supabase Storage, a API não recebe fotos (o app de campo abre, mas avisa; o disco da
       # Render é apagado a cada publicação e não há disco persistente no plano gratuito).
       # Para liberar, troque no painel para "supabase" (destino definitivo das fotos: SUPABASE_URL,
       # SUPABASE_SERVICE_KEY e SUPABASE_BUCKET). README, "Fotos no Supabase Storage".
