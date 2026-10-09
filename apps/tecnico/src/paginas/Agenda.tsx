@@ -286,7 +286,9 @@ function AvisoDaFila() {
           <Clock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           {fila.semConexao
             ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando sinal para enviar.`
-            : `Enviando ${quantas(naFila)}…`}
+            : fila.aguardandoServidor
+              ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando o servidor. O envio recomeça sozinho.`
+              : `Enviando ${quantas(naFila)}…`}
         </p>
       )}
       {comErro > 0 && (

@@ -115,7 +115,8 @@ export function Servico() {
     onError: (erro) =>
       setErroEnvio(
         erro instanceof ErroApi && erro.status === SEM_CONEXAO
-          ? 'Sem sinal para enviar agora. As fotos e as observações estão guardadas no celular: tente de novo quando o sinal voltar.'
+          ? // a mensagem já diz se é o celular sem internet ou o servidor que não respondeu
+            `${erro.message} As fotos e as observações estão guardadas no celular: é só enviar de novo depois.`
           : erro instanceof ErroApi
             ? erro.message
             : 'Não foi possível enviar. Tente de novo.',
@@ -216,7 +217,10 @@ export function Servico() {
 
   let rotuloBotao = 'Enviar para validação';
   const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
-  if (emAndamento > 0) rotuloBotao = fotos.semConexao ? `Sem sinal: ${fotosEscritas} na fila` : `Enviando ${fotosEscritas}…`;
+  const parado = fotos.semConexao || fotos.aguardandoServidor;
+  if (emAndamento > 0) {
+    rotuloBotao = fotos.semConexao ? `Sem sinal: ${fotosEscritas} na fila` : fotos.aguardandoServidor ? `Aguardando o servidor: ${fotosEscritas} na fila` : `Enviando ${fotosEscritas}…`;
+  }
   else if (faltam > 0) rotuloBotao = faltam === 1 ? 'Falta 1 foto obrigatória' : `Faltam ${faltam} fotos obrigatórias`;
   else if (faltaObservacao) rotuloBotao = `Preencha: ${roteiro.observacoes.rotulo.toLowerCase()}`;
   else if (faltaTeste) rotuloBotao = 'Confirme o teste do sistema';
@@ -396,14 +400,14 @@ export function Servico() {
             bloqueado ? 'bg-[#D9E0EA] text-[#414F60]' : 'bg-primary text-primary-foreground active:bg-primary/90',
           )}
         >
-          {(concluir.isPending || (emAndamento > 0 && !fotos.semConexao)) && (
+          {(concluir.isPending || (emAndamento > 0 && !parado)) && (
             <Loader2 className="size-5 animate-spin" aria-hidden />
           )}
           {concluir.isPending ? 'Enviando…' : rotuloBotao}
         </button>
         <p className="text-center text-xs text-muted-foreground">
-          {emAndamento > 0 && fotos.semConexao
-            ? 'As fotos estão guardadas no celular e sobem sozinhas quando o sinal voltar.'
+          {emAndamento > 0 && parado
+            ? `As fotos estão guardadas no celular e sobem sozinhas quando ${fotos.semConexao ? 'o sinal voltar' : 'o servidor responder'}.`
             : 'O gestor recebe as fotos para validar antes de concluir o serviço.'}
         </p>
       </footer>

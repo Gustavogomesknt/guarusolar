@@ -8,6 +8,7 @@ import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
 import { definirUsuarioDaFila } from '@/fotos/fila';
 import { AvisoAtualizacao } from '@/components/AvisoAtualizacao';
 import { ErroDeRota } from '@guarusolar/web/recarga';
+import { AvisoDeConexao } from '@guarusolar/web/AvisoDeConexao';
 import { RotaProtegida } from './RotaProtegida';
 
 // Só o técnico entra aqui; os demais papéis recebem este aviso no login.
@@ -26,6 +27,7 @@ function RaizDoApp() {
   return (
     <SessaoProvider papeisAceitos={PAPEIS_ACEITOS} avisoPapelRecusado={AVISO_OUTROS_PAPEIS} abrirSemConexao>
       <FilaDoUsuario />
+      <AvisoDeConexao aparelho="celular" />
       <AvisoAtualizacao />
       <Outlet />
     </SessaoProvider>

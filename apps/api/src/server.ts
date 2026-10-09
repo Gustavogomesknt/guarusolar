@@ -47,7 +47,10 @@ app.use(express.json({ limit: '2mb' }));
  * `producao`: o banco tem a marca de produção (db:marcar-producao). Confere, sem expor o
  * endereço, que a hospedagem aponta para o banco certo; o workflow Publicar exige true.
  */
-app.get('/saude', async (_req, res) => {
+app.get('/saude', async (req, res) => {
+  // /saude?ping=1: "está de pé?", SEM tocar no banco (não gasta conexão do pool). É o que os apps
+  // chamam enquanto o servidor acorda e o que um monitor externo pode chamar de tempos em tempos.
+  if (req.query.ping !== undefined) return void res.set('Cache-Control', 'no-store').json({ ok: true, ping: true });
   // RENDER_GIT_COMMIT: a Render informa o commit publicado (o workflow Publicar confere por ela)
   const versao = process.env.VERSAO ?? process.env.RENDER_GIT_COMMIT ?? 'desenvolvimento';
   try {

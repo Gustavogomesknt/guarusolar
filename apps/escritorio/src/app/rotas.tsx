@@ -1,6 +1,7 @@
 import { ErroDeRota, lazyComRecarga } from '@guarusolar/web/recarga';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
 import { SessaoProvider } from '@guarusolar/web/sessao';
+import { AvisoDeConexao } from '@guarusolar/web/AvisoDeConexao';
 import { Login } from '@/paginas/Login';
 import { Sair } from '@/paginas/Sair';
 import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
@@ -29,6 +30,7 @@ const PaginaValidacao = lazyComRecarga(() =>
 function RaizDoApp() {
   return (
     <SessaoProvider>
+      <AvisoDeConexao />
       <Outlet />
     </SessaoProvider>
   );

@@ -1,5 +1,5 @@
 import { createStore, del, set, values } from 'idb-keyval';
-import { ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
+import { conexaoAtual, ErroApi, ouvirConexao, SEM_CONEXAO } from '@guarusolar/web/api';
 import { clienteConsultas } from '@/lib/consultas';
 import { enviarFoto } from './envio';
 import { lerMetadados, type Posicao } from './metadados';
@@ -13,9 +13,13 @@ import { reduzirFoto } from './reduzir';
  *    (Com a câmera do navegador, muitos Android nem guardam a foto na galeria: esta é a cópia.)
  * 2. Dois trabalhadores independentes, cada um uma foto por vez: um prepara (reduz + metadados),
  *    outro envia. Um envio lento no 3G não segura a miniatura da próxima foto.
- * 3. Falha de rede (sem conexão, tempo esgotado, 5xx) tenta de novo sozinha, com espera
- *    crescente; recusa da API (4xx) vira erro que o técnico resolve na tela; 401 pausa a fila
- *    até o técnico entrar de novo (a sessão cuida do login).
+ * 3. A fila NUNCA desiste por causa do servidor ou da rede: sem conexão, tempo esgotado, 502,
+ *    503, 504 (servidor dormindo ou subindo na Render) e qualquer 5xx tentam de novo sozinhos,
+ *    para sempre, com espera crescente (5 s, 15 s, 1 min e depois de 5 em 5 min). A foto só sai
+ *    da fila quando a API confirma que recebeu, ou quando o técnico a descarta.
+ *    Erro definitivo, com o motivo na tela, só para RECUSA de verdade da API (4xx: 400, 403,
+ *    404, 409, 413, 422…). 401 não é erro da foto: a sessão encerra, o login diz o motivo e a
+ *    fila continua quando o técnico entra de novo.
  * 4. Tenta de novo ao abrir o app, quando a conexão volta, quando o app volta para a tela e
  *    no tempo agendado. Não confia só no navigator.onLine, que mente com sinal fraco.
  * 5. Cada foto guarda quem a tirou e só é enviada com a sessão dessa pessoa.
@@ -67,8 +71,10 @@ export type RetratoDaFila = {
   fotos: FotoNaFila[];
   /** miniaturas locais das fotos já enviadas nesta sessão, pelo id da foto na API */
   miniaturas: Record<string, string>;
-  /** a última tentativa de envio falhou por rede (e nenhuma deu certo depois) */
+  /** a última tentativa falhou porque o CELULAR está sem internet (e nenhuma deu certo depois) */
   semConexao: boolean;
+  /** a última tentativa falhou com internet: é o servidor (dormindo, subindo ou fora do ar) */
+  aguardandoServidor: boolean;
 };
 
 // ---------------------------------------------------------------------------------------
@@ -84,10 +90,11 @@ let usuarioAtual: string | null = null;
 let carregada = false;
 let enviandoId: string | null = null;
 let semConexao = false;
+let aguardandoServidor = false;
 let temporizador: ReturnType<typeof setTimeout> | undefined;
 
 const ouvintes = new Set<() => void>();
-let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false };
+let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false, aguardandoServidor: false };
 
 const ordenados = () => [...registros.values()].sort((a, b) => a.criadoEm - b.criadoEm);
 
@@ -113,7 +120,7 @@ function notificar() {
       preparada: Boolean(r.foto),
       erro: r.erro,
     }));
-  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao };
+  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor };
   ouvintes.forEach((ouvir) => ouvir());
 }
 
@@ -166,7 +173,11 @@ export async function iniciarFila() {
   // consulta que dá certo (abrir um serviço, voltar ao app, "Atualizar") prova que a conexão
   // voltou: acorda a fila na hora, em vez de esperar a próxima tentativa (até 5 min).
   clienteConsultas.getQueryCache().subscribe((evento) => {
-    if (evento.type === 'updated' && evento.action.type === 'success' && semConexao) acordar();
+    if (evento.type === 'updated' && evento.action.type === 'success' && (semConexao || aguardandoServidor)) acordar();
+  });
+  // o servidor acordou (ou a internet voltou e ele respondeu): as fotos vão agora
+  ouvirConexao(() => {
+    if (conexaoAtual().estado === 'conectado' && (semConexao || aguardandoServidor)) acordar();
   });
   void processar();
 }
@@ -333,6 +344,7 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
       AbortSignal.timeout(TEMPO_MAXIMO_DO_ENVIO),
     );
     semConexao = false;
+    aguardandoServidor = false;
     // um envio que deu certo prova que a conexão voltou: as fotos que esperavam a próxima
     // tentativa (algumas com espera de minutos) vão em seguida, sem esperar o tempo delas
     for (const x of registros.values()) x.proximaTentativa = 0;
@@ -347,8 +359,12 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
   } catch (erro) {
     const status = erro instanceof ErroApi ? erro.status : SEM_CONEXAO;
     if (status === 401) return false; // a sessão encerra e leva ao login; a foto fica na fila
-    if (status === SEM_CONEXAO || status >= 500 || status === 408 || status === 429) {
-      semConexao = status === SEM_CONEXAO;
+    // recusa de verdade: a API recebeu o pedido e disse não (o motivo vai para a tela)
+    const recusa = status >= 400 && status < 500 && status !== 408 && status !== 429;
+    if (!recusa) {
+      // rede, tempo esgotado, 502/503/504 e qualquer 5xx: a foto fica e tenta de novo, sempre
+      semConexao = status === SEM_CONEXAO && navigator.onLine === false;
+      aguardandoServidor = !semConexao;
       const tentativas = r.tentativas + 1;
       const espera = ESPERAS[Math.min(tentativas, ESPERAS.length) - 1];
       await gravar({ ...r, tentativas, proximaTentativa: Date.now() + espera });

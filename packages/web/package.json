@@ -14,7 +14,7 @@
     "./tiposServico": "./src/tiposServico.ts",
     "./ImagemProtegida": "./src/ImagemProtegida.tsx",
     "./FormularioTrocaSenha": "./src/FormularioTrocaSenha.tsx",
-    "./AvisoServidorAcordando": "./src/AvisoServidorAcordando.tsx",
+    "./AvisoDeConexao": "./src/AvisoDeConexao.tsx",
     "./SituacaoServico": "./src/SituacaoServico.tsx",
     "./recarga": "./src/recarga.tsx"
   },

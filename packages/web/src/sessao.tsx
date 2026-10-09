@@ -59,9 +59,12 @@ export function SessaoProvider({
 }) {
   const navegar = useNavigate();
   const clienteConsultas = useQueryClient();
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  // App do técnico: abre NA HORA com o último usuário confirmado e o que já foi carregado, e
+  // confere o token por trás. Com o servidor acordando (até 1 min) ou sem sinal, ele não fica
+  // parado numa tela de espera: a faixa do topo diz o que está acontecendo.
+  const [usuario, setUsuario] = useState<Usuario | null>(() => (abrirSemConexao && tokenSalvo.ler() ? usuarioSalvo.ler<Usuario>() : null));
   const [aviso, setAviso] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(() => tokenSalvo.ler() !== null);
+  const [carregando, setCarregando] = useState(() => tokenSalvo.ler() !== null && usuario === null);
   const [falhaAoConectar, setFalhaAoConectar] = useState<string | null>(null);
   const [tentativa, setTentativa] = useState(0);
 
@@ -85,7 +88,8 @@ export function SessaoProvider({
     // roda primeiro). Sem esta linha, "carregando" ficaria verdadeiro para sempre.
     if (!tokenSalvo.ler()) return setCarregando(false);
     const controle = new AbortController();
-    setCarregando(true);
+    const jaAberto = abrirSemConexao && usuarioSalvo.ler<Usuario>() !== null;
+    if (!jaAberto) setCarregando(true);
     setFalhaAoConectar(null);
     api
       .get<Usuario>('/api/auth/eu', { signal: controle.signal })

@@ -7,7 +7,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Como no escritório: no desenvolvimento o Vite repassa /api para a API local (inclusive as
 // fotos, que só saem por /api/fotos com login).
 const API_LOCAL = 'http://localhost:3333';
-const REPASSE = { '/api': API_LOCAL };
+// /saude?ping=1: o app confere se o servidor acordou (packages/web/src/api.ts)
+const REPASSE = { '/api': API_LOCAL, '/saude': API_LOCAL };
 
 // Teste no celular pelo Cloudflare Tunnel (túnel rápido, sem conta): o endereço muda a cada
 // execução (https://<aleatório>.trycloudflare.com). O ponto no início libera qualquer um deles;
@@ -60,7 +61,7 @@ export default defineConfig(({ command }) => {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         globIgnores: ['**/*cyrillic*', '**/*greek*', '**/*vietnamese*', '**/*latin-ext*'],
         navigateFallback: `${base}index.html`,
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/saude/],
         cleanupOutdatedCaches: true,
       },
     }),

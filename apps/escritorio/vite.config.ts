@@ -18,6 +18,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': API_LOCAL,
+      // /saude?ping=1: os apps conferem se o servidor acordou (packages/web/src/api.ts)
+      '/saude': API_LOCAL,
     },
   },
 });

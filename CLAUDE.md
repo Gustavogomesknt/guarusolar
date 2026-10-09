@@ -214,9 +214,11 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                rodapé que diz o que falta e leva até lá
   src/fotos/fila.ts            FILA OFFLINE das fotos (IndexedDB): a original é gravada no ato,
                                antes do preparo; um trabalhador prepara e outro envia, uma foto
-                               por vez; rede/5xx tenta de novo (5 s, 15 s, 1 min, 5 min), 4xx vira
-                               erro na tela, 401 pausa; acorda com `online`, com a volta à tela e
-                               com qualquer consulta que dá certo. Leia o comentário do topo
+                               por vez; NUNCA desiste por rede, tempo esgotado, 502/503/504 ou
+                               outro 5xx (servidor dormindo): tenta de novo para sempre (5 s, 15 s,
+                               1 min, 5 min); só recusa de verdade (4xx) vira erro na tela, com o
+                               motivo; 401 pausa até o novo login; acorda com `online`, com a volta
+                               à tela, com o servidor respondendo e com consulta que dá certo. Leia o comentário do topo
                                antes de mexer
   src/fotos/                   reduzir.ts (2000 px, JPEG 85), metadados.ts (EXIF + posição do
                                navegador), useLocalizacao.ts (permissão pedida num toque próprio,
@@ -249,11 +251,21 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
 packages/web/                  código de NAVEGADOR usado pelos dois fronts (só fonte, sem build:
                                o Vite de cada app compila e o `tsc -b` de cada app confere)
   src/api.ts                   cliente HTTP: token no cabeçalho (chave própria de cada app),
-                               JSON ou FormData, ErroApi, 401 encerra a sessão; ouvirDemora
-                               avisa quando um GET ou o login passa de 4 s (servidor acordando)
-  src/AvisoServidorAcordando.tsx  "Conectando ao sistema…" enquanto a Render acorda (30–60 s)
+                               JSON ou FormData, ErroApi, 401 encerra a sessão. CONEXÃO: antes do
+                               primeiro pedido (e após 10 min sem resposta) `acordarServidor` chama
+                               /saude?ping=1 até responder (esperas de 2, 4, 8, 15 s; 90 s no
+                               total) e só então faz o pedido, uma vez (nenhum POST repetido às
+                               cegas). navigator.onLine false = "Sem conexão. Verifique a internet
+                               do celular.", sem novas tentativas. Estados em `ouvirConexao`
+  src/AvisoDeConexao.tsx       o que a pessoa vê (dentro do SessaoProvider, nos dois apps): sem o
+                               app na tela (login, primeira abertura), TELA "Conectando ao
+                               servidor…" com progresso e, após 90 s, "Não foi possível conectar"
+                               + "Tentar de novo"; com o app na tela, FAIXA no topo (offline,
+                               conectando, falhou), só enquanto não está conectado
   src/sessao.tsx               usuário logado, entrar(), sair(), aviso de sessão expirada e
-                               papeisAceitos (o app do técnico só aceita TECNICO)
+                               papeisAceitos (o app do técnico só aceita TECNICO). abrirSemConexao
+                               (técnico): abre NA HORA com o último usuário confirmado e confere o
+                               token por trás (servidor acordando ou sem sinal não seguram a tela)
   src/tema.css                 cores e fontes da marca como variáveis do shadcn; `@source './'`
                                faz o Tailwind de cada app gerar as classes escritas no pacote
   src/tiposServico.ts          cores dos tipos de serviço (agenda do escritório e do técnico)
@@ -602,6 +614,11 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Poucas idas ao banco por pedido.** Produção roda na Render (Virginia) e cada ida ao banco
   pode custar ~120 ms (banco em SP). Prefira uma consulta com `include`/`select` a várias em
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.
-- **Não crie "ping" para manter a Render acordada** (contraria o plano gratuito).
+- **`/saude?ping=1` responde 200 sem tocar no banco** (não gasta conexão do pool): é o que os
+  apps chamam enquanto o servidor acorda. Decisão do Gustavo (09/10/2026): um monitor EXTERNO
+  chama esse endereço a cada 10 min para a Render não suspender o serviço (antes a regra era não
+  manter acordado). Não crie ping de dentro do sistema (cron, Actions, front): o monitor é
+  externo e é dele. `/saude` sem o parâmetro continua completo (banco e `producao`): é o que a
+  Render e o Publicar usam, não troque.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.
