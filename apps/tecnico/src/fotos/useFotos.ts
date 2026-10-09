@@ -42,6 +42,7 @@ export function useFotos(servicoId: string) {
     miniaturas: fila.miniaturas,
     semConexao: fila.semConexao,
     aguardandoServidor: fila.aguardandoServidor,
+    conexaoLenta: fila.conexaoLenta,
     adicionar,
     tentarDeNovo,
     descartar,

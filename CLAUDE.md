@@ -216,7 +216,9 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                antes do preparo; um trabalhador prepara e outro envia, uma foto
                                por vez; NUNCA desiste por rede, tempo esgotado, 502/503/504 ou
                                outro 5xx (servidor dormindo): tenta de novo para sempre (5 s, 15 s,
-                               1 min, 5 min); só recusa de verdade (4xx) vira erro na tela, com o
+                               1 min, 5 min); cada envio tem no máximo 120 s e, se estourar, a foto
+                               vai para o fim da fila e a próxima tenta ("Conexão lenta: tentando
+                               de novo"); só recusa de verdade (4xx) vira erro na tela, com o
                                motivo; 401 pausa até o novo login; acorda com `online`, com a volta
                                à tela, com o servidor respondendo e com consulta que dá certo. Leia o comentário do topo
                                antes de mexer
@@ -616,9 +618,15 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   sequência; consultas independentes em `Promise.all` ou `$transaction([...])`.
 - **`/saude?ping=1` responde 200 sem tocar no banco** (não gasta conexão do pool): é o que os
   apps chamam enquanto o servidor acorda. Decisão do Gustavo (09/10/2026): um monitor EXTERNO
-  chama esse endereço a cada 10 min para a Render não suspender o serviço (antes a regra era não
-  manter acordado). Não crie ping de dentro do sistema (cron, Actions, front): o monitor é
-  externo e é dele. `/saude` sem o parâmetro continua completo (banco e `producao`): é o que a
+  chama esse endereço **a cada 10 minutos, das 6h às 21h (America/Sao_Paulo)**, para a Render não
+  suspender o serviço no horário de trabalho (antes a regra era não manter acordado).
+  **A janela é limitada DE PROPÓSITO; não a amplie nem transforme em ping 24 horas:** a Render
+  dá 750 horas de instância por mês no plano gratuito, e 6h–21h todos os dias consome cerca de
+  480. Ping 24 horas consumiria cerca de 744 e não deixaria margem nenhuma (publicações,
+  reinícios, um segundo serviço). **Fora da janela o serviço dorme, e isso é esperado:** a espera
+  da primeira abertura é tratada pela tela "Conectando ao servidor…" (`AvisoDeConexao`), que por
+  isso não pode ser removida. Não crie ping de dentro do sistema (cron, Actions, front): o
+  monitor é externo e é dele. `/saude` sem o parâmetro continua completo (banco e `producao`): é o que a
   Render e o Publicar usam, não troque.
 - Ao terminar uma etapa, rode `npm run build` para garantir que o TypeScript compila.
 - Mudanças em regra de negócio: atualize também este arquivo e o `README.md`.

@@ -288,6 +288,8 @@ function AvisoDaFila() {
             ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando sinal para enviar.`
             : fila.aguardandoServidor
               ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando o servidor. O envio recomeça sozinho.`
+              : fila.conexaoLenta
+                ? `Conexão lenta: tentando de novo. ${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular.`
               : `Enviando ${quantas(naFila)}…`}
         </p>
       )}

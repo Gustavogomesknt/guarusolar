@@ -1,5 +1,5 @@
 import { createStore, del, set, values } from 'idb-keyval';
-import { conexaoAtual, ErroApi, ouvirConexao, SEM_CONEXAO } from '@guarusolar/web/api';
+import { acordarServidor, conexaoAtual, ErroApi, ouvirConexao, SEM_CONEXAO } from '@guarusolar/web/api';
 import { clienteConsultas } from '@/lib/consultas';
 import { enviarFoto } from './envio';
 import { lerMetadados, type Posicao } from './metadados';
@@ -20,6 +20,9 @@ import { reduzirFoto } from './reduzir';
  *    Erro definitivo, com o motivo na tela, só para RECUSA de verdade da API (4xx: 400, 403,
  *    404, 409, 413, 422…). 401 não é erro da foto: a sessão encerra, o login diz o motivo e a
  *    fila continua quando o técnico entra de novo.
+ *    Cada envio tem no máximo 120 s: em sinal fraco o navegador não dá erro, o pedido fica
+ *    pendurado e a fila pararia atrás dele. Estourou, a foto vai para o FIM da fila (tenta de
+ *    novo depois, sem erro) e a próxima tenta: uma foto pendurada nunca bloqueia as outras.
  * 4. Tenta de novo ao abrir o app, quando a conexão volta, quando o app volta para a tela e
  *    no tempo agendado. Não confia só no navigator.onLine, que mente com sinal fraco.
  * 5. Cada foto guarda quem a tirou e só é enviada com a sessão dessa pessoa.
@@ -33,7 +36,8 @@ const banco = createStore('guarusolar-tecnico', 'fila-de-fotos');
 
 /** Espera entre tentativas depois de falha de rede: 5 s, 15 s, 1 min e depois 5 min. */
 const ESPERAS = [5_000, 15_000, 60_000, 300_000];
-const TEMPO_MAXIMO_DO_ENVIO = 90_000;
+/** Só o envio da foto; a espera pelo servidor acordando (até 90 s) é contada à parte. */
+const TEMPO_MAXIMO_DO_ENVIO = 120_000;
 
 type Registro = {
   idLocal: string;
@@ -48,6 +52,8 @@ type Registro = {
   foto?: { dados: ArrayBuffer; capturadaEm: string; latitude?: number; longitude?: number };
   tentativas: number;
   proximaTentativa: number;
+  /** o envio estourou o tempo: a foto foi para o fim da fila (ordena por aqui, não por criadoEm) */
+  adiadaEm?: number;
   /** recusa definitiva (API ou preparo): precisa do técnico */
   erro?: string;
 };
@@ -75,6 +81,8 @@ export type RetratoDaFila = {
   semConexao: boolean;
   /** a última tentativa falhou com internet: é o servidor (dormindo, subindo ou fora do ar) */
   aguardandoServidor: boolean;
+  /** o último envio estourou o tempo (sinal fraco): a foto voltou para a fila e tenta de novo */
+  conexaoLenta: boolean;
 };
 
 // ---------------------------------------------------------------------------------------
@@ -91,10 +99,11 @@ let carregada = false;
 let enviandoId: string | null = null;
 let semConexao = false;
 let aguardandoServidor = false;
+let conexaoLenta = false;
 let temporizador: ReturnType<typeof setTimeout> | undefined;
 
 const ouvintes = new Set<() => void>();
-let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false, aguardandoServidor: false };
+let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false, aguardandoServidor: false, conexaoLenta: false };
 
 const ordenados = () => [...registros.values()].sort((a, b) => a.criadoEm - b.criadoEm);
 
@@ -120,7 +129,7 @@ function notificar() {
       preparada: Boolean(r.foto),
       erro: r.erro,
     }));
-  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor };
+  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor, conexaoLenta };
   ouvintes.forEach((ouvir) => ouvir());
 }
 
@@ -173,7 +182,7 @@ export async function iniciarFila() {
   // consulta que dá certo (abrir um serviço, voltar ao app, "Atualizar") prova que a conexão
   // voltou: acorda a fila na hora, em vez de esperar a próxima tentativa (até 5 min).
   clienteConsultas.getQueryCache().subscribe((evento) => {
-    if (evento.type === 'updated' && evento.action.type === 'success' && (semConexao || aguardandoServidor)) acordar();
+    if (evento.type === 'updated' && evento.action.type === 'success' && (semConexao || aguardandoServidor || conexaoLenta)) acordar();
   });
   // o servidor acordou (ou a internet voltou e ele respondeu): as fotos vão agora
   ouvirConexao(() => {
@@ -313,9 +322,10 @@ async function enviarProximas() {
   try {
     for (;;) {
       const agora = Date.now();
-      const r = ordenados().find(
-        (x) => x.usuarioId === usuarioAtual && x.foto && !x.erro && x.proximaTentativa <= agora,
-      );
+      // a vez de cada uma: a ordem em que foram tiradas; a que estourou o tempo vai para o fim
+      const r = [...registros.values()]
+        .filter((x) => x.usuarioId === usuarioAtual && x.foto && !x.erro && x.proximaTentativa <= agora)
+        .sort((a, b) => (a.adiadaEm ?? a.criadoEm) - (b.adiadaEm ?? b.criadoEm))[0];
       if (!r || !r.foto) break;
       const seguir = await enviarUma(r, r.foto);
       if (!seguir) break;
@@ -330,7 +340,11 @@ async function enviarProximas() {
 async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Promise<boolean> {
   enviandoId = r.idLocal;
   notificar();
+  // o relógio dos 120 s só começa com o servidor de pé (a espera por ele tem o tempo dela)
+  let limite: AbortSignal | undefined;
   try {
+    await acordarServidor();
+    limite = AbortSignal.timeout(TEMPO_MAXIMO_DO_ENVIO);
     const recebida = await enviarFoto(
       {
         servicoId: r.servicoId,
@@ -341,10 +355,11 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
         latitude: foto.latitude,
         longitude: foto.longitude,
       },
-      AbortSignal.timeout(TEMPO_MAXIMO_DO_ENVIO),
+      limite,
     );
     semConexao = false;
     aguardandoServidor = false;
+    conexaoLenta = false;
     // um envio que deu certo prova que a conexão voltou: as fotos que esperavam a próxima
     // tentativa (algumas com espera de minutos) vão em seguida, sem esperar o tempo delas
     for (const x of registros.values()) x.proximaTentativa = 0;
@@ -363,12 +378,16 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
     const recusa = status >= 400 && status < 500 && status !== 408 && status !== 429;
     if (!recusa) {
       // rede, tempo esgotado, 502/503/504 e qualquer 5xx: a foto fica e tenta de novo, sempre
-      semConexao = status === SEM_CONEXAO && navigator.onLine === false;
-      aguardandoServidor = !semConexao;
+      const estourou = limite?.aborted === true;
+      semConexao = !estourou && status === SEM_CONEXAO && navigator.onLine === false;
+      conexaoLenta = estourou;
+      aguardandoServidor = !estourou && !semConexao;
       const tentativas = r.tentativas + 1;
       const espera = ESPERAS[Math.min(tentativas, ESPERAS.length) - 1];
-      await gravar({ ...r, tentativas, proximaTentativa: Date.now() + espera });
-      return false;
+      await gravar({ ...r, tentativas, proximaTentativa: Date.now() + espera, ...(estourou ? { adiadaEm: Date.now() } : {}) });
+      // estourou o tempo: esta foi para o fim da fila e a próxima tenta agora; nos outros casos
+      // (sem sinal, servidor fora) não adianta tentar as próximas
+      return estourou;
     }
     // recusa da API (ex.: serviço cancelado, item fora do checklist): não adianta repetir
     await gravar({ ...r, erro: erro instanceof ErroApi ? erro.message : 'Não foi possível enviar a foto.' });

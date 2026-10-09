@@ -219,7 +219,13 @@ export function Servico() {
   const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
   const parado = fotos.semConexao || fotos.aguardandoServidor;
   if (emAndamento > 0) {
-    rotuloBotao = fotos.semConexao ? `Sem sinal: ${fotosEscritas} na fila` : fotos.aguardandoServidor ? `Aguardando o servidor: ${fotosEscritas} na fila` : `Enviando ${fotosEscritas}…`;
+    rotuloBotao = fotos.semConexao
+      ? `Sem sinal: ${fotosEscritas} na fila`
+      : fotos.aguardandoServidor
+        ? `Aguardando o servidor: ${fotosEscritas} na fila`
+        : fotos.conexaoLenta
+          ? 'Conexão lenta: tentando de novo'
+          : `Enviando ${fotosEscritas}…`;
   }
   else if (faltam > 0) rotuloBotao = faltam === 1 ? 'Falta 1 foto obrigatória' : `Faltam ${faltam} fotos obrigatórias`;
   else if (faltaObservacao) rotuloBotao = `Preencha: ${roteiro.observacoes.rotulo.toLowerCase()}`;
@@ -406,8 +412,8 @@ export function Servico() {
           {concluir.isPending ? 'Enviando…' : rotuloBotao}
         </button>
         <p className="text-center text-xs text-muted-foreground">
-          {emAndamento > 0 && parado
-            ? `As fotos estão guardadas no celular e sobem sozinhas quando ${fotos.semConexao ? 'o sinal voltar' : 'o servidor responder'}.`
+          {emAndamento > 0 && (parado || fotos.conexaoLenta)
+            ? `As fotos estão guardadas no celular e sobem sozinhas quando ${fotos.semConexao ? 'o sinal voltar' : fotos.aguardandoServidor ? 'o servidor responder' : 'a conexão melhorar'}.`
             : 'O gestor recebe as fotos para validar antes de concluir o serviço.'}
         </p>
       </footer>
