@@ -26,6 +26,7 @@ npm run db:seed                            # base (catálogo, equipes, checklist
 npm run usuario -- listar                  # usuários reais: criar, nova-senha, desativar, listar
 npm run dev:api                            # http://localhost:3333
 npm run db:limpar                          # apaga os dados de teste (pede para digitar LIMPAR)
+npm run db:zerar-para-entrega -- --admin email  # antes da entrega: zera os dados de teste, inclusive em produção, e deixa só esse ADMIN
 npm run dev:escritorio                     # front do escritório em http://localhost:5173
 npm run dev:tecnico                        # app do técnico em http://localhost:5174
 npm run preview:tecnico                    # build do técnico com service worker (5175)
