@@ -321,9 +321,18 @@ Mostra o total ocupado, o número de fotos, o tamanho médio, o que entrou em ca
 meses faltam para o teto no ritmo dos últimos 90 dias. `npm run storage:conferir` mostra o mesmo
 relatório no fim.
 
-**Quando ampliar:** ao aparecer o aviso de 70%, ou quando o relatório mostrar menos de 6 meses até
-o teto. O caminho mais simples é o plano pago do Supabase (mais Storage no mesmo lugar): basta
-mudar `SUPABASE_STORAGE_LIMITE_MB`, sem migrar nada. Apagar fotos antigas é decisão do cliente.
+**Egress, o segundo teto.** O plano gratuito também limita cerca de 5 GB de egress por mês.
+Armazenamento é o que fica guardado; egress é o que sai, cada vez que alguém abre uma foto. O
+sistema não mede o egress: o relatório imprime uma conta aproximada (fotos que entraram no mês × 3
+aberturas da foto inteira + 10 da miniatura) e o número exato está no painel do Supabase, em
+Settings → Usage.
+
+**Quando o aviso de 70% aparecer** (ou o relatório mostrar menos de 6 meses até o teto): o caminho
+é levar as fotos para o **Cloudflare R2** (10 GB grátis por mês, US$ 0,015 por GB-mês acima disso,
+sem cobrança de egress). O provedor `r2` ainda não existe; é cerca de um dia de trabalho, porque
+`STORAGE_PROVIDER` já escolhe o destino e o `npm run fotos:migrar` leva o histórico. O Supabase Pro
+(US$ 25 por mês, 100 GB) só vale para quem precisar do resto do pacote: banco maior, backups
+gerenciados e projeto que não pausa por inatividade. Apagar fotos antigas é decisão do cliente.
 
 **Referência: migrar as fotos para outro destino, sem perder nada.** O roteiro abaixo foi escrito
 para o SharePoint, que saiu do escopo (exige Microsoft 365 empresarial); o `npm run fotos:migrar`

@@ -174,7 +174,31 @@ export type RelatorioDoStorage = {
   diasMedidos: number;
   /** meses até o teto nesse ritmo; null sem ritmo (bucket vazio ou parado) */
   mesesAteOTeto: number | null;
+  /** as fotos (sem miniaturas nem refeitas) que entraram no mês corrente: base da estimativa de egress */
+  fotosDoMes: Grupo;
 };
+
+/*
+ * EGRESS: o segundo teto do plano gratuito do Supabase (cerca de 5 GB por mês). Armazenamento é o
+ * que FICA guardado; egress é o que SAI: toda vez que alguém abre uma foto, a API a baixa do
+ * Storage de novo (ela não guarda cópia; o navegador de quem viu guarda por 7 dias).
+ * O sistema não registra cada abertura e o Supabase não expõe o egress no banco: o número exato
+ * só existe no painel (Settings -> Usage). O relatório imprime uma CONTA APROXIMADA, com estas
+ * hipóteses por foto que entrou no mês: a foto inteira sai 3 vezes (a API a lê para gerar a
+ * miniatura, o gestor a amplia na validação e alguém a reabre depois) e a miniatura 10 vezes.
+ */
+export const limiteDeEgressBytes = () => (Number(process.env.SUPABASE_EGRESS_LIMITE_MB) > 0 ? Number(process.env.SUPABASE_EGRESS_LIMITE_MB) : 5 * 1024) * MB;
+export const ABERTURAS_DA_FOTO_INTEIRA = 3;
+export const ABERTURAS_DA_MINIATURA = 10;
+const MINIATURA_TIPICA = 30 * 1024;
+
+/** Estimativa do egress do mês corrente causado pelas fotos (não mede: ver o comentário acima). */
+export function egressEstimado(r: RelatorioDoStorage) {
+  const mediaDaFoto = r.fotosDoMes.arquivos ? r.fotosDoMes.bytes / r.fotosDoMes.arquivos : r.fotos.mediaBytes;
+  const mediaDaMiniatura = r.miniaturas.arquivos ? r.miniaturas.bytes / r.miniaturas.arquivos : MINIATURA_TIPICA;
+  const bytes = r.fotosDoMes.arquivos * (ABERTURAS_DA_FOTO_INTEIRA * mediaDaFoto + ABERTURAS_DA_MINIATURA * mediaDaMiniatura);
+  return { bytes, limiteBytes: limiteDeEgressBytes(), fracao: bytes / limiteDeEgressBytes(), mediaDaFoto, mediaDaMiniatura };
+}
 
 /** Lê tudo de storage.objects (só leitura). null se a tabela não existir (banco fora do Supabase). */
 export async function relatorioDoStorage(): Promise<RelatorioDoStorage | null> {
@@ -213,6 +237,8 @@ export async function relatorioDoStorage(): Promise<RelatorioDoStorage | null> {
     meses.set(l.mes, m);
   }
 
+  // "AAAA-MM" de hoje no fuso da empresa, como o banco agrupa
+  const mesCorrente = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
   const primeiro = recente[0]?.primeiro ?? null;
   const diasMedidos = primeiro ? Math.min(90, Math.max(1, (Date.now() - primeiro.getTime()) / 864e5)) : 0;
   const recentes = Number(recente[0]?.recentes ?? 0);
@@ -226,6 +252,9 @@ export async function relatorioDoStorage(): Promise<RelatorioDoStorage | null> {
     miniaturas,
     substituidas,
     porMes: [...meses.values()],
+    fotosDoMes: linhas
+      .filter((l) => l.tipo === 'fotos' && l.mes === mesCorrente)
+      .reduce((t, l) => ({ arquivos: t.arquivos + Number(l.arquivos), bytes: t.bytes + Number(l.bytes ?? 0) }), { arquivos: 0, bytes: 0 }),
     ritmoMensalBytes,
     diasMedidos,
     mesesAteOTeto: ritmoMensalBytes ? Math.max(0, limiteBytes - usadoBytes) / ritmoMensalBytes : null,

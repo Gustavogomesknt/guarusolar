@@ -2,7 +2,8 @@
  * Relatório do espaço das fotos (só LEITURA; precisa só da DATABASE_URL do projeto do Supabase):
  *   npm run storage:relatorio
  * Total ocupado, número de fotos, tamanho médio, o que entrou em cada mês e quantos meses
- * faltam para o teto (SUPABASE_STORAGE_LIMITE_MB) no ritmo atual.
+ * faltam para o teto (SUPABASE_STORAGE_LIMITE_MB) no ritmo atual. No fim, uma CONTA APROXIMADA
+ * do egress do mês (o outro teto do plano gratuito): o número exato só existe no painel.
  *
  * Confere o Supabase Storage antes de ligar em produção (e mostra o relatório no fim):
  *   npm run storage:conferir
@@ -24,6 +25,9 @@ import {
   enviarAoSupabase,
   FRACAO_DE_AVISO,
   FRACAO_DE_RECUSA,
+  ABERTURAS_DA_FOTO_INTEIRA,
+  ABERTURAS_DA_MINIATURA,
+  egressEstimado,
   relatorioDoStorage,
   usoDoStorage,
   variaveisDoSupabaseFaltando,
@@ -86,6 +90,18 @@ async function relatorio() {
     console.log(`  Faltam            ${escrito(meses)} para o teto; ${escrito(ate95)} para a API começar a recusar fotos (${FRACAO_DE_RECUSA * 100}%)`);
     if (dias < 30) console.log('                    (menos de 30 dias de dados: a previsão ainda oscila muito)');
   }
+
+  // Egress: não há como medir daqui (o sistema não registra cada abertura de foto e o Supabase
+  // não expõe o egress no banco). Sai a conta aproximada, com as hipóteses à vista.
+  const e = egressEstimado(r);
+  console.log('\n  Egress do mês (o que SAI do Supabase: cada vez que alguém abre uma foto). ESTIMATIVA, não medição:');
+  console.log(
+    `    ${inteiro(r.fotosDoMes.arquivos)} foto(s) entraram neste mês × (${ABERTURAS_DA_FOTO_INTEIRA} aberturas da foto inteira de ${kb(e.mediaDaFoto)} KB + ` +
+      `${ABERTURAS_DA_MINIATURA} da miniatura de ${kb(e.mediaDaMiniatura)} KB)`,
+  );
+  console.log(`    = cerca de ${mb(e.bytes)} MB, ${(e.fracao * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% dos ${inteiro(e.limiteBytes / 1024 / 1024)} MB por mês do plano`);
+  console.log('    Não entram na conta: fotos de meses anteriores reabertas e o tráfego do banco, que usa o mesmo limite.');
+  console.log('    O número exato está no painel do Supabase, em Settings → Usage.');
   return true;
 }
 

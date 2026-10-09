@@ -594,12 +594,29 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   afrouxe sem motivo): com a miniatura, cada foto ocupa uns 330 KB, e 1 GB guarda cerca de
   3.000 fotos (umas 500 instalações de 6 fotos). A API avisa gestor e admin em 70% e recusa
   fotos novas em 95%. `npm run storage:relatorio` mostra o crescimento e os meses que faltam.
-  **Quando vale migrar/ampliar:** ao aparecer o aviso de 70% ou quando o relatório mostrar menos
-  de 6 meses até o teto. Caminho mais simples: plano pago do Supabase (Pro, perto de US$ 25 por
-  mês, com 100 GB de Storage; confira o preço atual) e só mudar `SUPABASE_STORAGE_LIMITE_MB`,
-  sem migração nenhuma. Alternativa sem mensalidade: outro armazenamento (um provedor novo em
-  `armazenamento.ts`) e `npm run fotos:migrar`. Apagar fotos antigas para liberar espaço é
-  decisão do cliente, nunca automática (regra 3: nada é apagado).
+  **O segundo teto: EGRESS.** O plano gratuito do Supabase também limita cerca de 5 GB de egress
+  por mês. A diferença: ARMAZENAMENTO é o que FICA guardado (cresce devagar, a cada foto nova);
+  EGRESS é o que SAI, toda vez que alguém ABRE uma foto (a API a baixa do Storage a cada pedido;
+  só o navegador de quem viu guarda cópia, por 7 dias). Dá para estourar o egress com o bucket
+  quase vazio (muita gente reabrindo fotos) e o inverso. O sistema mede só o armazenamento: não
+  registra cada abertura, e o Supabase não expõe o egress no banco. O `storage:relatorio` imprime
+  uma CONTA APROXIMADA (fotos que entraram no mês × 3 aberturas da foto inteira + 10 da
+  miniatura; hipóteses em `supabaseStorage.ts`); o número exato está no painel do Supabase, em
+  Settings → Usage. O tráfego do banco usa o mesmo limite.
+  **Para onde ir quando o aviso de 70% aparecer: Cloudflare R2** (valores conferidos pelo Gustavo
+  em 09/10/2026): 10 GB grátis por mês, US$ 0,015 por GB-mês acima disso e SEM cobrança de
+  egress. Para guardar fotos é 10 vezes o teto atual de graça, e resolve os dois tetos de uma
+  vez. O trabalho é pequeno porque a abstração JÁ EXISTE: `STORAGE_PROVIDER` escolhe o destino
+  das fotos novas e a leitura segue o prefixo da chave (`armazenamento.ts`). Falta escrever o
+  provedor `r2` (API compatível com S3; cerca de UM DIA de trabalho, com o `r2:conferir`), e o
+  `npm run fotos:migrar` leva o histórico (copia, confere, troca a chave; as fotos antigas
+  continuam abrindo do Supabase enquanto isso). **Ainda não foi implementado, de propósito:** só
+  quando o aviso aparecer ou o relatório mostrar menos de 6 meses até o teto.
+  **Supabase Pro (US$ 25 por mês, 100 GB) NÃO é o caminho para as fotos:** só vale para quem
+  precisar do resto do pacote (banco maior, backups gerenciados, projeto que não pausa por
+  inatividade). Nesse caso basta mudar `SUPABASE_STORAGE_LIMITE_MB`, sem migração.
+  Apagar fotos antigas para liberar espaço é decisão do cliente, nunca automática (regra 3:
+  nada é apagado).
 - **Sessão confere o banco** (`autenticar` em `lib/auth.ts`): o token leva `versao`
   (`Usuario.sessaoVersao`); desativar, trocar papel ou equipe e gerar senha nova somam 1 e o login
   antigo cai na hora. A conferência fica 1 minuto em memória por usuário (cada ida ao banco custa
