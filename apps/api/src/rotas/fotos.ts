@@ -4,8 +4,8 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { tecnicoPodeVer } from '../lib/acesso';
-import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA, usoDoStorage } from '../lib/supabaseStorage';
-import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura } from '../lib/armazenamento';
+import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA } from '../lib/supabaseStorage';
+import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura, usoDoDestinoAtual } from '../lib/armazenamento';
 
 /*
  * Única saída das fotos dos serviços (casa e telhado do cliente, com localização): exige login
@@ -64,8 +64,9 @@ rotasFotos.get(
 );
 
 /**
- * Espaço das fotos (só GESTOR e ADMIN), para o aviso do escritório. Só há o que medir com o
- * Supabase Storage (provisório, 1 GB no plano gratuito): com disco ou SharePoint, `limitado: false`.
+ * Espaço das fotos (só GESTOR e ADMIN), para o aviso do escritório. Só há o que medir nos buckets
+ * (Supabase Storage: SUPABASE_STORAGE_LIMITE_MB; Cloudflare R2: R2_STORAGE_LIMITE_MB): com disco
+ * ou SharePoint, `limitado: false`.
  */
 export const rotasArmazenamento = Router();
 rotasArmazenamento.use(autenticar, autorizar('GESTOR'));
@@ -79,7 +80,7 @@ rotasArmazenamento.get(
     const provedor = destinoAtual();
     // false = produção sem lugar seguro para as fotos: a API as recusa (faixa vermelha no escritório)
     const recebendo = appTecnicoLiberado();
-    const uso = provedor === 'supabase' ? await usoDoStorage() : null;
+    const uso = await usoDoDestinoAtual();
     if (!uso) return res.json({ provedor, recebendo, limitado: false });
     res.json({
       provedor,

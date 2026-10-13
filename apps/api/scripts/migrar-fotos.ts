@@ -1,7 +1,16 @@
 /*
  * Leva as fotos já enviadas para o destino atual (STORAGE_PROVIDER), sem perder nenhuma.
- * Feito para a troca do Supabase Storage (provisório) pelo SharePoint do cliente, mas vale
- * entre quaisquer destinos (disco, supabase, sharepoint).
+ * Uso de agora: Supabase Storage -> Cloudflare R2 (rode com STORAGE_PROVIDER=r2). Vale entre
+ * quaisquer destinos (disco, supabase, r2, sharepoint).
+ *
+ * DE BUCKET PARA BUCKET (Supabase -> R2) o caminho do arquivo é MANTIDO: a chave só troca de
+ * prefixo ("sb:PRJ-…/01-….jpg" vira "r2:PRJ-…/01-….jpg"). As fotos refeitas ("substituidas/"),
+ * que não têm registro no banco, vão junto, lidas da lista de objetos do Supabase. As miniaturas
+ * não são copiadas: a API as refaz na primeira vez que cada foto for vista.
+ *
+ * PODE RODAR QUANTAS VEZES FOR PRECISO sem duplicar nada: foto já migrada tem a chave do destino
+ * novo e sai da lista; a que parou no meio é gravada de novo no MESMO caminho (substitui);
+ * substituída que já está no R2 com o mesmo tamanho é pulada.
  *
  *   npm run fotos:migrar                         só mostra o que seria migrado (não grava nada)
  *   npm run fotos:migrar -- --executar           copia para o destino atual e troca a chave no banco
@@ -13,12 +22,16 @@
  * não entram mais na lista). Sem --apagar-origem, a cópia antiga fica onde está, intocada.
  *
  * Os dois destinos precisam estar configurados na mesma janela: as variáveis do antigo (para ler)
- * e as do novo (para gravar). Fotos refeitas ("substituídas") não têm registro no banco e não são
- * migradas: continuam no armazenamento antigo.
+ * e as do novo (para gravar). Fora do caso Supabase -> R2, as fotos refeitas ("substituídas") não
+ * são migradas: continuam no armazenamento antigo.
+ *
+ * No fim: quantas foram movidas, quantas falharam e quantas já estavam no destino.
  */
 import 'dotenv/config';
 import path from 'node:path';
-import { apagarArquivo, destinoAtual, destinoDaChave, lerArquivo, salvarFoto } from '../src/lib/armazenamento';
+import { apagarArquivo, copiarParaOBucketAtual, destinoAtual, destinoDaChave, lerArquivo, salvarFoto } from '../src/lib/armazenamento';
+import { enviarAoR2, tamanhoNoR2 } from '../src/lib/r2';
+import { apagarDoSupabase, baixarDoSupabase, bucketDasFotos, variaveisDoSupabaseFaltando } from '../src/lib/supabaseStorage';
 import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
 import { prisma } from '../src/lib/prisma';
 
@@ -49,8 +62,21 @@ async function main() {
   console.log(`\nMigração de fotos — banco de ${(await bancoDeProducao(prisma)) ? 'PRODUÇÃO' : 'desenvolvimento'}`);
   console.log(`Destino atual (STORAGE_PROVIDER): ${para}`);
   console.log(`Fotos no banco: ${fotos.length} (${[...porOrigem].map(([d, n]) => `${n} em ${d}`).join(', ') || 'nenhuma'})`);
-  console.log(`A migrar para ${para}: ${aMigrar.length}`);
-  if (aMigrar.length === 0) return;
+  console.log(`A migrar para ${para}: ${aMigrar.length} (já estão em ${para}: ${fotos.length - aMigrar.length})`);
+
+  // Supabase -> R2: as fotos refeitas ficam em ".../substituidas/..." e não têm registro no banco
+  const substituidas =
+    para === 'r2' && variaveisDoSupabaseFaltando().length === 0
+      ? await prisma
+          .$queryRaw<{ name: string; bytes: bigint | number | null }[]>`select name, (metadata->>'size')::bigint as bytes from storage.objects where bucket_id = ${bucketDasFotos()} and name like '%/substituidas/%' order by name`
+          .catch(() => [] as { name: string; bytes: bigint | number | null }[])
+      : [];
+  if (substituidas.length) console.log(`Fotos refeitas ("substituidas") no Supabase Storage, a conferir no R2: ${substituidas.length}`);
+
+  if (aMigrar.length === 0 && substituidas.length === 0) {
+    console.log('\nNada a migrar: movidas 0, falhas 0.');
+    return;
+  }
   if (!executar) {
     console.log('\nNada foi feito. Para migrar: npm run fotos:migrar -- --executar');
     console.log('(acrescente --apagar-origem para apagar a cópia antiga de cada foto depois de conferida)');
@@ -66,14 +92,17 @@ async function main() {
     try {
       const original = await lerArquivo(foto.arquivoChave);
       const doChecklist = foto.chave ? checklist.find((c) => c.tipoServico === foto.agendamento.tipo && c.chave === foto.chave) : null;
-      const nova = await salvarFoto(original.dados, {
-        cliente: foto.agendamento.projeto.cliente,
-        projetoCodigo: foto.agendamento.projeto.codigo,
-        servico: { id: foto.agendamento.id, dataInicio: foto.agendamento.dataInicio, tipo: foto.agendamento.tipo },
-        item: doChecklist ? { ordem: doChecklist.ordem, rotulo: doChecklist.rotulo } : null,
-        capturadaEm: foto.capturadaEm ?? foto.criadoEm,
-        extensao: path.extname(foto.arquivoNome) || path.extname(foto.arquivoChave) || '.jpg',
-      });
+      // de bucket para bucket, o MESMO caminho (a chave só troca de prefixo); senão, como foto nova
+      const nova =
+        (await copiarParaOBucketAtual(foto.arquivoChave, original.dados, original.tipo)) ??
+        (await salvarFoto(original.dados, {
+          cliente: foto.agendamento.projeto.cliente,
+          projetoCodigo: foto.agendamento.projeto.codigo,
+          servico: { id: foto.agendamento.id, dataInicio: foto.agendamento.dataInicio, tipo: foto.agendamento.tipo },
+          item: doChecklist ? { ordem: doChecklist.ordem, rotulo: doChecklist.rotulo } : null,
+          capturadaEm: foto.capturadaEm ?? foto.criadoEm,
+          extensao: path.extname(foto.arquivoNome) || path.extname(foto.arquivoChave) || '.jpg',
+        }));
       // só troca a chave depois de ler a cópia nova e ela ter o mesmo tamanho
       const conferida = await lerArquivo(nova.chave);
       if (conferida.dados.length !== original.dados.length) {
@@ -94,7 +123,36 @@ async function main() {
     }
   }
 
-  console.log(`\nMigradas: ${migradas}. Falhas: ${falhas}.${apagarOrigem ? ` Cópias antigas não apagadas: ${naoApagadas}.` : ' As cópias antigas continuam no destino anterior.'}`);
+  // ---- fotos refeitas (Supabase -> R2): mesmo caminho; a que já está lá com o mesmo tamanho é pulada
+  let refeitasMovidas = 0;
+  let refeitasJaEstavam = 0;
+  for (const s of substituidas) {
+    try {
+      const noDestino = await tamanhoNoR2(s.name);
+      if (noDestino !== null && noDestino === Number(s.bytes ?? -1)) {
+        refeitasJaEstavam++;
+      } else {
+        const dados = await baixarDoSupabase(s.name);
+        await enviarAoR2(s.name, dados, 'image/jpeg');
+        if ((await tamanhoNoR2(s.name)) !== dados.length) throw new Error('a cópia no R2 não tem o tamanho do original');
+        refeitasMovidas++;
+      }
+      if (apagarOrigem) {
+        await apagarDoSupabase([s.name]).catch((erro) => {
+          naoApagadas++;
+          console.warn(`  ${s.name}: copiada, mas a cópia antiga não foi apagada (${(erro as Error).message})`);
+        });
+      }
+    } catch (erro) {
+      falhas++;
+      console.error(`  FALHOU ${s.name}: ${(erro as Error).message} (continua no Supabase Storage, nada mudou)`);
+    }
+  }
+
+  console.log(`\nRESULTADO: movidas ${migradas + refeitasMovidas}, falhas ${falhas}, já estavam no destino ${fotos.length - aMigrar.length + refeitasJaEstavam}.`);
+  console.log(`  Fotos dos serviços: ${migradas} movidas de ${aMigrar.length}.`);
+  if (substituidas.length) console.log(`  Fotos refeitas ("substituidas"): ${refeitasMovidas} movidas, ${refeitasJaEstavam} já estavam no R2.`);
+  console.log(apagarOrigem ? `  Cópias antigas não apagadas: ${naoApagadas}.` : '  As cópias antigas continuam no destino anterior, intocadas.');
   if (falhas) {
     console.log('Rode de novo para tentar as que falharam: as já migradas não entram mais.');
     process.exitCode = 1;

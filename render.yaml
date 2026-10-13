@@ -37,9 +37,13 @@ services:
       # literais deste arquivo a cada sincronização do Blueprint (toda vez que o render.yaml muda no
       # main), por cima do que estiver no painel. Até 09/10/2026 estava "disco": uma sincronização
       # devolveu a produção para "disco" e a API parou de receber fotos sem avisar ninguém.
-      # NUNCA volte este valor para "disco". Se faltar alguma das três SUPABASE_* abaixo no painel, a
+      # NUNCA volte este valor para "disco". Se faltar alguma variável do destino escolhido no painel, a
       # API sobe do mesmo jeito, em modo degradado: não recebe fotos, grita no log, mostra a faixa
       # vermelha no escritório e "recebendo": false no /saude.
+      # TROCA PARA O CLOUDFLARE R2 (SOCORRO.md, item 8): só mude para "r2" AQUI, neste arquivo (mudar
+      # só no painel dura até a próxima sincronização), e só DEPOIS de as quatro R2_* estarem no
+      # painel e de o `npm run r2:conferir` passar. As SUPABASE_* ficam: as fotos antigas são lidas
+      # de lá até a migração (`npm run fotos:migrar`) terminar.
       - key: STORAGE_PROVIDER
         value: supabase
       # Do projeto do Supabase de produção. "sync: false" = gerenciadas SÓ pelo painel: a Render
@@ -54,6 +58,19 @@ services:
       # recusa fotos novas em 95%. Mude aqui e no painel se o plano mudar.
       - key: SUPABASE_STORAGE_LIMITE_MB
         value: 1024
+      # Cloudflare R2 (STORAGE_PROVIDER=r2). "sync: false": preenchidas SÓ no painel, nunca aqui.
+      # R2_ACCOUNT_ID = o ID da conta (32 letras e números), não o endereço inteiro.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      # Teto do R2, em MB (10 GB gratuitos por mês). A API avisa em 70% e recusa fotos novas em 95%.
+      - key: R2_STORAGE_LIMITE_MB
+        value: 10240
       # Endereço do serviço (o nome pode ganhar um sufixo se "guarusolar" já existir na Render):
       # confira no painel e ajuste os dois abaixo.
       - key: API_URL_PUBLICA

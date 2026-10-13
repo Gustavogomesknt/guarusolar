@@ -328,16 +328,17 @@ sistema não mede o egress: o relatório imprime uma conta aproximada (fotos que
 aberturas da foto inteira + 10 da miniatura) e o número exato está no painel do Supabase, em
 Settings → Usage.
 
-**Quando o aviso de 70% aparecer** (ou o relatório mostrar menos de 6 meses até o teto): o caminho
-é levar as fotos para o **Cloudflare R2** (10 GB grátis por mês, US$ 0,015 por GB-mês acima disso,
-sem cobrança de egress). O provedor `r2` ainda não existe; é cerca de um dia de trabalho, porque
-`STORAGE_PROVIDER` já escolhe o destino e o `npm run fotos:migrar` leva o histórico. O Supabase Pro
-(US$ 25 por mês, 100 GB) só vale para quem precisar do resto do pacote: banco maior, backups
-gerenciados e projeto que não pausa por inatividade. Apagar fotos antigas é decisão do cliente.
+**Cloudflare R2 (`STORAGE_PROVIDER=r2`).** Com a Guarusolar passando a enviar vídeo dos serviços,
+o 1 GB do Supabase não comporta. O R2 dá 10 GB grátis por mês, US$ 0,015 por GB-mês acima disso e
+não cobra egress. Variáveis: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_BUCKET` e o teto `R2_STORAGE_LIMITE_MB` (padrão 10240). `npm run r2:conferir` testa tudo antes
+de ligar; `npm run storage:relatorio` e o aviso de 70% funcionam igual (no R2 o uso é medido
+listando o bucket). As fotos continuam saindo só pela API, com login. **Passo a passo da troca e da
+migração: SOCORRO.md, item 8.** O Supabase Pro (US$ 25 por mês, 100 GB) só vale para quem precisar
+do resto do pacote. Apagar fotos antigas é decisão do cliente.
 
-**Referência: migrar as fotos para outro destino, sem perder nada.** O roteiro abaixo foi escrito
-para o SharePoint, que saiu do escopo (exige Microsoft 365 empresarial); o `npm run fotos:migrar`
-serve do mesmo jeito para qualquer destino novo:
+**Referência antiga: o mesmo roteiro para o SharePoint**, que saiu do escopo (exige Microsoft 365
+empresarial). Para o R2, siga o SOCORRO.md, item 8:
 
 1. Configure as variáveis `MS_*` e rode `npm run sharepoint:conferir`.
 2. Faça o Backup do banco (Actions › Backup do banco).

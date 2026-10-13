@@ -23,17 +23,21 @@ import {
   moverNoSupabase,
   usoDoStorage,
   variaveisDoSupabaseFaltando,
+  type UsoDoStorage,
 } from './supabaseStorage';
+import { apagarDoR2, baixarDoR2, conferirBucketDoR2, enviarAoR2, moverNoR2, usoDoR2, variaveisDoR2Faltando } from './r2';
 
 export { ArmazenamentoCheio, ArmazenamentoIndisponivel, ArquivoNaoEncontrado };
 export type { DestinoDaFoto };
 
 /**
- * Camada de armazenamento das fotos. Três destinos:
+ * Camada de armazenamento das fotos. Quatro destinos:
  *
  * - "disco" (padrão, desenvolvimento): pasta STORAGE_DIR (uploads/). Chave = caminho relativo.
- * - "supabase" (produção, destino DEFINITIVO): bucket PRIVADO do Supabase Storage
- *   (lib/supabaseStorage.ts). Chave = "sb:<caminho no bucket>".
+ * - "supabase": bucket PRIVADO do Supabase Storage (lib/supabaseStorage.ts), cerca de 1 GB no
+ *   plano gratuito. Chave = "sb:<caminho no bucket>".
+ * - "r2": bucket PRIVADO do Cloudflare R2 (lib/r2.ts), 10 GB gratuitos e sem cobrança de egress.
+ *   Chave = "r2:<caminho no bucket>", com os mesmos caminhos do Supabase.
  * - "sharepoint" (FORA DE ESCOPO, mantido no código): biblioteca do SharePoint pelo Microsoft
  *   Graph (lib/sharepoint.ts). EXIGE TENANT CORPORATIVO da Microsoft (Entra ID + SharePoint);
  *   o cliente usa conta pessoal, que não tem nenhum dos dois. Chave = "sp:<id do arquivo>".
@@ -50,19 +54,46 @@ export type ArquivoLido = { dados: Buffer; tipo: string };
 
 const PREFIXO_SHAREPOINT = 'sp:';
 const PREFIXO_SUPABASE = 'sb:';
+const PREFIXO_R2 = 'r2:';
 const LADO_DA_MINIATURA = 480;
 const TIPOS: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 
-export type Destino = 'disco' | 'sharepoint' | 'supabase';
+export type Destino = 'disco' | 'sharepoint' | 'supabase' | 'r2';
 export const destinoAtual = (): Destino => {
   // maiúsculas e aspas digitadas no painel da hospedagem não mudam o destino
   const valor = provedorDeclarado();
-  return valor === 'sharepoint' || valor === 'supabase' ? valor : 'disco';
+  return valor === 'sharepoint' || valor === 'supabase' || valor === 'r2' ? valor : 'disco';
 };
 
 /** Em qual destino está guardado o arquivo desta chave. */
 export const destinoDaChave = (chave: string): Destino =>
-  chave.startsWith(PREFIXO_SHAREPOINT) ? 'sharepoint' : chave.startsWith(PREFIXO_SUPABASE) ? 'supabase' : 'disco';
+  chave.startsWith(PREFIXO_SHAREPOINT) ? 'sharepoint' : chave.startsWith(PREFIXO_SUPABASE) ? 'supabase' : chave.startsWith(PREFIXO_R2) ? 'r2' : 'disco';
+
+/**
+ * Os dois destinos que são "bucket" (Supabase Storage e Cloudflare R2) guardam os arquivos com os
+ * MESMOS caminhos e as mesmas regras (miniatura guardada, pasta "substituidas"); só muda quem
+ * recebe a chamada. Tudo o que vale para um vale para o outro por aqui.
+ */
+type Bucket = {
+  prefixo: string;
+  enviar: (caminho: string, dados: Buffer, tipo: string, opcoes?: { conferir?: boolean }) => Promise<void>;
+  baixar: (caminho: string) => Promise<Buffer>;
+  mover: (de: string, para: string) => Promise<void>;
+  apagar: (caminhos: string[]) => Promise<void>;
+};
+const BUCKETS: Record<'supabase' | 'r2', Bucket> = {
+  supabase: { prefixo: PREFIXO_SUPABASE, enviar: enviarAoSupabase, baixar: baixarDoSupabase, mover: moverNoSupabase, apagar: apagarDoSupabase },
+  r2: { prefixo: PREFIXO_R2, enviar: enviarAoR2, baixar: baixarDoR2, mover: moverNoR2, apagar: apagarDoR2 },
+};
+const bucketAtual = (): Bucket | null => {
+  const destino = destinoAtual();
+  return destino === 'supabase' || destino === 'r2' ? BUCKETS[destino] : null;
+};
+/** O bucket onde está o arquivo desta chave e o caminho dele lá dentro; null se não é de bucket. */
+function noBucket(chave: string): { bucket: Bucket; caminho: string } | null {
+  const bucket = Object.values(BUCKETS).find((b) => chave.startsWith(b.prefixo));
+  return bucket ? { bucket, caminho: chave.slice(bucket.prefixo.length) } : null;
+}
 
 const provedorDeclarado = () => process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
 
@@ -73,8 +104,12 @@ const provedorDeclarado = () => process.env.STORAGE_PROVIDER?.trim().replace(/^[
  */
 export function configuracaoIncompleta(): string | null {
   const valor = provedorDeclarado();
-  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase') {
-    return `STORAGE_PROVIDER="${valor}" não existe (use "supabase"; em desenvolvimento, "disco").`;
+  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase' && valor !== 'r2') {
+    return `STORAGE_PROVIDER="${valor}" não existe (use "r2" ou "supabase"; em desenvolvimento, "disco").`;
+  }
+  if (destinoAtual() === 'r2') {
+    const faltam = variaveisDoR2Faltando();
+    if (faltam.length) return `STORAGE_PROVIDER=r2, mas faltam: ${faltam.join(', ')}.`;
   }
   if (destinoAtual() === 'supabase') {
     const faltam = variaveisDoSupabaseFaltando();
@@ -110,8 +145,9 @@ export function conferirArmazenamentoAoIniciar() {
             ? `  ${incompleta}`
             : `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}): o disco deste servidor é apagado a cada publicação.`,
           '  A API está no ar em MODO DEGRADADO: tudo funciona, menos o envio de fotos, que é RECUSADO (503).',
-          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
-          '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET, e publique de novo. Confira em /saude: "recebendo":true.',
+          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=r2, com R2_ACCOUNT_ID,',
+          '  R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY e R2_BUCKET (ou STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
+          '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET), e publique de novo. Confira em /saude: "recebendo":true.',
           '################################################################################',
           '',
         ].join('\n'),
@@ -138,6 +174,22 @@ export function conferirArmazenamentoAoIniciar() {
     setInterval(() => void conferir(), 24 * 60 * 60 * 1000).unref();
     return;
   }
+  if (destinoAtual() === 'r2') {
+    // Confere as chaves e o bucket e deixa o espaço no log. Falha aqui não derruba o servidor.
+    const conferir = async () => {
+      try {
+        await conferirBucketDoR2();
+        const uso = await usoDoR2(true);
+        const espaco = uso ? `${(uso.fracao * 100).toFixed(1)}% de ${(uso.limiteBytes / 1024 / 1024).toFixed(0)} MB em uso` : 'uso não medido';
+        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] Cloudflare R2: bucket conferido; ${espaco}.`);
+      } catch (erro) {
+        console.error(`[armazenamento] Cloudflare R2: ${(erro as Error).message}`);
+      }
+    };
+    void conferir();
+    setInterval(() => void conferir(), 24 * 60 * 60 * 1000).unref();
+    return;
+  }
   if (destinoAtual() !== 'sharepoint') return;
   const avisar = () => {
     const aviso = avisoDeValidadeDoSegredo();
@@ -148,7 +200,15 @@ export function conferirArmazenamentoAoIniciar() {
 }
 
 /**
- * As fotos sobrevivem a uma publicação? No Supabase Storage (e no SharePoint), sim. No disco, só
+ * Espaço do destino atual, para o aviso de 70% do escritório. Só os buckets têm teto a medir
+ * (SUPABASE_STORAGE_LIMITE_MB e R2_STORAGE_LIMITE_MB); disco e SharePoint devolvem null.
+ */
+export const usoDoDestinoAtual = (): Promise<UsoDoStorage | null> =>
+  // em modo degradado (faltam variáveis) não há o que medir: quem avisa é a faixa vermelha
+  configuracaoIncompleta() !== null ? Promise.resolve(null) : destinoAtual() === 'supabase' ? usoDoStorage() : destinoAtual() === 'r2' ? usoDoR2() : Promise.resolve(null);
+
+/**
+ * As fotos sobrevivem a uma publicação? No Supabase Storage, no R2 (e no SharePoint), sim. No disco, só
  * se ele for persistente (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco): o
  * disco comum do servidor é apagado a cada publicação, reinício e sono. Em produção sem isso, a
  * API NÃO RECEBE FOTOS (melhor não receber do que perder), e só isso: o login e a agenda do app
@@ -165,6 +225,7 @@ export const appTecnicoLiberado = () =>
   (process.env.NODE_ENV !== 'production' ||
     destinoAtual() === 'sharepoint' ||
     destinoAtual() === 'supabase' ||
+    destinoAtual() === 'r2' ||
     process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim');
 
 /** Para o técnico (tela do serviço e fila de fotos): o motivo de verdade, e a quem avisar. */
@@ -194,18 +255,18 @@ async function lerDoDisco(chave: string): Promise<Buffer> {
 }
 
 // ------------------------------------------------------------------------------------------
-// Supabase Storage: caminhos (só ASCII: o Storage recusa acento no nome do objeto)
+// Buckets (Supabase Storage e R2): caminhos (só ASCII: o Supabase recusa acento no nome do objeto)
 // ------------------------------------------------------------------------------------------
 
-const PASTA_SUBSTITUIDAS_NO_SUPABASE = 'substituidas';
+const PASTA_SUBSTITUIDAS_NO_BUCKET = 'substituidas';
 
 /** PRJ-2026-0015/<serviço>/01-20260929T170207123.jpg; o mesmo instante dá o mesmo nome (reenvio substitui). */
-function caminhoNoSupabase(destino: DestinoDaFoto, extensao: string) {
+function caminhoNoBucket(destino: DestinoDaFoto, extensao: string) {
   const quando = destino.capturadaEm.toISOString().replace(/[-:.Z]/g, '');
   const item = destino.item ? String(destino.item.ordem + 1).padStart(2, '0') : 'extra';
   return `${destino.projetoCodigo}/${destino.servico.id}/${item}-${quando}${extensao}`;
 }
-const miniaturaNoSupabase = (caminho: string) => `miniaturas/${caminho.replace(/\.[^./]+$/, '')}.jpg`;
+const miniaturaNoBucket = (caminho: string) => `miniaturas/${caminho.replace(/\.[^./]+$/, '')}.jpg`;
 
 // ------------------------------------------------------------------------------------------
 // Operações
@@ -219,10 +280,11 @@ export async function salvarFoto(dados: Buffer, destino: DestinoDaFoto): Promise
     return { chave: `${PREFIXO_SHAREPOINT}${id}`, nome: segmentos.at(-1)!, tamanhoBytes: dados.length };
   }
   const extensao = TIPOS[destino.extensao.toLowerCase()] ? destino.extensao.toLowerCase() : '.jpg';
-  if (destinoAtual() === 'supabase') {
-    const caminho = caminhoNoSupabase(destino, extensao);
-    await enviarAoSupabase(caminho, dados, tipo);
-    return { chave: `${PREFIXO_SUPABASE}${caminho}`, nome: path.posix.basename(caminho), tamanhoBytes: dados.length };
+  const bucket = bucketAtual();
+  if (bucket) {
+    const caminho = caminhoNoBucket(destino, extensao);
+    await bucket.enviar(caminho, dados, tipo);
+    return { chave: `${bucket.prefixo}${caminho}`, nome: path.posix.basename(caminho), tamanhoBytes: dados.length };
   }
   const nome = `${randomUUID()}${extensao}`;
   const chave = `${destino.projetoCodigo}/${destino.servico.id}/${nome}`;
@@ -237,9 +299,9 @@ export async function lerArquivo(chave: string): Promise<ArquivoLido> {
   if (chave.startsWith(PREFIXO_SHAREPOINT)) {
     return { dados: await baixarDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length)), tipo: 'image/jpeg' };
   }
-  if (chave.startsWith(PREFIXO_SUPABASE)) {
-    const caminho = chave.slice(PREFIXO_SUPABASE.length);
-    return { dados: await baixarDoSupabase(caminho), tipo: TIPOS[path.extname(caminho).toLowerCase()] ?? 'image/jpeg' };
+  const guardado = noBucket(chave);
+  if (guardado) {
+    return { dados: await guardado.bucket.baixar(guardado.caminho), tipo: TIPOS[path.extname(guardado.caminho).toLowerCase()] ?? 'image/jpeg' };
   }
   return { dados: await lerDoDisco(chave), tipo: TIPOS[path.extname(chave).toLowerCase()] ?? 'application/octet-stream' };
 }
@@ -261,17 +323,18 @@ export async function lerMiniatura(chave: string): Promise<ArquivoLido> {
     const pronta = await miniaturaDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length));
     return { dados: pronta ?? (await reduzir((await lerArquivo(chave)).dados)), tipo: 'image/jpeg' };
   }
-  if (chave.startsWith(PREFIXO_SUPABASE)) {
-    // gerada uma vez e guardada no bucket (o Supabase gratuito não reduz imagens)
-    const miniatura = miniaturaNoSupabase(chave.slice(PREFIXO_SUPABASE.length));
+  const guardado = noBucket(chave);
+  if (guardado) {
+    // gerada uma vez e guardada no bucket (nem o Supabase gratuito nem o R2 reduzem imagens)
+    const miniatura = miniaturaNoBucket(guardado.caminho);
     try {
-      return { dados: await baixarDoSupabase(miniatura), tipo: 'image/jpeg' };
+      return { dados: await guardado.bucket.baixar(miniatura), tipo: 'image/jpeg' };
     } catch (erro) {
       if (!(erro instanceof ArquivoNaoEncontrado)) throw erro;
     }
     const dados = await reduzir((await lerArquivo(chave)).dados);
     // se não der para guardar, a miniatura sai do mesmo jeito (e é refeita no próximo pedido)
-    await enviarAoSupabase(miniatura, dados, 'image/jpeg', { conferir: false }).catch((erro) =>
+    await guardado.bucket.enviar(miniatura, dados, 'image/jpeg', { conferir: false }).catch((erro) =>
       console.warn(`[armazenamento] miniatura não guardada (${miniatura}): ${(erro as Error).message}`),
     );
     return { dados, tipo: 'image/jpeg' };
@@ -296,11 +359,12 @@ export async function guardarComoSubstituida(chave: string) {
     await moverNoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length), PASTA_DAS_SUBSTITUIDAS);
     return;
   }
-  if (chave.startsWith(PREFIXO_SUPABASE)) {
-    const caminho = chave.slice(PREFIXO_SUPABASE.length);
-    await moverNoSupabase(caminho, `${path.posix.dirname(caminho)}/${PASTA_SUBSTITUIDAS_NO_SUPABASE}/${path.posix.basename(caminho)}`);
+  const guardado = noBucket(chave);
+  if (guardado) {
+    const { bucket, caminho } = guardado;
+    await bucket.mover(caminho, `${path.posix.dirname(caminho)}/${PASTA_SUBSTITUIDAS_NO_BUCKET}/${path.posix.basename(caminho)}`);
     // a miniatura da foto antiga só ocupa espaço
-    await apagarDoSupabase([miniaturaNoSupabase(caminho)]).catch(() => undefined);
+    await bucket.apagar([miniaturaNoBucket(caminho)]).catch(() => undefined);
     return;
   }
   const atual = caminhoDa(chave);
@@ -315,10 +379,22 @@ export async function guardarComoSubstituida(chave: string) {
  */
 export async function apagarArquivo(chave: string) {
   if (chave.startsWith(PREFIXO_SHAREPOINT)) return apagarDoSharepoint(chave.slice(PREFIXO_SHAREPOINT.length));
-  if (chave.startsWith(PREFIXO_SUPABASE)) {
-    const caminho = chave.slice(PREFIXO_SUPABASE.length);
-    return apagarDoSupabase([caminho, miniaturaNoSupabase(caminho)]);
-  }
+  const guardado = noBucket(chave);
+  if (guardado) return guardado.bucket.apagar([guardado.caminho, miniaturaNoBucket(guardado.caminho)]);
   await unlink(caminhoDa(chave));
   await unlink(caminhoDa(chave, path.join(pastaBase(), '.miniaturas'))).catch(() => undefined);
+}
+
+/**
+ * Migração de um bucket para outro (Supabase Storage -> R2): grava no destino atual com o MESMO
+ * caminho da origem, de modo que a chave só troca de prefixo ("sb:…" vira "r2:…"). Gravar de
+ * novo o mesmo caminho substitui o arquivo: rodar a migração duas vezes não duplica nada.
+ * null quando a origem ou o destino atual não é bucket (aí a migração usa salvarFoto).
+ */
+export async function copiarParaOBucketAtual(chaveDeOrigem: string, dados: Buffer, tipo: string): Promise<ArquivoSalvo | null> {
+  const origem = noBucket(chaveDeOrigem);
+  const destino = bucketAtual();
+  if (!origem || !destino || origem.bucket === destino) return null;
+  await destino.enviar(origem.caminho, dados, tipo);
+  return { chave: `${destino.prefixo}${origem.caminho}`, nome: path.posix.basename(origem.caminho), tamanhoBytes: dados.length };
 }

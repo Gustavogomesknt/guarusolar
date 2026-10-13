@@ -10,8 +10,8 @@ const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
 /**
  * Aviso do espaço das fotos para o gestor e o admin (montado no Layout, em todas as telas deles).
- * As fotos ficam no Supabase Storage, em definitivo, com um teto (cerca de 1 GB no plano
- * gratuito; variável SUPABASE_STORAGE_LIMITE_MB na API). Aparece a partir de 70% de uso, bem
+ * As fotos ficam num bucket com teto: Cloudflare R2 (10 GB gratuitos; R2_STORAGE_LIMITE_MB na
+ * API) ou Supabase Storage (cerca de 1 GB; SUPABASE_STORAGE_LIMITE_MB). Aparece a partir de 70% de uso, bem
  * antes de a API começar a recusar fotos novas (95%): dá tempo de decidir (README, "Espaço das fotos").
  */
 export function AvisoDoArmazenamento() {
@@ -24,7 +24,7 @@ export function AvisoDoArmazenamento() {
     meta: { erroNaTela: true }, // sem aviso flutuante: se não der para medir, não há o que mostrar
   });
   const d = uso.data;
-  // Produção sem armazenamento (STORAGE_PROVIDER fora de "supabase"): a API recusa as fotos dos
+  // Produção sem armazenamento (STORAGE_PROVIDER sem destino válido ou sem as variáveis dele): a API recusa as fotos dos
   // técnicos. Faixa vermelha em todas as telas do gestor e do admin, até ser corrigido.
   if (d && d.recebendo === false) {
     return (

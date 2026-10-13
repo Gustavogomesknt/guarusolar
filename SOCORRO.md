@@ -167,8 +167,12 @@ quando isto for resolvido. Peça para ele não limpar os dados do navegador nem 
      das fotos (mensagem "espaço cheio": tabela do item 2).
    - `"recebendo":false` → a hospedagem está sem a configuração das fotos. Siga.
 2. Painel da Render → serviço **guarusolar** → **Environment**. Confira:
-   - `STORAGE_PROVIDER` tem de ser exatamente `supabase`;
-   - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` e `SUPABASE_BUCKET` têm de estar preenchidas.
+   - se `STORAGE_PROVIDER` é `r2`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e
+     `R2_BUCKET` têm de estar preenchidas;
+   - se `STORAGE_PROVIDER` é `supabase`: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` e `SUPABASE_BUCKET`
+     têm de estar preenchidas;
+   - qualquer outro valor em `STORAGE_PROVIDER` está errado.
+   O log da Render diz qual variável falta (bloco `AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS`).
    Corrija o que estiver diferente e salve.
 3. **Republique**: GitHub → **Actions** → **Publicar** → **Run workflow** (ou, no painel da Render,
    **Manual Deploy**). Espere terminar.
@@ -177,7 +181,57 @@ quando isto for resolvido. Peça para ele não limpar os dados do navegador nem 
 5. Se `STORAGE_PROVIDER` voltar sozinho para outro valor, ou a publicação falhar, ligue para o
    desenvolvedor.
 
-## 8. Quem contatar
+## 8. Trocar onde as fotos ficam guardadas (do Supabase para o Cloudflare R2)
+
+Para quê: o Supabase gratuito guarda cerca de 1 GB; o Cloudflare R2 guarda 10 GB sem custo e não
+cobra pelo que sai. **Faça com o desenvolvedor na linha.** Nenhuma foto se perde em nenhum passo: a
+troca só muda onde as fotos NOVAS entram, e as antigas continuam abrindo de onde estão.
+
+**A. No painel da Cloudflare (uma vez)**
+
+1. Crie a conta em dash.cloudflare.com e abra **R2 Object Storage**. A Cloudflare pede um cartão
+   para ativar o R2, mesmo no uso gratuito.
+2. **Create bucket**: nome `guarusolar-fotos` (minúsculas, sem espaço); localização automática.
+   Não ligue **Public Development URL** nem domínio público: o bucket tem de ficar privado.
+3. Na página do R2, **Manage API Tokens → Create API Token**: permissão **Object Read & Write**,
+   aplicada **só ao bucket `guarusolar-fotos`**, sem data de validade. Ao criar, a tela mostra o
+   **Access Key ID** e o **Secret Access Key** UMA vez: guarde os dois no cofre de senhas.
+4. Anote o **Account ID** (32 letras e números), que aparece na página do R2.
+
+**B. Na Render e no computador**
+
+5. Render → serviço **guarusolar** → **Environment**: preencha `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY` e `R2_BUCKET`. **Não apague as `SUPABASE_*`** e não mexa em
+   `STORAGE_PROVIDER` ainda.
+6. Numa janela do PowerShell, na pasta do sistema, defina as mesmas quatro variáveis (entre aspas
+   SIMPLES, como no item 6) e rode **`npm run r2:conferir`**. Tem de terminar em "Tudo certo".
+   Se parar num passo, a mensagem diz qual valor conferir.
+7. O desenvolvedor troca `STORAGE_PROVIDER` para `r2` **no arquivo `render.yaml`** (mudar só no
+   painel não basta: a Render devolve o valor do arquivo). Faça o **Backup** (Actions → Backup do
+   banco) e depois **Actions → Publicar**.
+8. Abra o `/saude`: tem de mostrar `"fotos":{"destino":"r2","recebendo":true}`. Daqui em diante as
+   fotos novas vão para o R2; as antigas continuam abrindo do Supabase.
+
+**C. Levar as fotos antigas (a migração)**
+
+9. Numa janela do PowerShell ligada ao banco de produção (como no item 6), com as três
+   `SUPABASE_*`, as quatro `R2_*` e `$env:STORAGE_PROVIDER='r2'`, rode **`npm run fotos:migrar`**:
+   ele só MOSTRA quantas fotos há a levar, sem mexer em nada.
+10. Rode **`npm run fotos:migrar -- --executar`**. Cada foto é copiada para o R2 com o mesmo nome,
+    conferida, e só então o sistema passa a buscá-la lá. No fim aparece a linha
+    `RESULTADO: movidas N, falhas N, já estavam no destino N`.
+11. Se houver falhas (queda de internet, por exemplo), **rode o mesmo comando de novo**: ele pode
+    ser repetido quantas vezes for preciso, não duplica nada e só tenta o que faltou. Está pronto
+    quando disser `falhas 0` e "A migrar para r2: 0".
+12. Confira no sistema: abra a Validação e a ficha de dois ou três projetos antigos e veja as fotos.
+13. **Não apague nada do Supabase por enquanto.** As cópias antigas ficam lá, intocadas, como
+    reserva. Semanas depois, com tudo conferido, o desenvolvedor decide esvaziar o bucket antigo.
+
+Para **voltar atrás** antes da migração: `STORAGE_PROVIDER` de volta a `supabase` no `render.yaml`
+e Publicar. As fotos que entraram no R2 nesse meio-tempo continuam abrindo de lá enquanto as
+`R2_*` estiverem na Render.
+
+## 9. Quem contatar
 
 | Quem | Para quê | Contato |
 |---|---|---|

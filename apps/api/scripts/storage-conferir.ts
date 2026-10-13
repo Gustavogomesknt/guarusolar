@@ -1,9 +1,13 @@
 /*
- * Relatório do espaço das fotos (só LEITURA; precisa só da DATABASE_URL do projeto do Supabase):
+ * Relatório do espaço das fotos (só LEITURA), do destino de STORAGE_PROVIDER:
  *   npm run storage:relatorio
  * Total ocupado, número de fotos, tamanho médio, o que entrou em cada mês e quantos meses
- * faltam para o teto (SUPABASE_STORAGE_LIMITE_MB) no ritmo atual. No fim, uma CONTA APROXIMADA
- * do egress do mês (o outro teto do plano gratuito): o número exato só existe no painel.
+ * faltam para o teto no ritmo atual.
+ * - supabase: lê a tabela storage.objects (precisa só da DATABASE_URL do projeto do Supabase);
+ *   teto em SUPABASE_STORAGE_LIMITE_MB. No fim, uma CONTA APROXIMADA do egress do mês (o outro
+ *   teto do plano gratuito): o número exato só existe no painel.
+ * - r2: lista o bucket (precisa das quatro R2_*); teto em R2_STORAGE_LIMITE_MB. O R2 não cobra
+ *   egress. Conferência do R2: npm run r2:conferir.
  *
  * Confere o Supabase Storage antes de ligar em produção (e mostra o relatório no fim):
  *   npm run storage:conferir
@@ -32,6 +36,8 @@ import {
   usoDoStorage,
   variaveisDoSupabaseFaltando,
 } from '../src/lib/supabaseStorage';
+import { relatorioDoR2, variaveisDoR2Faltando } from '../src/lib/r2';
+import { destinoAtual } from '../src/lib/armazenamento';
 import { prisma } from '../src/lib/prisma';
 
 /** Falha já explicada na tela: encerra a conferência sem repetir a mensagem. */
@@ -56,7 +62,14 @@ const inteiro = (n: number) => n.toLocaleString('pt-BR');
 
 /** Só leitura: quanto o Storage ocupa, como cresce e quando chega ao teto. */
 async function relatorio() {
-  const r = await relatorioDoStorage();
+  const noR2 = destinoAtual() === 'r2';
+  if (noR2 && variaveisDoR2Faltando().length) {
+    console.log(`Não deu para medir: STORAGE_PROVIDER=r2, e faltam nesta janela ${variaveisDoR2Faltando().join(', ')}.`);
+    return false;
+  }
+  const r = noR2 ? await relatorioDoR2() : await relatorioDoStorage();
+  const nome = noR2 ? 'Cloudflare R2' : 'Supabase Storage';
+  const variavel = noR2 ? 'R2_STORAGE_LIMITE_MB' : 'SUPABASE_STORAGE_LIMITE_MB';
   if (!r) {
     console.log(
       'Não deu para medir: a tabela storage.objects não existe neste banco.\n' +
@@ -64,7 +77,7 @@ async function relatorio() {
     );
     return false;
   }
-  console.log(`Relatório do espaço das fotos (Supabase Storage), teto de ${inteiro(r.limiteBytes / 1024 / 1024)} MB (SUPABASE_STORAGE_LIMITE_MB${process.env.SUPABASE_STORAGE_LIMITE_MB ? '' : ' não definida: usando o padrão'})\n`);
+  console.log(`Relatório do espaço das fotos (${nome}), teto de ${inteiro(r.limiteBytes / 1024 / 1024)} MB (${variavel}${process.env[variavel] ? '' : ' não definida: usando o padrão'})\n`);
   console.log(`  Total ocupado     ${mb(r.usadoBytes)} MB  (${(r.fracao * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do teto), ${inteiro(r.arquivos)} arquivo(s)`);
   console.log(`  Fotos             ${inteiro(r.fotos.arquivos)}, ${mb(r.fotos.bytes)} MB; tamanho médio ${kb(r.fotos.mediaBytes)} KB`);
   console.log(`  Miniaturas        ${inteiro(r.miniaturas.arquivos)}, ${mb(r.miniaturas.bytes)} MB`);
@@ -89,6 +102,13 @@ async function relatorio() {
     const escrito = (n: number) => (n >= 120 ? 'mais de 10 anos' : n >= 24 ? `cerca de ${Math.round(n / 12)} anos` : `cerca de ${n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${n < 1.05 && n > 0.95 ? 'mês' : 'meses'}`);
     console.log(`  Faltam            ${escrito(meses)} para o teto; ${escrito(ate95)} para a API começar a recusar fotos (${FRACAO_DE_RECUSA * 100}%)`);
     if (dias < 30) console.log('                    (menos de 30 dias de dados: a previsão ainda oscila muito)');
+  }
+
+  if (noR2) {
+    console.log('\n  Egress: o R2 não cobra pelo que SAI (abrir fotos não tem teto nem custo).');
+    console.log('    O plano gratuito limita operações por mês (1 milhão de gravações e listagens, 10 milhões de');
+    console.log('    leituras), muito acima do uso do sistema. O número exato está no painel da Cloudflare, em R2.');
+    return true;
   }
 
   // Egress: não há como medir daqui (o sistema não registra cada abertura de foto e o Supabase
