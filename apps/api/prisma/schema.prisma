@@ -103,7 +103,9 @@ model Cliente {
   id          String     @id @default(uuid())
   tipoPessoa  TipoPessoa @default(FISICA)
   nome        String // nome completo ou razão social
-  documento   String     @unique // CPF ou CNPJ (somente dígitos)
+  /// CPF ou CNPJ (somente dígitos). OPCIONAL: nulo quando não informado (nunca texto vazio, que
+  /// bateria na chave única); preenchido, não se repete entre clientes
+  documento   String?    @unique
   whatsapp    String // somente dígitos, com DDD: 11987342215
   email       String?
   cep         String?
@@ -283,6 +285,11 @@ model Orcamento {
   // se a tabela mostra preço unitário e subtotal de cada item (padrão: só item e quantidade)
   descricaoServico    String?
   detalharPrecosNoPdf Boolean     @default(false)
+  // prazo de execução e garantia do serviço, texto livre impresso no PDF (sugestões e texto
+  // padrão em compartilhado/textosDaProposta.ts). Prazo: rascunho pode ficar sem; é exigido
+  // para gerar o PDF e enviar. Garantia nula = o PDF usa o texto padrão
+  prazoExecucao       String?
+  garantia            String?
   enviadoEm           DateTime?
   aprovadoEm          DateTime?
   recusadoEm          DateTime?

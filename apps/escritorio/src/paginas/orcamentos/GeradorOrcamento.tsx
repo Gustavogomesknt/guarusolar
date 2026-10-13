@@ -270,6 +270,8 @@ export function GeradorOrcamento({
             salvo={salvo !== null}
             somenteLeitura={somenteLeitura}
             alteradoDepoisDeSalvar={salvo !== null && alterado}
+            // aprovado não pode mais ser editado: o anterior ao campo continua abrindo o PDF
+            semPrazo={!somenteLeitura && !valores.prazoExecucao?.trim()}
             enviandoWhatsApp={enviandoWhatsApp}
             onWhatsApp={aoEnviarWhatsApp}
             onPdf={() => salvo && window.open(urlDaApi(caminhoDoPdf(salvo)), '_blank', 'noopener')}

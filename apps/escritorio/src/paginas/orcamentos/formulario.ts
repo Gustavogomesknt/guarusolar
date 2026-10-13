@@ -1,4 +1,4 @@
-import { MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
+import { GARANTIA_PADRAO, MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
@@ -48,6 +48,10 @@ export type FormularioOrcamento = {
   descricaoServico: string;
   /** PDF com preço unitário e subtotal de cada item (padrão: só item e quantidade) */
   detalharPrecosNoPdf: boolean;
+  /** prazo de execução, texto livre; rascunho pode ficar sem, mas sem ele não há PDF nem envio */
+  prazoExecucao: string;
+  /** garantia do serviço no PDF; começa no texto padrão (compartilhado/textosDaProposta.ts) */
+  garantia: string;
   /** troca a cópia gravada do cliente pelos dados atuais do cadastro, ao salvar */
   atualizarDadosCliente: boolean;
 };
@@ -94,6 +98,8 @@ export function valoresIniciais(): FormularioOrcamento {
     observacoes: '',
     descricaoServico: '',
     detalharPrecosNoPdf: false,
+    prazoExecucao: '',
+    garantia: GARANTIA_PADRAO,
     atualizarDadosCliente: false,
   };
 }
@@ -213,6 +219,9 @@ export function paraApi(f: FormularioOrcamento) {
     observacoes: f.observacoes.trim() || undefined,
     descricaoServico: f.descricaoServico.trim() || undefined,
     detalharPrecosNoPdf: f.detalharPrecosNoPdf,
+    // sempre enviados, mesmo vazios: vazio apaga o que estava gravado
+    prazoExecucao: f.prazoExecucao.trim(),
+    garantia: f.garantia.trim(),
     atualizarDadosCliente: f.atualizarDadosCliente,
     itens: f.itens.map((item) => ({
       produtoId: item.produtoId,
@@ -362,6 +371,9 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     observacoes: o.observacoes ?? '',
     descricaoServico: o.descricaoServico ?? '',
     detalharPrecosNoPdf: o.detalharPrecosNoPdf,
+    prazoExecucao: o.prazoExecucao ?? '',
+    // sem garantia gravada (orçamento anterior ao campo), parte do padrão: é o que o PDF mostra
+    garantia: o.garantia || GARANTIA_PADRAO,
     atualizarDadosCliente: false,
   };
 }

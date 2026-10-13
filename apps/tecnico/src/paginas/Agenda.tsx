@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, MessageCircle, Navigation, RefreshCw, Users } from 'lucide-react';
+import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, Navigation, RefreshCw, Users } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import type { ServicoNaAgenda } from '@/lib/tipos';
-import { enderecoEscrito, linkDoMapa, linkDoWhatsApp } from '@/lib/contato';
+import { enderecoEscrito, linkDoMapa } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
@@ -243,29 +243,21 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
         <span className="font-mono text-xs text-muted-foreground">{servico.projeto.codigo}</span>
       </Link>
 
-      <div className="grid grid-cols-2 border-t">
-        <a
-          href={linkDoWhatsApp(cliente)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-12 items-center justify-center gap-2 text-sm font-semibold text-primary active:bg-muted/60"
-        >
-          <MessageCircle className="size-5" aria-hidden />
-          WhatsApp
-          <span className="sr-only"> de {cliente.nome}</span>
-        </a>
+      {/* só o caminho: o contato do cliente não chega ao app de campo (fala-se pelo escritório) */}
+      <div className="border-t">
         {mapa ? (
           <a
             href={mapa}
             target="_blank"
             rel="noreferrer"
-            className="flex h-12 items-center justify-center gap-2 border-l text-sm font-semibold text-primary active:bg-muted/60"
+            className="flex h-12 items-center justify-center gap-2 text-sm font-semibold text-primary active:bg-muted/60"
           >
             <Navigation className="size-5" aria-hidden />
             Como chegar
+            <span className="sr-only"> a {cliente.nome}</span>
           </a>
         ) : (
-          <span className="flex h-12 items-center justify-center border-l text-xs text-muted-foreground">Sem endereço</span>
+          <span className="flex h-12 items-center justify-center text-xs text-muted-foreground">Sem endereço</span>
         )}
       </div>
     </article>

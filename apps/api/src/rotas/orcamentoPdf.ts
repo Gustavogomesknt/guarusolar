@@ -60,6 +60,18 @@ rotasOrcamentoPdf.get(
     // mesma resposta para orçamento inexistente e token errado: não revela quais ids existem
     if (!orcamento || !tokenConfere(token, orcamento.tokenPdf)) return linkInvalido(res);
 
+    // Sem prazo de execução a proposta não é gerada (o gerador nem habilita o botão). Só o
+    // rascunho chega aqui sem prazo; proposta enviada antes de o campo existir continua abrindo,
+    // com "A combinar" no lugar (o link já está com o cliente).
+    if (orcamento.status === 'RASCUNHO' && !orcamento.prazoExecucao?.trim()) {
+      return paginaParaOCliente(
+        res,
+        409,
+        'Esta proposta ainda não está pronta',
+        'Falta o prazo de execução. No sistema, preencha o prazo no orçamento, salve e gere a proposta de novo.',
+      );
+    }
+
     let pdf: Buffer;
     try {
       pdf = await gerarPdfOrcamento(orcamento);

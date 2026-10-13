@@ -495,8 +495,11 @@ pasta de armazenamento não são removidos.
 - **Proposta em PDF (layout do canvas "Nova proposta comercial"):** página 1 com a proposta e
   última página institucional, fixa. Textos fixos, dados da empresa (razão social, CNPJ,
   endereço, contatos, logo) e todo o conteúdo institucional ficam em
-  `apps/api/src/conteudo/proposta.ts`; texto entre colchetes, como `[PRAZO]`, é pendência e sai
-  assim no PDF. Depois de editar, `npm run pdf:exemplo` gera três PDFs de exemplo, sem banco
+  `apps/api/src/conteudo/proposta.ts`; texto entre colchetes, como `[BANCO PARCEIRO]`, é pendência
+  e sai assim no PDF. **Prazo de execução e garantia** são preenchidos em cada orçamento: o prazo
+  é obrigatório para gerar o PDF e enviar (o rascunho pode ficar sem), e a garantia já vem com o
+  texto padrão de 12 meses. As sugestões de prazo e o texto padrão da garantia ficam num lugar
+  só: `packages/compartilhado/src/textosDaProposta.ts`. Depois de editar, `npm run pdf:exemplo` gera três PDFs de exemplo, sem banco
   (padrão, com preços e com muitos itens), para conferir. No gerador de orçamentos, "Serviço"
   vira o título da proposta e "Detalhar preços por item no PDF" (desmarcado por padrão) mostra
   preço unitário e subtotal de cada item.
@@ -682,8 +685,8 @@ publicar se o segredo `PRODUCAO_DATABASE_URL` ou a Render apontarem para outro b
    validação e projetos).
 2. ~~PWA dos técnicos com câmera e fila de envio offline~~ (feito; falta o teste no celular,
    que precisa do ambiente exposto com HTTPS).
-3. ~~Geração do PDF do orçamento~~ (feito, no layout novo; faltam o logo, o prazo e a garantia
-   em `apps/api/src/conteudo/proposta.ts`).
+3. ~~Geração do PDF do orçamento~~ (feito, no layout novo; falta o logo em
+   `apps/api/src/conteudo/proposta.ts`. Prazo e garantia agora são de cada orçamento).
 4. ~~SharePoint do cliente (Microsoft Graph)~~ (feito; falta o administrador criar o aplicativo e
    conferir com `npm run sharepoint:conferir`).
 5. ~~Atualização em tempo real da fila de validação~~ (feito: polling leve da versão da operação a

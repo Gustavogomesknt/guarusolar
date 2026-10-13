@@ -14,9 +14,14 @@ const somenteDigitos = (v: string) => v.replace(/\D/g, '');
 const clienteSchema = z.object({
   tipoPessoa: z.enum(['FISICA', 'JURIDICA']).default('FISICA'),
   nome: z.string().min(3, 'Informe o nome completo'),
-  documento: z.string().transform(somenteDigitos).refine((d) => d.length === 11 || d.length === 14, {
-    message: 'CPF deve ter 11 dígitos e CNPJ 14',
-  }),
+  // opcional (decisão da Guarusolar): vazio ou ausente grava nulo; preenchido, o formato é conferido
+  documento: z
+    .string()
+    .nullish()
+    .transform((v) => somenteDigitos(v ?? '') || null)
+    .refine((d) => d === null || d.length === 11 || d.length === 14, {
+      message: 'CPF deve ter 11 dígitos e CNPJ 14',
+    }),
   whatsapp: z.string().transform(somenteDigitos).refine((d) => d.length >= 10, {
     message: 'Informe o WhatsApp com DDD',
   }),
@@ -31,7 +36,10 @@ const clienteSchema = z.object({
   observacoes: z.string().optional(),
 });
 
-/** Documento já usado por outro cliente: 409 com o nome, em vez de erro do banco. */
+/**
+ * Documento já usado por outro cliente: 409 com o nome, em vez de erro do banco. É a única
+ * conferência de cliente repetido, e só vale quando o documento foi informado.
+ */
 async function conferirDocumentoLivre(documento: string, idAtual?: string) {
   const existente = await prisma.cliente.findUnique({ where: { documento } });
   if (existente && existente.id !== idAtual) {
@@ -84,7 +92,7 @@ rotasClientes.post(
   '/',
   rota(async (req, res) => {
     const dados = clienteSchema.parse(req.body);
-    await conferirDocumentoLivre(dados.documento);
+    if (dados.documento) await conferirDocumentoLivre(dados.documento);
     res.status(201).json(await prisma.cliente.create({ data: dados }));
   }),
 );

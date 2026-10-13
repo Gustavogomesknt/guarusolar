@@ -39,9 +39,10 @@ const esquema = z
     uf: z.string().trim().refine((v) => v === '' || /^[A-Za-z]{2}$/.test(v), 'Use a sigla com 2 letras'),
   })
   .superRefine((dados, ctx) => {
+    // CPF/CNPJ é opcional: em branco passa; preenchido, tem de estar completo
     const digitos = somenteDigitos(dados.documento).length;
     const esperado = dados.tipoPessoa === 'FISICA' ? 11 : 14;
-    if (digitos !== esperado) {
+    if (digitos > 0 && digitos !== esperado) {
       ctx.addIssue({
         code: 'custom',
         path: ['documento'],
@@ -67,13 +68,13 @@ const VAZIO: DadosCliente = {
   uf: '',
 };
 
-/** Para a API: só dígitos em documento/WhatsApp/CEP e sem campos vazios. */
+/** Para a API: só dígitos em documento/WhatsApp/CEP e sem campos vazios (documento vazio = null: apaga). */
 function paraApi(dados: DadosCliente) {
   const opcional = (v: string) => (v.trim() ? v.trim() : undefined);
   return {
     tipoPessoa: dados.tipoPessoa,
     nome: dados.nome.trim(),
-    documento: somenteDigitos(dados.documento),
+    documento: somenteDigitos(dados.documento) || null,
     whatsapp: somenteDigitos(dados.whatsapp),
     email: opcional(dados.email),
     cep: somenteDigitos(dados.cep),
@@ -91,7 +92,7 @@ function valoresDoCliente(c: Cliente): DadosCliente {
   return {
     tipoPessoa: c.tipoPessoa,
     nome: c.nome,
-    documento: mascararDocumento(c.documento),
+    documento: c.documento ? mascararDocumento(c.documento) : '',
     whatsapp: mascararTelefone(c.whatsapp),
     email: c.email ?? '',
     cep: c.cep ? mascararCep(c.cep) : '',
@@ -287,8 +288,7 @@ export function DialogCliente({
 
               <Campo
                 id="nc-documento"
-                rotulo={tipoPessoa === 'FISICA' ? 'CPF' : 'CNPJ'}
-                obrigatorio
+                rotulo={tipoPessoa === 'FISICA' ? 'CPF (opcional)' : 'CNPJ (opcional)'}
                 erro={errors.documento?.message}
                 className="col-span-6 sm:col-span-3"
               >

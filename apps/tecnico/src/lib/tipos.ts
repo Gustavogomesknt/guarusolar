@@ -5,11 +5,15 @@ import type { StatusAgendamento, TipoServico } from '@guarusolar/compartilhado';
  * Datas do agendamento chegam como "2026-09-29T00:00:00.000Z" (só o dia importa: diaDaApi).
  */
 
+/**
+ * O técnico recebe do cliente só o nome e o endereço da instalação. Telefone, WhatsApp, e-mail e
+ * dado comercial NÃO vêm da API (decisão da Guarusolar): não acrescente aqui.
+ */
 export type ClienteDoServico = {
   nome: string;
-  whatsapp: string;
   logradouro: string | null;
   numero: string | null;
+  complemento?: string | null;
   bairro: string | null;
   cidade: string | null;
   uf: string | null;

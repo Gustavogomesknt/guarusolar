@@ -8,6 +8,7 @@ import {
   formatarBRL,
   formatarData,
   formatarQuantidade,
+  GARANTIA_PADRAO,
   mascararCep,
   mascararTelefone,
   ROTULO_UNIDADE,
@@ -437,7 +438,10 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
 
   // --- Prazo, garantia e suporte
   const larguraTerco = (LARGURA - 2 * 9) / 3;
-  const textos = [PAGINA_1.prazo.texto, PAGINA_1.garantia.texto, PAGINA_1.suporte.texto];
+  // prazo e garantia são do orçamento (texto livre); a altura das três caixas segue o maior
+  const prazo = o.prazoExecucao?.trim() || PAGINA_1.prazo.semPrazo;
+  const garantia = o.garantia?.trim() || GARANTIA_PADRAO;
+  const textos = [prazo, garantia, PAGINA_1.suporte.texto];
   const alturaCaixinha = 29 + Math.max(...textos.map((t) => alturaDoTexto(t, larguraTerco - 22, 9.5, 1.25)));
   const caixinha = (titulo: string, texto: string): Peca => ({
     width: larguraTerco,
@@ -448,8 +452,8 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
   });
   const blocoCondicoes: Peca = {
     columns: [
-      caixinha(PAGINA_1.prazo.titulo, PAGINA_1.prazo.texto),
-      caixinha(PAGINA_1.garantia.titulo, PAGINA_1.garantia.texto),
+      caixinha(PAGINA_1.prazo.titulo, prazo),
+      caixinha(PAGINA_1.garantia.titulo, garantia),
       caixinha(PAGINA_1.suporte.titulo, PAGINA_1.suporte.texto),
     ],
     columnGap: 9,

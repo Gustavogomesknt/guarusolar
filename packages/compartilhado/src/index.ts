@@ -8,4 +8,5 @@ export * from './dias.js';
 export * from './mascaras.js';
 export * from './margem.js';
 export * from './margemDoOrcamento.js';
+export * from './textosDaProposta.js';
 export * from './roteiroDoServico.js';

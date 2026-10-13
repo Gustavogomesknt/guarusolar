@@ -80,7 +80,7 @@ export function CartaoCliente({ gravado, somenteLeitura = false }: { gravado: Or
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-medium">{c.nome}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {documentoParaExibir(c.documento)} · {mascararTelefone(c.whatsapp)}
+                  {[documentoParaExibir(c.documento), mascararTelefone(c.whatsapp)].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <span className="text-xs text-muted-foreground">
@@ -220,7 +220,7 @@ function ClienteSelecionado({
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="text-xs text-[#2C5484]">{titulo}</div>
         <div className="truncate text-[15px] font-semibold">{cliente.nome}</div>
-        <div className="text-[13px] text-foreground/80">{documentoParaExibir(cliente.documento)}</div>
+        <div className="text-[13px] text-foreground/80">{documentoParaExibir(cliente.documento) || 'CPF/CNPJ não informado'}</div>
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="text-xs text-[#2C5484]">Contato</div>

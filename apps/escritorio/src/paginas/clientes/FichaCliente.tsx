@@ -49,7 +49,7 @@ export function FichaCliente() {
   }
 
   const c = ficha.data;
-  const tipoDocumento = c.documento.length === 14 ? 'CNPJ' : 'CPF';
+  const tipoDocumento = c.documento?.length === 14 ? 'CNPJ' : 'CPF';
   const rua = [c.logradouro, c.numero].filter(Boolean).join(', ');
   const endereco = [rua, c.complemento, c.bairro].filter(Boolean).join(' — ');
   const cidade = [c.cidade, c.uf].filter(Boolean).join('/');
@@ -94,9 +94,13 @@ export function FichaCliente() {
           Dados do cliente
         </h2>
         <Dado rotulo={c.tipoPessoa === 'FISICA' ? 'Pessoa física' : 'Pessoa jurídica'}>
-          <span className="font-mono">
-            {tipoDocumento} {mascararDocumento(c.documento)}
-          </span>
+          {c.documento ? (
+            <span className="font-mono">
+              {tipoDocumento} {mascararDocumento(c.documento)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{c.tipoPessoa === 'FISICA' ? 'CPF' : 'CNPJ'} não informado</span>
+          )}
         </Dado>
         <Dado rotulo="Contato">
           <span>WhatsApp {mascararTelefone(c.whatsapp)}</span>

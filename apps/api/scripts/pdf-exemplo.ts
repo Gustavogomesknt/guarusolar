@@ -14,7 +14,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Prisma } from '@prisma/client';
-import { calcularOrcamento, formatarBRL, MARGEM_PADRAO } from '@guarusolar/compartilhado';
+import { calcularOrcamento, formatarBRL, GARANTIA_PADRAO, MARGEM_PADRAO, SUGESTOES_DE_PRAZO } from '@guarusolar/compartilhado';
 import { gerarPdfOrcamento, type OrcamentoParaPdf } from '../src/lib/pdf-orcamento';
 
 const D = (v: number) => new Prisma.Decimal(v);
@@ -92,6 +92,10 @@ function exemplo(opcoes: { detalhar: boolean; longo?: boolean; parcelas: number 
       : 'Instalação em até 3 metros do quadro de distribuição. Vistoria técnica incluída.',
     descricaoServico: 'Instalação de carregador veicular · Residencial',
     detalharPrecosNoPdf: opcoes.detalhar,
+    prazoExecucao: opcoes.longo
+      ? '45 dias após a aprovação, conforme a homologação na concessionária e a liberação do acesso ao local da instalação'
+      : SUGESTOES_DE_PRAZO[2],
+    garantia: GARANTIA_PADRAO,
     enviadoEm: null,
     aprovadoEm: null,
     recusadoEm: null,

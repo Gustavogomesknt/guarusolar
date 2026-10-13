@@ -138,7 +138,8 @@ apps/api/                      API (Express + Prisma)
                                em Plex negrito). Conferir com `npm run pdf:exemplo` e olhar o PDF
   src/conteudo/proposta.ts     EDITÁVEL: dados da empresa, textos fixos da página 1 e a página
                                institucional inteira. Orçamento: descricaoServico (título) e
-                               detalharPrecosNoPdf (preço unitário e subtotal; padrão false)
+                               detalharPrecosNoPdf (preço unitário e subtotal; padrão false).
+                               Prazo e garantia NÃO ficam aqui: são texto de cada orçamento
   scripts/pdf-exemplo.ts       npm run pdf:exemplo [pasta]: PDFs de exemplo sem banco
   scripts/importar-produtos.ts npm run produtos:importar -- revisar|gravar: catálogo a partir de
                                .xlsx em duas etapas (revisão em Excel, depois grava tudo ou nada).
@@ -215,7 +216,7 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                nenhum, a agenda vazia); COMERCIAL recebe o aviso com link para o escritório
   src/paginas/Agenda.tsx       hoje e os próximos 7 dias; serviço de vários dias aparece em cada
                                dia; no topo, os devolvidos pelo gestor e os em aberto de dias
-                               anteriores; WhatsApp e "Como chegar"
+                               anteriores; "Como chegar" (sem contato do cliente: regra 6)
   src/paginas/Servico.tsx      serviço aberto (protótipo "Técnico — concluir serviço"): checklist,
                                extras, observações e teste (rascunho no localStorage), botão do
                                rodapé que diz o que falta e leva até lá
@@ -251,6 +252,8 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
   src/calculo.ts               totais, desconto e condições de pagamento; calcularCartao
   src/taxasCartao.ts           EDITÁVEL: tabela de taxas do Mercado Pago (débito, 1x a 18x) e a
                                data da última atualização
+  src/textosDaProposta.ts      EDITÁVEL: GARANTIA_PADRAO (texto de garantia de todo orçamento novo) e
+                               SUGESTOES_DE_PRAZO (atalhos do campo "Prazo de execução")
   src/margemDoOrcamento.ts     EDITÁVEL: MARGEM_PADRAO (margem em reais de todo orçamento novo) e
                                distribuirMargem (preços do PDF detalhado)
   src/roteiroDoServico.ts      EDITÁVEL: por tipo de serviço, as fotos pedidas, as observações (nome e
@@ -354,6 +357,12 @@ O `.env` da API fica em `apps/api/.env`.
    troca entra no histórico do projeto. Serviço sem ninguém escalado é permitido (o gestor marca
    a data antes de definir quem vai) e aparece com o aviso "Sem técnico escalado". O "técnico
    responsável" não é mais usado (a coluna continua); mostra-se a escala e `enviadoPor`.
+   **O técnico não recebe o contato do cliente nem dado comercial** (decisão da Guarusolar,
+   13/10/2026): as rotas `/api/tecnico` devolvem do cliente só o nome e o endereço completo da
+   instalação, pelo select `PROJETO_PARA_O_TECNICO` (operacao.ts). Nada de telefone, WhatsApp,
+   e-mail, documento, observações do cadastro, orçamento, valores ou pagamento, e isso vale no
+   PAYLOAD, não só na tela. Nunca use `cliente: true` nem `include` do projeto inteiro numa rota
+   do técnico; o app de campo não tem botão de WhatsApp (o contato passa pelo escritório).
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
@@ -415,6 +424,19 @@ O `.env` da API fica em `apps/api/.env`.
 - Rotas assíncronas envolvidas no helper `rota()`; erros de regra com `new ErroHttp(status, msg)`.
 - Dinheiro em `Decimal(12,2)` no banco e arredondado para centavos no cálculo.
 - Documento e WhatsApp gravados **somente com dígitos**; a formatação é responsabilidade do front.
+- **CPF/CNPJ do cliente é OPCIONAL** (decisão da Guarusolar, 13/10/2026): `Cliente.documento` é
+  nulo quando não informado (nunca texto vazio, que bateria na chave única). Preenchido, o
+  formato é conferido (11 ou 14 dígitos) e não se repete entre clientes (409 com o nome). Toda
+  tela que mostra o documento trata o nulo. Sem documento NÃO há conferência de cliente repetido.
+- **Prazo de execução e garantia são texto de cada orçamento** (`Orcamento.prazoExecucao` e
+  `garantia`), impressos nas caixas da página 1 do PDF. O PRAZO não tem padrão e é obrigatório
+  para a proposta sair: o rascunho salva sem, mas sem prazo o gerador desabilita "Gerar PDF" e
+  "Enviar via WhatsApp" com o motivo, e a API recusa o envio pelo WhatsApp, a passagem para
+  "Enviado" e o PDF do rascunho (`conferirPrazo` em orcamentos.ts; orcamentoPdf.ts). Orçamento
+  que já saiu do rascunho não pode ter o prazo apagado. Proposta enviada ou aprovada ANTES de o
+  campo existir continua abrindo, com "A combinar" (o link já está com o cliente). A GARANTIA
+  parte de `GARANTIA_PADRAO` (compartilhado/textosDaProposta.ts, onde ficam também as
+  `SUGESTOES_DE_PRAZO`); nula ou em branco, o PDF usa o padrão.
 - Tabelas largas rolam dentro do próprio quadro (`relative overflow-x-auto`), nunca a página.
   O `relative` é obrigatório: sem ele, textos `sr-only` (absolutos) esticam a página.
 - Mensagens de erro escritas para o usuário final, não para o desenvolvedor.

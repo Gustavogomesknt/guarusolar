@@ -5,7 +5,10 @@
  * pagamento, observações, vendedor) vem do banco. Depois de editar: `npm run build` confere se
  * nada quebrou, e a mudança entra na próxima publicação.
  *
- * Texto entre colchetes, como [PRAZO], aparece assim no PDF: é pendência a preencher.
+ * O PRAZO DE EXECUÇÃO e a GARANTIA não ficam mais aqui: são texto de cada orçamento, com as
+ * sugestões de prazo e o texto padrão da garantia em
+ * packages/compartilhado/src/textosDaProposta.ts.
+ * Texto entre colchetes, como [BANCO PARCEIRO], aparece assim no PDF: é pendência a preencher.
  * Para tirar uma linha opcional, deixe o texto vazio ('').
  */
 
@@ -34,8 +37,10 @@ export const PAGINA_1 = {
   notaDosItens: 'Todos os equipamentos e serviços seguem rigorosamente as normas ABNT NBR.',
   /** abaixo da condição de pagamento escolhida no orçamento */
   notaDoPagamento: 'Parcelamos em até 18x no cartão, com taxa da operadora. À vista no Pix ou transferência, com desconto.',
-  prazo: { titulo: 'PRAZO DE EXECUÇÃO', texto: '[PRAZO] após aprovação' },
-  garantia: { titulo: 'GARANTIA DO SERVIÇO', texto: '[GARANTIA] · equipamentos conforme fabricante' },
+  /** o texto vem do orçamento (prazoExecucao); semPrazo só em proposta enviada antes de o campo existir */
+  prazo: { titulo: 'PRAZO DE EXECUÇÃO', semPrazo: 'A combinar' },
+  /** o texto vem do orçamento (garantia); sem ele, GARANTIA_PADRAO (compartilhado/textosDaProposta.ts) */
+  garantia: { titulo: 'GARANTIA DO SERVIÇO' },
   suporte: { titulo: 'SUPORTE', texto: 'Pós-venda dedicado em todo o Brasil' },
 };
 

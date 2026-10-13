@@ -1,5 +1,5 @@
 import { FileText, Loader2, MessageCircle } from 'lucide-react';
-import type { PagamentoCartao } from '@guarusolar/compartilhado';
+import { AVISO_SEM_PRAZO, type PagamentoCartao } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { CartaoCondicoes } from './CartaoCondicoes';
@@ -30,6 +30,7 @@ export function ResumoOrcamento({
   salvo,
   somenteLeitura = false,
   alteradoDepoisDeSalvar,
+  semPrazo,
   enviandoWhatsApp,
   onWhatsApp,
   onPdf,
@@ -39,17 +40,22 @@ export function ResumoOrcamento({
   salvo: boolean;
   somenteLeitura?: boolean;
   alteradoDepoisDeSalvar: boolean;
+  /** o prazo de execução está em branco: a proposta não é gerada nem enviada */
+  semPrazo: boolean;
   enviandoWhatsApp: boolean;
   onWhatsApp: () => void;
   onPdf: () => void;
 }) {
   // PDF e WhatsApp mostram o que está gravado: só com o orçamento salvo e sem alterações
-  const podeEnviar = salvo && !alteradoDepoisDeSalvar;
-  const dicaAcoes = !salvo
-    ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
-    : alteradoDepoisDeSalvar
-      ? 'Há alterações não salvas. Salve antes, para o PDF e o cliente terem a versão atual.'
-      : 'O PDF abre numa nova aba, com o mesmo link que o cliente recebe.';
+  // e só com o prazo de execução preenchido (o rascunho pode ficar sem; a proposta, não)
+  const podeEnviar = salvo && !alteradoDepoisDeSalvar && !semPrazo;
+  const dicaAcoes = semPrazo
+    ? AVISO_SEM_PRAZO
+    : !salvo
+      ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
+      : alteradoDepoisDeSalvar
+        ? 'Há alterações não salvas. Salve antes, para o PDF e o cliente terem a versão atual.'
+        : 'O PDF abre numa nova aba, com o mesmo link que o cliente recebe.';
 
   return (
     <aside aria-label="Resumo do orçamento" className="flex flex-col gap-4">
@@ -93,7 +99,7 @@ export function ResumoOrcamento({
           <FileText aria-hidden />
           Gerar PDF
         </Button>
-        <p id="dica-acoes" className="text-center text-[13px] text-muted-foreground">
+        <p id="dica-acoes" className={`text-center text-[13px] ${semPrazo ? 'text-destaque-texto' : 'text-muted-foreground'}`}>
           {dicaAcoes}
         </p>
       </div>

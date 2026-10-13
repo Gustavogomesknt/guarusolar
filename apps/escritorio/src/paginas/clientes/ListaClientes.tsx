@@ -112,7 +112,7 @@ export function ListaClientes() {
                   </span>
                 </span>
                 <span role="cell" className={cn('font-mono text-[13px]', !c.ativo && 'opacity-60')}>
-                  {mascararDocumento(c.documento)}
+                  {c.documento ? mascararDocumento(c.documento) : <span className="font-sans text-muted-foreground">Não informado</span>}
                 </span>
                 <span role="cell" className={cn('font-mono text-[13px]', !c.ativo && 'opacity-60')}>
                   {mascararTelefone(c.whatsapp)}

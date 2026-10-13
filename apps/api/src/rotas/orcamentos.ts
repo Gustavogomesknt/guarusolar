@@ -8,7 +8,10 @@ import { operacaoMudou } from '../lib/versaoDaOperacao';
 import { autenticar, autorizar } from '../lib/auth';
 import {
   calcularOrcamento,
+  AVISO_SEM_PRAZO,
+  GARANTIA_MAXIMO_DE_CARACTERES,
   MAXIMO_PARCELAS,
+  PRAZO_MAXIMO_DE_CARACTERES,
   formatarBRL,
   formatarData,
   inicioDoMes,
@@ -45,6 +48,10 @@ const orcamentoSchema = z.object({
   // proposta em PDF: serviço no título e se a tabela mostra os preços de cada item
   descricaoServico: z.string().trim().max(100, 'Use até 100 caracteres').optional(),
   detalharPrecosNoPdf: z.boolean().default(false),
+  // texto livre, impressos no PDF. Vazio apaga; ausente (tela da versão anterior, durante uma
+  // publicação) mantém o que estava gravado. Sem prazo só o RASCUNHO: ver conferirPrazo
+  prazoExecucao: z.string().trim().max(PRAZO_MAXIMO_DE_CARACTERES, `Use até ${PRAZO_MAXIMO_DE_CARACTERES} caracteres`).optional(),
+  garantia: z.string().trim().max(GARANTIA_MAXIMO_DE_CARACTERES, `Use até ${GARANTIA_MAXIMO_DE_CARACTERES} caracteres`).optional(),
   // o vendedor pediu para trocar a cópia gravada do cliente pelos dados atuais do cadastro
   atualizarDadosCliente: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
@@ -97,6 +104,14 @@ export function copiaDoCliente(c: Cliente) {
     clienteUf: c.uf,
     clienteCopiadoEm: new Date(),
   };
+}
+
+/**
+ * O prazo de execução é obrigatório para a proposta sair (PDF e envio ao cliente); só o rascunho
+ * pode ficar sem. Orçamento APROVADO anterior ao campo não tem como ser editado: passa.
+ */
+function conferirPrazo(orcamento: { prazoExecucao: string | null }) {
+  if (!orcamento.prazoExecucao?.trim()) throw new ErroHttp(409, AVISO_SEM_PRAZO);
 }
 
 async function clienteDoOrcamento(id: string) {
@@ -337,6 +352,8 @@ rotasOrcamentos.post(
           observacoes: dados.observacoes,
           descricaoServico: dados.descricaoServico || null,
           detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
+          prazoExecucao: dados.prazoExecucao || null,
+          garantia: dados.garantia || null,
           subtotal: totais.subtotal,
           margem: totais.margem,
           descontoAplicado: totais.descontoAplicado,
@@ -361,6 +378,11 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
   if (atual.status === 'APROVADO') {
     throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
+  }
+
+  // só o rascunho fica sem prazo: quem já saiu para o cliente não pode perdê-lo numa edição
+  if (atual.status !== 'RASCUNHO' && dados.prazoExecucao === '') {
+    throw new ErroHttp(400, 'Este orçamento já foi enviado: o prazo de execução não pode ficar em branco.');
   }
 
   // itens que já estavam no orçamento mantêm a cópia gravada (regra 2); o cliente também:
@@ -400,6 +422,8 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         observacoes: dados.observacoes,
         descricaoServico: dados.descricaoServico || null,
         detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
+        ...(dados.prazoExecucao === undefined ? {} : { prazoExecucao: dados.prazoExecucao || null }),
+        ...(dados.garantia === undefined ? {} : { garantia: dados.garantia || null }),
         subtotal: totais.subtotal,
         margem: totais.margem,
         descontoAplicado: totais.descontoAplicado,
@@ -443,6 +467,8 @@ rotasOrcamentos.patch(
         `Um orçamento ${ROTULO_STATUS_ORCAMENTO[orcamento.status].toLowerCase()} não pode ir para ${ROTULO_STATUS_ORCAMENTO[status].toLowerCase()}`,
       );
     }
+    // marcar como enviado é dizer que a proposta foi para o cliente: exige o prazo
+    if (status === 'ENVIADO') conferirPrazo(orcamento);
 
     const atualizado = await prisma.$transaction((tx) =>
       mudarStatus(tx, orcamento, status, req.usuario!.id, observacao),
@@ -514,6 +540,7 @@ rotasOrcamentos.post(
       include: { cliente: true },
     });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
+    if (orcamento.status !== 'APROVADO') conferirPrazo(orcamento);
 
     // o texto usa a cópia gravada (a mesma do PDF); orçamento antigo sem cópia usa o cadastro
     const primeiroNome = (orcamento.clienteNome ?? orcamento.cliente.nome).split(' ')[0];

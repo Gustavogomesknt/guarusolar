@@ -14,9 +14,9 @@ export {
   somenteDigitos,
 } from '@guarusolar/compartilhado';
 
-/** CPF com os dígitos do meio ocultos (348.•••.•••-06); CNPJ aparece inteiro. */
-export function documentoParaExibir(documento: string) {
-  const d = somenteDigitos(documento);
+/** CPF com os dígitos do meio ocultos (348.•••.•••-06); CNPJ aparece inteiro; sem documento, ''. */
+export function documentoParaExibir(documento: string | null | undefined) {
+  const d = somenteDigitos(documento ?? '');
   if (d.length === 11) return `CPF ${d.slice(0, 3)}.•••.•••-${d.slice(9)}`;
   if (d.length === 14) return `CNPJ ${mascararDocumento(d)}`;
   return mascararDocumento(d);

@@ -629,12 +629,32 @@ const upload = multer({
   },
 });
 
+/**
+ * O QUE O TÉCNICO RECEBE DO PROJETO E DO CLIENTE: nome e endereço completo da instalação, para
+ * chegar e executar. NADA de contato (telefone, WhatsApp, e-mail), documento, observações do
+ * cadastro ou dado comercial (orçamento, valores, pagamento): decisão da Guarusolar, e vale no
+ * payload, não só na tela. Use SEMPRE este select nas rotas /api/tecnico; nunca `cliente: true`
+ * nem `include` do projeto inteiro.
+ */
+const PROJETO_PARA_O_TECNICO = {
+  select: {
+    id: true,
+    codigo: true,
+    cliente: {
+      select: {
+        nome: true, cep: true, logradouro: true, numero: true, complemento: true,
+        bairro: true, cidade: true, uf: true,
+      },
+    },
+  },
+} satisfies Prisma.ProjetoDefaultArgs;
+
 /** Garante que o técnico só acesse os serviços em que está escalado (regra em lib/acesso.ts). */
 async function servicoDoTecnico(id: string, usuarioId: string) {
   const servico = await prisma.agendamento.findFirst({
     where: { id, ...filtroDoTecnico({ id: usuarioId }) },
     include: {
-      projeto: { include: { cliente: true } },
+      projeto: PROJETO_PARA_O_TECNICO,
       equipe: { select: { nome: true } },
       ...ESCALA,
       fotos: { orderBy: { criadoEm: 'asc' } },
@@ -685,16 +705,7 @@ rotasTecnico.get(
         // com quem ele vai: a equipe (linha da agenda) e os colegas escalados
         equipe: { select: { nome: true } },
         ...ESCALA,
-        projeto: {
-          include: {
-            cliente: {
-              select: {
-                nome: true, whatsapp: true, logradouro: true, numero: true,
-                bairro: true, cidade: true, uf: true, cep: true,
-              },
-            },
-          },
-        },
+        projeto: PROJETO_PARA_O_TECNICO,
       },
     });
 

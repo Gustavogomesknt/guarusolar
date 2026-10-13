@@ -21,7 +21,8 @@ export type Cliente = {
   id: string;
   tipoPessoa: TipoPessoa;
   nome: string;
-  documento: string;
+  /** CPF ou CNPJ, só dígitos; null = não informado (é opcional) */
+  documento: string | null;
   whatsapp: string;
   email: string | null;
   cep: string | null;
@@ -137,6 +138,9 @@ export type OrcamentoCompleto = {
   observacoes: string | null;
   descricaoServico: string | null;
   detalharPrecosNoPdf: boolean;
+  /** texto livre do PDF; null em orçamento anterior aos campos (ou rascunho sem prazo) */
+  prazoExecucao?: string | null;
+  garantia?: string | null;
   /** o projeto criado na aprovação */
   projeto?: { id: string; codigo: string } | null;
   /** cópia dos dados do cliente gravada no orçamento (a do PDF); null só em orçamento antigo */

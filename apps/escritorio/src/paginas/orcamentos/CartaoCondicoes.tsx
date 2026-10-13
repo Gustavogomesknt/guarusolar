@@ -1,5 +1,13 @@
 import { Controller, useFormContext, useWatch } from 'react-hook-form';
-import { TAXAS_CARTAO, type CondicaoPagamento, type TipoDesconto } from '@guarusolar/compartilhado';
+import {
+  GARANTIA_MAXIMO_DE_CARACTERES,
+  GARANTIA_PADRAO,
+  PRAZO_MAXIMO_DE_CARACTERES,
+  SUGESTOES_DE_PRAZO,
+  TAXAS_CARTAO,
+  type CondicaoPagamento,
+  type TipoDesconto,
+} from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -39,10 +47,14 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
     clearErrors,
     formState: { errors },
   } = useFormContext<FormularioOrcamento>();
-  const [descontoTipo, descontoValor, condicao] = useWatch({
+  const [descontoTipo, descontoValor, condicao, garantia] = useWatch({
     control,
-    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento'],
+    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia'],
   });
+  const preencher = (campo: 'prazoExecucao' | 'garantia', texto: string) => {
+    setValue(campo, texto, { shouldDirty: true });
+    clearErrors(campo);
+  };
   // o desconto percentual incide também sobre a margem; aqui o vendedor vê quando ela acabou
   const descontoPassaDaMargem = margem > 0 && descontoAplicado > margem + 0.005;
 
@@ -259,9 +271,56 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
           {...ariaDoCampo('observacoes', errors.observacoes?.message)}
           {...register('observacoes', { onChange: () => clearErrors('observacoes') })}
           rows={3}
-          placeholder="Prazo de instalação, garantias, condições especiais…"
+          placeholder="Condições especiais, o que está incluso, detalhes do local…"
           className="rounded-[10px] text-sm leading-relaxed"
         />
+      </Campo>
+
+      {/* Prazo e garantia: texto livre, impressos na proposta em PDF */}
+      <Campo
+        id="prazoExecucao"
+        rotulo="Prazo de execução"
+        erro={errors.prazoExecucao?.message}
+        ajuda="Obrigatório para gerar o PDF e enviar ao cliente. O rascunho pode ficar sem."
+      >
+        <Textarea
+          {...ariaDoCampo('prazoExecucao', errors.prazoExecucao?.message)}
+          {...register('prazoExecucao', { onChange: () => clearErrors('prazoExecucao') })}
+          rows={2}
+          maxLength={PRAZO_MAXIMO_DE_CARACTERES}
+          placeholder="Ex.: 25 dias úteis após a aprovação e liberação do acesso ao local"
+          className="rounded-[10px] text-sm leading-relaxed"
+        />
+        <div role="group" aria-label="Sugestões de prazo" className="flex flex-wrap gap-1.5">
+          {SUGESTOES_DE_PRAZO.map((sugestao) => (
+            <button
+              key={sugestao}
+              type="button"
+              onClick={() => preencher('prazoExecucao', sugestao)}
+              className="rounded-full border bg-background px-2.5 py-1 text-left text-xs text-foreground/80 hover:bg-muted"
+            >
+              {sugestao}
+            </button>
+          ))}
+        </div>
+      </Campo>
+
+      <Campo id="garantia" rotulo="Garantia do serviço" erro={errors.garantia?.message}>
+        <Textarea
+          {...ariaDoCampo('garantia', errors.garantia?.message)}
+          {...register('garantia', { onChange: () => clearErrors('garantia') })}
+          rows={3}
+          maxLength={GARANTIA_MAXIMO_DE_CARACTERES}
+          className="rounded-[10px] text-sm leading-relaxed"
+        />
+        {garantia.trim() !== GARANTIA_PADRAO && (
+          <p className="text-xs text-muted-foreground">
+            {garantia.trim() ? 'Texto diferente do padrão.' : 'Em branco, o PDF sai com o texto padrão.'}{' '}
+            <button type="button" onClick={() => preencher('garantia', GARANTIA_PADRAO)} className="font-medium text-primary underline-offset-2 hover:underline">
+              Usar o texto padrão
+            </button>
+          </p>
+        )}
       </Campo>
 
       {/* Proposta em PDF */}
