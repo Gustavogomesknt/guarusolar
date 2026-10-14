@@ -381,6 +381,15 @@ O `.env` da API fica em `apps/api/.env`.
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
+   **Cache das fotos: um ano, privado, SEM `Vary`, de propósito** (decisão do Gustavo, 13/10/2026).
+   A rota responde `Cache-Control: private, max-age=31536000, immutable` e ETag derivado do id
+   (304 antes de buscar o arquivo). As telas buscam a foto por `fetch` com o cabeçalho
+   `Authorization` (ImagemProtegida), nunca por `<img src>`, cookie ou token no endereço; o cache
+   do navegador guarda pelo endereço, não por quem está logado. A exposição exige perfil de
+   navegador compartilhado E conhecer o endereço com identificador aleatório, e quem tem acesso a
+   essas telas no escritório (gestor, admin) já vê todas as fotos; o técnico, que só vê as da
+   própria equipe, usa o celular dele. `Vary: Authorization` fecharia isso, mas perderia o cache
+   a cada login, numa conta de bucket com teto diário de download. Não adicionar sem nova decisão.
 7. **Enviar o serviço exige o roteiro completo do TIPO** (`packages/compartilhado/src/roteiroDoServico.ts`,
    o único lugar onde ele é editado): as fotos obrigatórias; a confirmação do teste do sistema
    (instalação, manutenção e retrabalho; visita técnica e vistoria da concessionária não têm o que
