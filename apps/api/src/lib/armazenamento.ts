@@ -147,29 +147,64 @@ export function configuracaoIncompleta(): string | null {
  * ou incompleta ela sobe em MODO DEGRADADO: grita no log (agora e a cada hora), /saude mostra
  * "recebendo": false, o escritório mostra a faixa vermelha e o envio de foto é recusado com o
  * motivo (503: a fila do celular guarda e reenvia). Nenhuma foto se perde.
+ *
+ * `lerMarcaDoBanco`: a marca de produção do banco (db:marcar-producao). Com destino "disco", ela é
+ * lida agora e a cada 5 minutos: banco de produção + disco = modo degradado, MESMO sem
+ * NODE_ENV=production (a API rodando num PC, ligada no banco de produção, gravaria a foto no
+ * disco do PC e a chave no banco de produção; a produção nunca a acharia).
  */
-export function conferirArmazenamentoAoIniciar() {
-  if (!appTecnicoLiberado()) {
-    const gritar = () => {
-      const incompleta = configuracaoIncompleta();
-      console.error(
-        [
-          '',
-          '################################################################################',
-          '##  [armazenamento] AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS                      ##',
-          '################################################################################',
-          incompleta
-            ? `  ${incompleta}`
-            : `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}): o disco deste servidor é apagado a cada publicação.`,
-          '  A API está no ar em MODO DEGRADADO: tudo funciona, menos o envio de fotos, que é RECUSADO (503).',
-          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=s3, com S3_ENDPOINT, S3_REGION,',
-          '  S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY e S3_BUCKET (ou STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
-          '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET), e publique de novo. Confira em /saude: "recebendo":true.',
-          '################################################################################',
-          '',
-        ].join('\n'),
+export function conferirArmazenamentoAoIniciar(lerMarcaDoBanco: () => Promise<boolean>) {
+  const local = process.env.NODE_ENV !== 'production';
+  const gritar = () => {
+    if (appTecnicoLiberado()) return;
+    console.error(
+      [
+        '',
+        '################################################################################',
+        '##  [armazenamento] AS FOTOS NÃO ESTÃO SENDO ARMAZENADAS                      ##',
+        '################################################################################',
+        `  ${motivoDoBloqueio()}`,
+        '  A API está no ar em MODO DEGRADADO: tudo funciona, menos o envio de fotos, que é RECUSADO (503).',
+        ...(local && bancoDeProducaoMarcado
+          ? [
+              '  Esta API está ligada no banco de PRODUÇÃO. Ou ligue-a num banco de desenvolvimento, ou defina',
+              '  STORAGE_PROVIDER=s3 com as cinco S3_* nesta janela. Confira em /saude: "recebendo":true.',
+            ]
+          : [
+              '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=s3, com S3_ENDPOINT, S3_REGION,',
+              '  S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY e S3_BUCKET (ou STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
+              '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET), e publique de novo. Confira em /saude: "recebendo":true.',
+            ]),
+        '################################################################################',
+        '',
+      ].join('\n'),
+    );
+  };
+
+  // a marca só decide alguma coisa com destino disco (sem disco persistente declarado)
+  const marcaDecide = destinoAtual() === 'disco' && !discoPersistente() && configuracaoIncompleta() === null;
+  if (marcaDecide) {
+    const lerMarca = () =>
+      lerMarcaDoBanco().then(
+        (marcado) => {
+          if (bancoDeProducaoMarcado !== null && marcado !== bancoDeProducaoMarcado) {
+            console.warn(`[armazenamento] a marca de produção do banco mudou (agora: ${marcado ? 'produção' : 'sem marca'}).`);
+            bancoDeProducaoMarcado = marcado;
+            gritar();
+          }
+          bancoDeProducaoMarcado = marcado;
+        },
+        // banco fora do ar: continua como estava (null = disco não recebe até a marca ser lida)
+        () => undefined,
       );
-    };
+    void lerMarca().then(() => {
+      gritar();
+      setInterval(gritar, 60 * 60 * 1000).unref();
+    });
+    setInterval(() => void lerMarca(), 5 * 60 * 1000).unref();
+    return;
+  }
+  if (!appTecnicoLiberado()) {
     gritar();
     setInterval(gritar, 60 * 60 * 1000).unref();
     return;
@@ -231,7 +266,11 @@ export const usoDoDestinoAtual = (): Promise<UsoDoStorage | null> =>
  * se ele for persistente (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco): o
  * disco comum do servidor é apagado a cada publicação, reinício e sono. Em produção sem isso, a
  * API NÃO RECEBE FOTOS (melhor não receber do que perder), e só isso: o login e a agenda do app
- * de campo funcionam. Fora de produção, sempre liberado.
+ * de campo funcionam.
+ *
+ * "Produção" aqui é NODE_ENV=production OU o banco com a marca de produção: a API rodando num
+ * PC (sem NODE_ENV) e ligada no banco de produção também não grava foto em disco. Fora disso, o
+ * disco só recebe depois de a marca ser lida e dar "sem marca" (ver conferirArmazenamentoAoIniciar).
  *
  * Isto NADA tem a ver com o técnico ter ou não serviço agendado. Até 09/10/2026 esta condição
  * barrava o LOGIN do técnico com "O app dos técnicos ainda não foi liberado. Fale com o gestor
@@ -241,11 +280,29 @@ export const usoDoDestinoAtual = (): Promise<UsoDoStorage | null> =>
 export const appTecnicoLiberado = () =>
   // destino escolhido sem as variáveis dele (ou nome que não existe): não há onde gravar
   configuracaoIncompleta() === null &&
-  (process.env.NODE_ENV !== 'production' ||
-    destinoAtual() === 'sharepoint' ||
-    destinoAtual() === 'supabase' ||
-    destinoAtual() === 's3' ||
-    process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim');
+  (destinoAtual() !== 'disco' ||
+    discoPersistente() ||
+    (process.env.NODE_ENV !== 'production' && bancoDeProducaoMarcado === false));
+
+const discoPersistente = () => process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim';
+
+/**
+ * Marca de produção do banco, lida por conferirArmazenamentoAoIniciar (só com destino disco).
+ * null = ainda não lida (API subindo, ou banco fora do ar): disco não recebe foto até ser lida.
+ */
+let bancoDeProducaoMarcado: boolean | null = null;
+
+/** Por que as fotos estão recusadas (para o log do modo degradado). */
+function motivoDoBloqueio() {
+  const incompleta = configuracaoIncompleta();
+  if (incompleta) return incompleta;
+  const declarado = `STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()})`;
+  if (process.env.NODE_ENV === 'production') return `NODE_ENV=production e ${declarado}: o disco deste servidor é apagado a cada publicação.`;
+  if (bancoDeProducaoMarcado) {
+    return `o banco tem a marca de PRODUÇÃO e ${declarado}: a foto ficaria no disco deste computador e a chave no banco de produção, que nunca a acharia.`;
+  }
+  return `${declarado}: não deu para ler a marca do banco (produção ou não); disco só recebe depois. Nova tentativa a cada 5 minutos.`;
+}
 
 /** Para o técnico (tela do serviço e fila de fotos): o motivo de verdade, e a quem avisar. */
 export const AVISO_FOTOS_BLOQUEADAS =

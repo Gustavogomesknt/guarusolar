@@ -651,6 +651,13 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   503 com o motivo, leitura de foto 503). Não reintroduza `throw` na inicialização por
   configuração opcional. A única variável cuja falta impede a subida é `JWT_SECRET` (sem ela não
   há como assinar nem conferir login; inventar um segredo padrão seria uma brecha).
+  **Disco nunca recebe foto com banco de produção** (14/10/2026), mesmo sem `NODE_ENV=production`:
+  a API rodando num PC e ligada no banco de produção gravaria a foto no disco do PC e a chave no
+  banco de produção. `appTecnicoLiberado()` usa a marca do banco (`db:marcar-producao`), lida ao
+  subir e a cada 5 minutos, só com destino disco; banco com marca + disco = mesmo MODO DEGRADADO.
+  Enquanto a marca não é lida (API subindo, banco fora do ar), disco também não recebe. A única
+  saída continua sendo `FOTOS_EM_DISCO_PERSISTENTE=sim`, para quem tem disco de verdade. O
+  `fotos:migrar` tem a guarda equivalente (recusa produção + disco sem `--forcar-disco`).
 - **`render.yaml`: todo `value:` é REAPLICADO pela Render a cada sincronização do Blueprint**
   (quando o arquivo muda no main), por cima do que estiver no painel. Foi o que derrubou as
   fotos em 09/10/2026: o arquivo dizia `STORAGE_PROVIDER: disco`, o painel dizia `supabase`, e

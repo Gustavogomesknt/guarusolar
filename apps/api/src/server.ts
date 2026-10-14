@@ -22,7 +22,7 @@ const PRODUCAO = process.env.NODE_ENV === 'production';
 
 // Armazenamento mal configurado NÃO impede a API de subir: ela sobe em modo degradado (não recebe
 // fotos) e grita no log. Único motivo para não subir: faltar o JWT_SECRET (lib/auth.ts).
-conferirArmazenamentoAoIniciar();
+conferirArmazenamentoAoIniciar(() => bancoDeProducao(prisma));
 
 const app = express();
 
