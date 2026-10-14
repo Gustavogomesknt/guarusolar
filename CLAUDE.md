@@ -139,7 +139,8 @@ apps/api/                      API (Express + Prisma)
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
                                login sempre; gestor vê todas, técnico só de serviço em que está
                                escalado (outro: 404),
-                               comercial não (403). Não existe pasta pública de arquivos
+                               comercial não (403). Cache privado de um ano + ETag pelo id (304
+                               sem buscar o arquivo). Não existe pasta pública de arquivos
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central; erros do Prisma viram
                                mensagem para o usuário (banco fora do ar = 503, P2025 = 404, P2002 = 409)
   src/lib/upload.ts            limite de tamanho das fotos (usado no multer e na mensagem)
@@ -671,7 +672,7 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   **O segundo teto: EGRESS.** O plano gratuito do Supabase também limita cerca de 5 GB de egress
   por mês. A diferença: ARMAZENAMENTO é o que FICA guardado (cresce devagar, a cada foto nova);
   EGRESS é o que SAI, toda vez que alguém ABRE uma foto (a API a baixa do Storage a cada pedido;
-  só o navegador de quem viu guarda cópia, por 7 dias). Dá para estourar o egress com o bucket
+  só o navegador de quem viu guarda cópia, por um ano, e quem já a tem recebe 304 sem a API buscar o arquivo). Dá para estourar o egress com o bucket
   quase vazio (muita gente reabrindo fotos) e o inverso. O sistema mede só o armazenamento: não
   registra cada abertura, e o Supabase não expõe o egress no banco. O `storage:relatorio` imprime
   uma CONTA APROXIMADA (fotos que entraram no mês × 3 aberturas da foto inteira + 10 da

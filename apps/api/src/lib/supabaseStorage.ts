@@ -187,7 +187,7 @@ export type RelatorioDoStorage = {
 /*
  * EGRESS: o segundo teto do plano gratuito do Supabase (cerca de 5 GB por mês). Armazenamento é o
  * que FICA guardado; egress é o que SAI: toda vez que alguém abre uma foto, a API a baixa do
- * Storage de novo (ela não guarda cópia; o navegador de quem viu guarda por 7 dias).
+ * Storage de novo (ela não guarda cópia; o navegador de quem viu guarda por um ano).
  * O sistema não registra cada abertura e o Supabase não expõe o egress no banco: o número exato
  * só existe no painel (Settings -> Usage). O relatório imprime uma CONTA APROXIMADA, com estas
  * hipóteses por foto que entrou no mês: a foto inteira sai 3 vezes (a API a lê para gerar a

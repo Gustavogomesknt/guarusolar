@@ -18,8 +18,26 @@ import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, de
  *
  * O navegador não manda o token em <img src>: as telas buscam a foto com o cabeçalho
  * Authorization e exibem o resultado (componente ImagemProtegida, em packages/web).
+ *
+ * Cache: uma foto nunca muda (refazer apaga o registro e cria outro, com outro id), então o
+ * navegador guarda por um ano e o ETag sai do id, sem abrir o arquivo. Quem já tem a foto recebe
+ * 304 ANTES de a API buscar no armazenamento (cada busca conta no limite diário de downloads da
+ * conta gratuita do bucket). A conferência de login e de equipe vem sempre antes do 304.
+ * Vale só para estas respostas (original e miniatura), não para o restante da API.
  */
 export const rotasFotos = Router();
+
+const CACHE_DA_FOTO = 'private, max-age=31536000, immutable';
+
+/** A miniatura pode ser gerada de novo com outros bytes (mesma imagem): validador fraco. */
+const etagDaFoto = (id: string, tamanho: 'original' | 'miniatura') => (tamanho === 'miniatura' ? `W/"${id}-m"` : `"${id}-o"`);
+
+/** If-None-Match (RFC 9110): lista de ETags ou "*"; a comparação ignora o W/ dos dois lados. */
+function navegadorJaTem(cabecalho: string | undefined, etag: string) {
+  if (!cabecalho) return false;
+  const semFraco = (e: string) => e.trim().replace(/^W\//, '');
+  return cabecalho.trim() === '*' || cabecalho.split(',').some((e) => semFraco(e) === semFraco(etag));
+}
 rotasFotos.use(autenticar, autorizar('GESTOR', 'TECNICO'));
 
 rotasFotos.get(
@@ -34,6 +52,16 @@ rotasFotos.get(
     });
     if (!foto || (usuario.papel === 'TECNICO' && !tecnicoPodeVer(usuario, foto.agendamento))) {
       throw new ErroHttp(404, 'Foto não encontrada');
+    }
+
+    const cabecalhos = {
+      // "private": só o navegador de quem pediu, nunca um cache compartilhado no caminho
+      'Cache-Control': CACHE_DA_FOTO,
+      ETag: etagDaFoto(req.params.id, tamanho),
+    };
+    // já conferido quem pede: se o navegador tem a foto, responde sem tocar no armazenamento
+    if (navegadorJaTem(req.get('If-None-Match'), cabecalhos.ETag)) {
+      return void res.status(304).set(cabecalhos).end();
     }
 
     let arquivo;
@@ -53,9 +81,7 @@ rotasFotos.get(
       .status(200)
       .type(arquivo.tipo)
       .set({
-        // Cada foto nunca muda (refazer cria outra, com outro id): o navegador pode guardar.
-        // "private": só o navegador de quem pediu, nunca um cache compartilhado no caminho.
-        'Cache-Control': 'private, max-age=604800, immutable',
+        ...cabecalhos,
         'X-Content-Type-Options': 'nosniff',
         'Content-Disposition': 'inline',
       })
