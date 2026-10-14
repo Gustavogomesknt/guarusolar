@@ -390,6 +390,12 @@ O `.env` da API fica em `apps/api/.env`.
    essas telas no escritório (gestor, admin) já vê todas as fotos; o técnico, que só vê as da
    própria equipe, usa o celular dele. `Vary: Authorization` fecharia isso, mas perderia o cache
    a cada login, numa conta de bucket com teto diário de download. Não adicionar sem nova decisão.
+   O motivo de não compensar: como a foto entra por `fetch` e é exibida por `createObjectURL`, o
+   endereço da API nunca aparece no histórico do navegador; o `<img>` aponta para um endereço
+   local temporário, que morre com a página. Para aproveitar o cache de outra pessoa, alguém
+   precisaria saber o identificador aleatório da foto e fazer o pedido na mão, na mesma origem.
+   Por isso o `Vary: Authorization`, embora funcionasse tecnicamente, não vale perder o cache a
+   cada login.
 7. **Enviar o serviço exige o roteiro completo do TIPO** (`packages/compartilhado/src/roteiroDoServico.ts`,
    o único lugar onde ele é editado): as fotos obrigatórias; a confirmação do teste do sistema
    (instalação, manutenção e retrabalho; visita técnica e vistoria da concessionária não têm o que
