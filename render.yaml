@@ -45,7 +45,7 @@ services:
       # painel e de o `npm run s3:conferir` passar. As SUPABASE_* ficam: as fotos antigas são lidas
       # de lá até a migração (`npm run fotos:migrar`) terminar.
       - key: STORAGE_PROVIDER
-        value: supabase
+        value: s3
       # Do projeto do Supabase de produção. "sync: false" = gerenciadas SÓ pelo painel: a Render
       # pede o valor ao criar o Blueprint e depois nunca mais mexe nelas.
       - key: SUPABASE_URL
