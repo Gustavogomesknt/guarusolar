@@ -210,14 +210,16 @@ async function chamar(
 }
 
 /** Texto do erro que o serviço devolve (<Code> e <Message> do XML), sem segredo nenhum. */
-async function motivo(resposta: Response) {
+export async function motivo(resposta: Response) {
   const texto = await resposta.text().catch(() => '');
   const codigo = /<Code>([^<]*)<\/Code>/.exec(texto)?.[1] ?? '';
   const mensagem = /<Message>([^<]*)<\/Message>/.exec(texto)?.[1] ?? '';
   const regiaoErrada = resposta.status === 400 || resposta.status === 401 || resposta.status === 403 ? avisoDeRegiaoDoS3() : null;
   const dica = regiaoErrada
     ? ` (${regiaoErrada})`
-    : codigo === 'AuthorizationHeaderMalformed'
+    : /expired/i.test(mensagem)
+      ? ' (o link já tinha expirado ao chegar: o horário dele vem do relógio deste computador; confira se está certo)'
+      : codigo === 'AuthorizationHeaderMalformed'
       ? ' (a região não é a deste endereço: confira S3_REGION com S3_ENDPOINT)'
       : codigo === 'InvalidAccessKeyId' || codigo === 'SignatureDoesNotMatch' || resposta.status === 401
         ? ' (confira S3_ACCESS_KEY_ID e S3_SECRET_ACCESS_KEY, que são o par da MESMA chave, e S3_REGION, que tem de ser a região do endereço)'
@@ -438,10 +440,14 @@ export async function apagarDoS3(caminhos: string[]) {
  * conferido pelo `npm run s3:conferir`, para quando um arquivo grande (vídeo) não puder passar
  * pela memória da API. Antes de entregar um link destes a um navegador, decida com o cliente:
  * quem tem o link abre o arquivo sem login até ele expirar.
+ *
+ * O prazo conta a partir do relógio DESTE servidor, e o serviço compara com o dele: com prazo
+ * de poucos segundos, um relógio atrasado faz o link chegar já vencido. Use minutos, não segundos.
+ * `agora` só existe para o s3:conferir montar um link sabidamente vencido.
  */
-export function linkAssinadoDoS3(caminho: string, segundos = 300): string {
+export function linkAssinadoDoS3(caminho: string, segundos = 300, agora = new Date()): string {
   const destino = endpoint();
-  const { amz, dia } = instante();
+  const { amz, dia } = instante(agora);
   const escopo = `${dia}/${regiao()}/${SERVICO}/aws4_request`;
   const consulta: [string, string][] = [
     ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],

@@ -4,7 +4,7 @@
  * Usa S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY e S3_BUCKET do ambiente (ou
  * do .env). Passos: a região bate com o endereço, as chaves e o bucket funcionam, envio de um
  * arquivo de teste, regravação no mesmo caminho (não duplica), leitura de volta, o
- * arquivo NÃO abre sem assinatura, um link assinado abre e deixa de abrir quando expira, mover
+ * arquivo NÃO abre sem assinatura, um link assinado abre e um vencido não abre, mover
  * (como numa foto refeita), medição do espaço e remoção. Diz em qual passo parou e por quê.
  * Não grava nada no banco e não toca em foto nenhuma: tudo acontece na pasta "_conferencia/".
  *
@@ -23,6 +23,7 @@ import {
   limiteDoS3Bytes,
   linkAssinadoDoS3,
   listarDoS3,
+  motivo,
   moverNoS3,
   servicoDoS3,
   tamanhoNoS3,
@@ -80,14 +81,17 @@ async function main() {
     await passo('o arquivo NÃO abre sem assinatura', async () => {
       if (await abreSemAssinatura(caminho)) throw new Error('o arquivo abriu sem assinatura: o bucket está exposto.');
     });
-    await passo('link assinado abre, e deixa de abrir depois de expirar (2 segundos)', async () => {
-      const link = linkAssinadoDoS3(caminho, 2);
-      const agora = await fetch(link);
-      if (!agora.ok) throw new Error(`o link assinado não abriu (${agora.status})`);
-      if (!Buffer.from(await agora.arrayBuffer()).equals(original)) throw new Error('o link assinado devolveu outro arquivo');
-      await new Promise((r) => setTimeout(r, 4000));
-      const depois = await fetch(link);
-      if (depois.ok) throw new Error('o link assinado continuou abrindo depois de expirar');
+    // Prazos de minutos dos dois lados: o horário do link vem do relógio deste computador, e o
+    // serviço confere com o dele. Com prazo de 2 segundos, um relógio 3 segundos atrasado fazia o
+    // link chegar vencido (401 no B2) mesmo com a assinatura certa.
+    await passo('link assinado abre (prazo de 5 minutos)', async () => {
+      const resposta = await fetch(linkAssinadoDoS3(caminho, 300));
+      if (!resposta.ok) throw new Error(`o link assinado não abriu: ${await motivo(resposta)}`);
+      if (!Buffer.from(await resposta.arrayBuffer()).equals(original)) throw new Error('o link assinado devolveu outro arquivo');
+    });
+    await passo('link assinado vencido não abre (assinado há 10 minutos, com prazo de 1 minuto)', async () => {
+      const resposta = await fetch(linkAssinadoDoS3(caminho, 60, new Date(Date.now() - 10 * 60_000)));
+      if (resposta.ok) throw new Error('o link vencido abriu o arquivo');
     });
     await passo('mover dentro do bucket (o que acontece com uma foto refeita)', async () => {
       await moverNoS3(caminho, movido);
