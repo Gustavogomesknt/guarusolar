@@ -5,7 +5,7 @@ import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { calcularMargem, CATEGORIAS_PRODUTO, UNIDADES } from '@guarusolar/compartilhado';
+import { calcularMargem, CATEGORIAS_PRODUTO, GRUPOS_NA_PROPOSTA, UNIDADES } from '@guarusolar/compartilhado';
 
 export const rotasProdutos = Router();
 rotasProdutos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -13,6 +13,8 @@ rotasProdutos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
 const produtoSchema = z.object({
   nome: z.string().min(3),
   categoria: z.enum(CATEGORIAS_PRODUTO),
+  // parte da proposta em PDF (materiais ou documentação); ausente = MATERIAL ao criar, mantém ao editar
+  grupoNaProposta: z.enum(GRUPOS_NA_PROPOSTA).optional(),
   unidade: z.enum(UNIDADES).default('UN'),
   // código que a Guarusolar já usa (113, 320...); texto vazio vira null
   codigoFornecedor: z
@@ -48,12 +50,14 @@ const comMargem = <T extends { precoCusto: Prisma.Decimal | null; precoVenda: Pr
 rotasProdutos.get(
   '/',
   rota(async (req, res) => {
-    const { q, categoria, incluirInativos } = req.query as Record<string, string>;
+    const { q, categoria, grupo, incluirInativos } = req.query as Record<string, string>;
+    const grupoValido = (GRUPOS_NA_PROPOSTA as readonly string[]).includes(grupo) ? (grupo as (typeof GRUPOS_NA_PROPOSTA)[number]) : undefined;
     const produtos = await prisma.produto.findMany({
       where: {
         // sem incluirInativos, só itens ativos: é assim que desativados somem dos novos orçamentos
         ...(incluirInativos === 'true' ? {} : { ativo: true }),
         ...(categoria ? { categoria: categoria as never } : {}),
+        ...(grupoValido ? { grupoNaProposta: grupoValido } : {}),
         // por palavras no nome ("disjuntor 20"); o código do fornecedor só casa quando a palavra
         // digitada É o código ("113"): número curto, como o "1" de "unidut 1", não puxa códigos
         ...filtroDeBusca(q, (p) => [

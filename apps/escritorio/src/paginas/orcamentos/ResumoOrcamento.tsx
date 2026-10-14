@@ -12,6 +12,9 @@ export type Totais = {
   /** itens + margem */
   subtotal: number;
   descontoAplicado: number;
+  /** imposto em R$, sobre o valor já com os descontos */
+  impostoAplicado: number;
+  /** com o imposto */
   valorTotal: number;
   resumoPagamento: string;
   entrada: number;

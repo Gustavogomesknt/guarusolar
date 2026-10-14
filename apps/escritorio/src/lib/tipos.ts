@@ -1,5 +1,6 @@
 import type {
   CategoriaProduto,
+  GrupoNaProposta,
   CondicaoPagamento,
   Papel,
   StatusAgendamento,
@@ -131,6 +132,10 @@ export type OrcamentoCompleto = {
   validade: string;
   descontoTipo: TipoDesconto;
   descontoValor: string;
+  /** imposto em %, somado depois dos descontos; ausentes em resposta da versão anterior da API */
+  impostoPct?: string;
+  impostoAplicado?: string;
+  mostrarImpostosNoPdf?: boolean;
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct: string | null;
   entradaPct: string | null;
@@ -189,6 +194,8 @@ export type Produto = {
   id: string;
   nome: string;
   categoria: CategoriaProduto;
+  /** parte da proposta em PDF; ausente em resposta da versão anterior da API (= MATERIAL) */
+  grupoNaProposta?: GrupoNaProposta;
   unidade: Unidade;
   /** null = custo em branco (desconhecido) */
   precoCusto: string | null;

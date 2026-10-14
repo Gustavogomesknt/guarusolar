@@ -10,7 +10,9 @@ import {
   CATEGORIAS_PRODUTO,
   calcularMargem,
   formatarBRL,
+  GRUPOS_NA_PROPOSTA,
   ROTULO_CATEGORIA,
+  TITULO_GRUPO_NA_PROPOSTA,
   UNIDADES,
   type CategoriaProduto,
   type Unidade,
@@ -55,6 +57,7 @@ const ROTULO_UNIDADE_LONGO: Record<Unidade, string> = {
 const esquema = z.object({
   nome: z.string().trim().min(3, 'Informe o nome do item (pelo menos 3 letras)'),
   categoria: z.enum(CATEGORIAS_PRODUTO),
+  grupoNaProposta: z.enum(GRUPOS_NA_PROPOSTA),
   unidade: z.enum(UNIDADES),
   // opcional: em branco = custo desconhecido; 0 = custo zero de verdade
   precoCusto: z.string().refine((v) => v.trim() === '' || lerNumero(v) >= 0, 'Informe um valor válido ou deixe em branco'),
@@ -70,6 +73,8 @@ function valoresDoItem(item: Produto | null): DadosItem {
     nome: item?.nome ?? '',
     // o catálogo da Guarusolar é quase todo elétrico e de carregador: "Outros" obriga a escolher
     categoria: item?.categoria ?? 'OUTROS',
+    // ninguém é classificado sozinho: todo item começa como material
+    grupoNaProposta: item?.grupoNaProposta ?? 'MATERIAL',
     unidade: item?.unidade ?? 'UN',
     precoCusto: item && item.precoCusto !== null ? formatarDecimal(Number(item.precoCusto)) : '',
     precoVenda: item ? formatarDecimal(Number(item.precoVenda)) : '',
@@ -82,6 +87,7 @@ function valoresDoItem(item: Produto | null): DadosItem {
 const paraApi = (d: DadosItem) => ({
   nome: d.nome.trim(),
   categoria: d.categoria,
+  grupoNaProposta: d.grupoNaProposta,
   unidade: d.unidade,
   precoCusto: d.precoCusto.trim() === '' ? null : lerNumero(d.precoCusto),
   precoVenda: lerNumero(d.precoVenda),
@@ -224,6 +230,20 @@ export function PainelItem({
                   </select>
                 </Campo>
               </div>
+
+              <Campo
+                id="item-grupo"
+                rotulo="Na proposta em PDF, sai em"
+                ajuda="Documentação e engenharia: ART, diagrama unifilar, memorial descritivo, Kit IT 41... Sai numa seção própria do PDF, depois dos materiais, com subtotal."
+              >
+                <select id="item-grupo" {...register('grupoNaProposta')} className={CLASSE_SELECT}>
+                  {GRUPOS_NA_PROPOSTA.map((g) => (
+                    <option key={g} value={g}>
+                      {TITULO_GRUPO_NA_PROPOSTA[g]}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
 
               <div className="grid grid-cols-2 gap-3">
                 <CampoDinheiro

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { type Cliente, Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
+import { type Cliente, type GrupoNaProposta, Prisma, type StatusOrcamento, type Unidade } from '@prisma/client';
 import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
@@ -37,6 +37,11 @@ const orcamentoSchema = z.object({
   validade: z.coerce.date(),
   descontoTipo: z.enum(['PERCENTUAL', 'VALOR']).default('PERCENTUAL'),
   descontoValor: z.number().nonnegative().default(0),
+  // imposto em %, somado depois dos descontos. Ausente (tela da versão anterior, durante uma
+  // publicação): criar grava zero e editar mantém o que estava gravado; o mesmo vale para o
+  // interruptor do PDF
+  impostoPct: z.number().min(0, 'O imposto não pode ser negativo').max(100, 'O imposto vai até 100%').optional(),
+  mostrarImpostosNoPdf: z.boolean().optional(),
   condicaoPagamento: z.enum(['A_VISTA', 'ENTRADA_PARCELAS', 'FINANCIAMENTO']),
   descontoAVistaPct: z.number().min(0).max(100).optional(),
   entradaPct: z.number().min(0).max(100).optional(),
@@ -133,6 +138,7 @@ type CopiaDoItem = {
   descricaoTecnica: string | null;
   unidade: Unidade;
   precoTabela: Prisma.Decimal;
+  grupoNaProposta: GrupoNaProposta;
 };
 
 /**
@@ -160,12 +166,14 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
     const descricaoTecnica = copia ? copia.descricaoTecnica : produto.descricaoTecnica;
     const unidade = copia?.unidade ?? produto.unidade;
     const precoTabela = copia ? Number(copia.precoTabela) : Number(produto.precoVenda);
+    const grupoNaProposta = copia?.grupoNaProposta ?? produto.grupoNaProposta;
     const precoUnitario = item.precoUnitario ?? precoTabela;
     return {
       produtoId: produto.id,
       descricao,
       descricaoTecnica,
       unidade,
+      grupoNaProposta,
       quantidade: new Prisma.Decimal(item.quantidade),
       precoUnitario: new Prisma.Decimal(precoUnitario),
       precoTabela: new Prisma.Decimal(precoTabela),
@@ -324,6 +332,7 @@ rotasOrcamentos.post(
       margem: dados.margem ?? 0,
       descontoTipo: dados.descontoTipo,
       descontoValor: dados.descontoValor,
+      impostoPct: dados.impostoPct ?? 0,
       condicaoPagamento: dados.condicaoPagamento,
       descontoAVistaPct: dados.descontoAVistaPct,
       entradaPct: dados.entradaPct,
@@ -344,6 +353,8 @@ rotasOrcamentos.post(
           validade: dados.validade,
           descontoTipo: dados.descontoTipo,
           descontoValor: dados.descontoValor,
+          impostoPct: dados.impostoPct ?? 0,
+          mostrarImpostosNoPdf: dados.mostrarImpostosNoPdf ?? true,
           condicaoPagamento: dados.condicaoPagamento,
           descontoAVistaPct: dados.descontoAVistaPct,
           entradaPct: dados.entradaPct,
@@ -357,6 +368,7 @@ rotasOrcamentos.post(
           subtotal: totais.subtotal,
           margem: totais.margem,
           descontoAplicado: totais.descontoAplicado,
+          impostoAplicado: totais.impostoAplicado,
           valorTotal: totais.valorTotal,
           ...pagamentoGravado(dados.condicaoPagamento, totais),
           itens: { create: itens.map(({ _calculo, ...item }) => item) },
@@ -395,6 +407,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
     margem: dados.margem ?? Number(atual.margem),
     descontoTipo: dados.descontoTipo,
     descontoValor: dados.descontoValor,
+    impostoPct: dados.impostoPct ?? Number(atual.impostoPct),
     condicaoPagamento: dados.condicaoPagamento,
     descontoAVistaPct: dados.descontoAVistaPct,
     entradaPct: dados.entradaPct,
@@ -414,6 +427,8 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         validade: dados.validade,
         descontoTipo: dados.descontoTipo,
         descontoValor: dados.descontoValor,
+        ...(dados.impostoPct === undefined ? {} : { impostoPct: dados.impostoPct }),
+        ...(dados.mostrarImpostosNoPdf === undefined ? {} : { mostrarImpostosNoPdf: dados.mostrarImpostosNoPdf }),
         condicaoPagamento: dados.condicaoPagamento,
         descontoAVistaPct: dados.descontoAVistaPct,
         entradaPct: dados.entradaPct,
@@ -427,6 +442,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         subtotal: totais.subtotal,
         margem: totais.margem,
         descontoAplicado: totais.descontoAplicado,
+        impostoAplicado: totais.impostoAplicado,
         valorTotal: totais.valorTotal,
         ...pagamentoGravado(dados.condicaoPagamento, totais),
         itens: { create: itens.map(({ _calculo, ...item }) => item) },

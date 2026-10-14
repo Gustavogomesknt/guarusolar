@@ -4,9 +4,12 @@ import { Loader2, Package, Pencil, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CATEGORIAS_PRODUTO,
+  GRUPOS_NA_PROPOSTA,
   ROTULO_CATEGORIA,
+  ROTULO_GRUPO_NA_PROPOSTA,
   ROTULO_UNIDADE,
   type CategoriaProduto,
+  type GrupoNaProposta,
 } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { Produto } from '@/lib/tipos';
@@ -19,6 +22,7 @@ import { Selo } from '@/components/Selo';
 import { PainelItem } from './PainelItem';
 
 type FiltroCategoria = CategoriaProduto | 'TODAS';
+type FiltroGrupo = GrupoNaProposta | 'TODOS';
 
 const COLUNAS = 'grid-cols-[minmax(0,1fr)_130px_64px_120px_130px_90px_64px_40px]';
 
@@ -27,6 +31,7 @@ const MARGEM_BAIXA = 15;
 
 export function PaginaCatalogo() {
   const [categoria, setCategoria] = useState<FiltroCategoria>('TODAS');
+  const [grupo, setGrupo] = useState<FiltroGrupo>('TODOS');
   const [busca, setBusca] = useState('');
   const [incluirInativos, setIncluirInativos] = useState(false);
   const [painel, setPainel] = useState<{ aberto: boolean; item: Produto | null }>({ aberto: false, item: null });
@@ -36,9 +41,10 @@ export function PaginaCatalogo() {
     const p = new URLSearchParams();
     if (buscaAtrasada) p.set('q', buscaAtrasada);
     if (categoria !== 'TODAS') p.set('categoria', categoria);
+    if (grupo !== 'TODOS') p.set('grupo', grupo);
     if (incluirInativos) p.set('incluirInativos', 'true');
     return p.toString();
-  }, [buscaAtrasada, categoria, incluirInativos]);
+  }, [buscaAtrasada, categoria, grupo, incluirInativos]);
 
   const itens = useQuery({
     queryKey: ['produtos', 'catalogo', parametros],
@@ -46,7 +52,7 @@ export function PaginaCatalogo() {
   });
 
   const abrir = (item: Produto | null) => setPainel({ aberto: true, item });
-  const filtrando = categoria !== 'TODAS' || buscaAtrasada !== '';
+  const filtrando = categoria !== 'TODAS' || grupo !== 'TODOS' || buscaAtrasada !== '';
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -82,6 +88,23 @@ export function PaginaCatalogo() {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* parte da proposta em PDF: materiais ou documentação (o cliente marca item a item) */}
+          <div role="group" aria-label="Filtrar pela parte da proposta" className="flex h-10 overflow-hidden rounded-[10px] border border-input">
+            {(['TODOS', ...GRUPOS_NA_PROPOSTA] as FiltroGrupo[]).map((g) => (
+              <button
+                key={g}
+                type="button"
+                aria-pressed={grupo === g}
+                onClick={() => setGrupo(g)}
+                className={cn(
+                  'px-3 text-[13px] font-medium transition-colors',
+                  grupo === g ? 'bg-foreground text-white' : 'bg-card text-foreground hover:bg-muted',
+                )}
+              >
+                {g === 'TODOS' ? 'Material e documentação' : ROTULO_GRUPO_NA_PROPOSTA[g]}
+              </button>
+            ))}
+          </div>
           <label className="flex h-10 w-[260px] items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30">
             <Search className="size-4 shrink-0" aria-hidden />
             <span className="sr-only">Buscar item pelo nome ou código</span>
@@ -214,7 +237,7 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
           {apoio}
         </span>
       </span>
-      <span role="cell" className={cn('min-w-0', inativo && 'opacity-60')}>
+      <span role="cell" className={cn('flex min-w-0 flex-col items-start gap-1', inativo && 'opacity-60')}>
         {/* nome longo ("Proteção e aterramento") não quebra a etiqueta em duas linhas */}
         <span
           title={ROTULO_CATEGORIA[item.categoria]}
@@ -222,6 +245,12 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
         >
           {ROTULO_CATEGORIA[item.categoria]}
         </span>
+        {/* só a exceção ganha etiqueta: material é o padrão de todos */}
+        {item.grupoNaProposta === 'DOCUMENTACAO' && (
+          <span className="inline-block rounded-full border border-destaque bg-destaque-suave px-2 py-0.5 text-[11px] font-medium text-destaque-texto">
+            Documentação
+          </span>
+        )}
       </span>
       <span role="cell" className={cn('text-sm text-foreground/80', inativo && 'opacity-60')}>
         {ROTULO_UNIDADE[item.unidade]}

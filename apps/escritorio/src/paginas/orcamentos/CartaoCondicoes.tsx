@@ -20,6 +20,7 @@ import {
   OPCOES_ENTRADA,
   OPCOES_PARCELAS,
   problemaNoDesconto,
+  problemaNoImposto,
   type FormularioOrcamento,
 } from './formulario';
 import type { Totais } from './ResumoOrcamento';
@@ -39,7 +40,7 @@ const CLASSE_SELECT =
   'h-10 w-full rounded-[10px] border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
 export function CartaoCondicoes({ totais }: { totais: Totais }) {
-  const { subtotalItens, margem, subtotal, descontoAplicado } = totais;
+  const { subtotalItens, margem, subtotal, descontoAplicado, impostoAplicado } = totais;
   const {
     control,
     register,
@@ -47,9 +48,9 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
     clearErrors,
     formState: { errors },
   } = useFormContext<FormularioOrcamento>();
-  const [descontoTipo, descontoValor, condicao, garantia] = useWatch({
+  const [descontoTipo, descontoValor, condicao, garantia, impostoPct] = useWatch({
     control,
-    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia'],
+    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia', 'impostoPct'],
   });
   const preencher = (campo: 'prazoExecucao' | 'garantia', texto: string) => {
     setValue(campo, texto, { shouldDirty: true });
@@ -60,6 +61,7 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
 
   // aviso ao vivo enquanto digita; o erro da API (se houver) aparece quando não há aviso
   const erroDesconto = problemaNoDesconto({ descontoTipo, descontoValor }, subtotal) ?? errors.descontoValor?.message;
+  const erroImposto = problemaNoImposto(impostoPct) ?? errors.impostoPct?.message;
 
   return (
     <section aria-labelledby="titulo-condicoes" className="flex flex-col gap-4 rounded-[14px] border bg-card p-[22px]">
@@ -152,6 +154,54 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
             abaixo do preço dos itens.
           </p>
         )}
+      </div>
+
+      {/* Impostos: espelho do desconto, somando. Incide sobre o valor JÁ com os descontos
+          (inclusive o à vista), e o pagamento (entrada e cartão) é calculado com ele */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="imposto-pct" className="text-[13px] font-medium text-foreground/80">
+            Impostos (%)
+          </Label>
+          <Input
+            {...ariaDoCampo('imposto-pct', erroImposto)}
+            {...register('impostoPct', { onChange: () => clearErrors('impostoPct') })}
+            aria-describedby={erroImposto ? 'imposto-pct-erro' : 'imposto-pct-ajuda'}
+            inputMode="decimal"
+            autoComplete="off"
+            className="h-11 w-[150px] rounded-[10px] text-right font-mono"
+          />
+        </div>
+        {erroImposto ? (
+          <p id="imposto-pct-erro" className="text-[13px] text-destructive">
+            {erroImposto}
+          </p>
+        ) : (
+          <p id="imposto-pct-ajuda" className="text-xs text-muted-foreground">
+            Sobre o valor já com os descontos (inclusive o à vista). As parcelas do cartão saem do total com o imposto.
+          </p>
+        )}
+        <div className="flex justify-between text-[13px]">
+          <span className="text-muted-foreground">Impostos aplicados</span>
+          <span className="font-mono">+ {formatarBRL(impostoAplicado)}</span>
+        </div>
+        <Controller
+          control={control}
+          name="mostrarImpostosNoPdf"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3">
+              <Label htmlFor="mostrar-impostos" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
+                Mostrar impostos na proposta
+                <span id="mostrar-impostos-ajuda" className="text-xs font-normal text-muted-foreground">
+                  {field.value
+                    ? 'O PDF mostra a linha "Impostos (X%)" junto com o desconto.'
+                    : 'O imposto sai embutido nos preços do PDF, sem linha própria. O total é o mesmo.'}
+                </span>
+              </Label>
+              <Switch id="mostrar-impostos" aria-describedby="mostrar-impostos-ajuda" checked={field.value} onCheckedChange={field.onChange} />
+            </div>
+          )}
+        />
       </div>
 
       <div className="h-px bg-border" />

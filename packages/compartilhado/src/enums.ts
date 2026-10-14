@@ -27,6 +27,10 @@ export const CATEGORIAS_PRODUTO = [
 ] as const;
 export type CategoriaProduto = (typeof CATEGORIAS_PRODUTO)[number];
 
+/** Parte da proposta em PDF em que o item sai (materiais primeiro, documentação depois). */
+export const GRUPOS_NA_PROPOSTA = ['MATERIAL', 'DOCUMENTACAO'] as const;
+export type GrupoNaProposta = (typeof GRUPOS_NA_PROPOSTA)[number];
+
 export const UNIDADES = ['UN', 'PECA', 'KIT', 'M', 'BARRA', 'ROLO', 'SERVICO', 'KWP'] as const;
 export type Unidade = (typeof UNIDADES)[number];
 

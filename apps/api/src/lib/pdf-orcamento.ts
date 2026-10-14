@@ -12,6 +12,8 @@ import {
   mascararCep,
   mascararTelefone,
   ROTULO_UNIDADE,
+  TITULO_GRUPO_NA_PROPOSTA,
+  type GrupoNaProposta,
 } from '@guarusolar/compartilhado';
 import { EMPRESA, INSTITUCIONAL, PAGINA_1, type IconePilar } from '../conteudo/proposta';
 
@@ -316,15 +318,24 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
     ? ['ITEM / SERVIÇO', 'QTD.', 'PREÇO UNIT.', 'SUBTOTAL']
     : ['ITEM / SERVIÇO', 'QUANTIDADE'];
   const alinhar = (i: number) => (i === 0 ? 'left' : detalhar ? 'right' : 'center');
-  const itens = o.itens.slice().sort((a, b) => a.ordem - b.ordem);
+  // materiais primeiro, documentação depois; dentro de cada grupo, a ordem do orçamento
+  const GRUPOS: GrupoNaProposta[] = ['MATERIAL', 'DOCUMENTACAO'];
+  const itens = o.itens.slice().sort((a, b) => GRUPOS.indexOf(a.grupoNaProposta) - GRUPOS.indexOf(b.grupoNaProposta) || a.ordem - b.ordem);
+  // só com algum item de documentação a tabela se divide em seções; sem nenhum, fica como sempre foi
+  const emSecoes = itens.some((item) => item.grupoNaProposta === 'DOCUMENTACAO');
   const quantidade = (item: (typeof itens)[number]) =>
     item.unidade === 'UN' || item.unidade === 'SERVICO' ? formatarQuantidade(numero(item.quantidade)) : `${formatarQuantidade(numero(item.quantidade))} ${ROTULO_UNIDADE[item.unidade]}`;
   // A margem NUNCA aparece como linha. Com os preços detalhados, ela é distribuída nos itens na
   // proporção de cada um, para a soma das linhas fechar com o subtotal (itens + margem). Os
   // preços gravados no orçamento não mudam: é só a apresentação ao cliente.
+  // Imposto com "mostrar impostos na proposta" DESLIGADO: vai embutido do mesmo jeito (nos itens e
+  // no subtotal mostrado), e "subtotal − desconto" continua fechando com o total.
+  const impostoEmbutido = o.mostrarImpostosNoPdf ? 0 : numero(o.impostoAplicado);
+  const acrescimoNosItens = numero(o.margem) + impostoEmbutido;
+  const subtotalMostrado = numero(o.subtotal) + impostoEmbutido;
   const subtotaisComMargem = distribuirMargem(
     itens.map((item) => numero(item.subtotal)),
-    numero(o.margem),
+    acrescimoNosItens,
   );
   const linhasItens = itens.map((item, i) => [
     {
@@ -337,7 +348,7 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
     ...(detalhar
       ? [
           {
-            text: formatarBRL(numero(o.margem) > 0 ? subtotaisComMargem[i] / (numero(item.quantidade) || 1) : numero(item.precoUnitario)),
+            text: formatarBRL(acrescimoNosItens > 0 ? subtotaisComMargem[i] / (numero(item.quantidade) || 1) : numero(item.precoUnitario)),
             alignment: 'right',
             fontSize: 10,
           },
@@ -346,19 +357,56 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
       : []),
   ]);
   const colunas = larguras.length;
+  const linhaInteira = (celula: object) => [{ ...celula, colSpan: colunas }, ...Array.from({ length: colunas - 1 }, () => ({}))];
+  // Em seções: título de cada grupo, os itens e o subtotal do grupo (com a margem e o imposto
+  // embutido distribuídos, como nas linhas: os subtotais somam o subtotal mostrado no total).
+  type Tipo = 'cabecalho' | 'item' | 'secao' | 'subtotal' | 'nota';
+  const tipos: Tipo[] = ['cabecalho'];
+  const linhasDoCorpo: unknown[][] = [];
+  if (emSecoes) {
+    for (const grupo of GRUPOS) {
+      const indices = itens.map((item, i) => (item.grupoNaProposta === grupo ? i : -1)).filter((i) => i >= 0);
+      if (indices.length === 0) continue;
+      linhasDoCorpo.push(linhaInteira({ text: TITULO_GRUPO_NA_PROPOSTA[grupo].toUpperCase(), fontSize: 8.5, bold: true, color: COR.marinho, characterSpacing: 0.6 }));
+      tipos.push('secao');
+      for (const i of indices) {
+        linhasDoCorpo.push(linhasItens[i]);
+        tipos.push('item');
+      }
+      const soma = Math.round(indices.reduce((t, i) => t + subtotaisComMargem[i] * 100, 0)) / 100;
+      linhasDoCorpo.push(linhaInteira({ text: `Subtotal de ${TITULO_GRUPO_NA_PROPOSTA[grupo].toLowerCase()}: ${formatarBRL(soma)}`, alignment: 'right', fontSize: 9.5, bold: true }));
+      tipos.push('subtotal');
+    }
+  } else {
+    for (const linha of linhasItens) {
+      linhasDoCorpo.push(linha);
+      tipos.push('item');
+    }
+  }
   const corpo = [
     cabecalho.map((t, i) => ({ text: t, alignment: alinhar(i), fontSize: 8, bold: true, color: COR.branco, characterSpacing: 0.8 })),
-    ...linhasItens,
-    [
-      { text: PAGINA_1.notaDosItens, colSpan: colunas, fontSize: 8.5, color: COR.secundario },
-      ...Array.from({ length: colunas - 1 }, () => ({})),
-    ],
+    ...linhasDoCorpo,
+    linhaInteira({ text: PAGINA_1.notaDosItens, fontSize: 8.5, color: COR.secundario }),
   ];
+  tipos.push('nota');
   const ultima = corpo.length - 1;
+  // zebra contada só entre os itens de cada seção (sem seções, igual à de sempre)
+  let n = 0;
+  const fundoDaLinha = tipos.map((tipo) => {
+    if (tipo === 'cabecalho') return COR.marinho;
+    if (tipo === 'nota') return COR.zebra;
+    if (tipo === 'secao') {
+      n = 0;
+      return COR.linha;
+    }
+    if (tipo === 'subtotal') return COR.branco;
+    n += 1;
+    return n % 2 === 1 ? COR.branco : COR.zebra;
+  });
   const tabelaItens: Peca = {
     table: { headerRows: 1, dontBreakRows: true, widths: larguras, body: corpo },
     layout: {
-      fillColor: (i: number) => (i === 0 ? COR.marinho : i === ultima ? COR.zebra : i % 2 === 1 ? COR.branco : COR.zebra),
+      fillColor: (i: number) => fundoDaLinha[i],
       hLineWidth: (i: number, no: { table: { body: unknown[] } }) => (i === 0 || i === 1 ? 0 : i === no.table.body.length ? 0.75 : 0.75),
       hLineColor: (i: number, no: { table: { body: unknown[] } }) => (i === no.table.body.length || i === ultima ? COR.borda : COR.linha),
       // nas bordas, a linha cinza; entre as colunas do cabeçalho, uma da cor do fundo (sem emenda clara)
@@ -383,20 +431,30 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
       : o.resumoPagamento
     : condicaoPorExtenso(o);
   const desconto = numero(o.descontoAplicado);
-  const alturaPagamento = Math.max(
-    76,
-    35 + alturaDoTexto(textoPagamento, larguraPagamento - 28, 10.5, 1.3, true) + (PAGINA_1.notaDoPagamento ? 4 + alturaDoTexto(PAGINA_1.notaDoPagamento, larguraPagamento - 28, 9, 1.3) : 0),
-  );
   // O cliente vê o total JÁ com a taxa do cartão repassada, sem linha de "taxa da operadora".
   // Com a taxa embutida, "subtotal · desconto" não fecharia com o total: fica só o desconto.
   const totalCliente = numero(o.valorTotalCliente ?? o.valorTotal);
   const comTaxaEmbutida = totalCliente !== numero(o.valorTotal);
-  const linhaDoDesconto =
-    desconto > 0
-      ? detalhar && !comTaxaEmbutida
-        ? `Subtotal ${formatarBRL(numero(o.subtotal))} · desconto de ${formatarBRL(desconto)}`
-        : `Já com desconto de ${formatarBRL(desconto)}`
-      : '';
+  // Impostos: linha própria, no mesmo estilo do desconto, logo abaixo dele (só com o interruptor
+  // "mostrar impostos na proposta" ligado; desligado, o imposto está embutido nos preços).
+  const imposto = o.mostrarImpostosNoPdf ? numero(o.impostoAplicado) : 0;
+  const linhasDoTotal: string[] = [];
+  if (detalhar && !comTaxaEmbutida) {
+    // subtotal − desconto + impostos = total, conferível pelo cliente
+    if (desconto > 0 || imposto > 0) {
+      linhasDoTotal.push(`Subtotal ${formatarBRL(subtotalMostrado)}${desconto > 0 ? ` · desconto de ${formatarBRL(desconto)}` : ''}`);
+    }
+    if (imposto > 0) linhasDoTotal.push(`Impostos (${pct(o.impostoPct)}): ${formatarBRL(imposto)}`);
+  } else {
+    if (desconto > 0) linhasDoTotal.push(`Já com desconto de ${formatarBRL(desconto)}`);
+    if (imposto > 0) linhasDoTotal.push(`Já com impostos (${pct(o.impostoPct)}) de ${formatarBRL(imposto)}`);
+  }
+  // a caixa do total cresce 20 pt por linha depois da primeira (desconto e impostos juntos);
+  // com uma linha ou nenhuma, a altura é a de sempre
+  const alturaPagamento = Math.max(
+    76 + 20 * Math.max(0, linhasDoTotal.length - 1),
+    35 + alturaDoTexto(textoPagamento, larguraPagamento - 28, 10.5, 1.3, true) + (PAGINA_1.notaDoPagamento ? 4 + alturaDoTexto(PAGINA_1.notaDoPagamento, larguraPagamento - 28, 9, 1.3) : 0),
+  );
   const blocoPagamento: Peca = {
     columns: [
       {
@@ -421,14 +479,15 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
             stack: [
               { text: 'VALOR TOTAL DA PROPOSTA', fontSize: 8, bold: true, characterSpacing: 0.9, color: COR.branco },
               { text: formatarBRL(totalCliente), fontSize: 27, bold: true, color: COR.branco, lineHeight: 1.1, margin: [0, 2, 0, 0] },
-              ...(linhaDoDesconto ? [{ text: linhaDoDesconto, fontSize: 8.5, color: COR.branco, margin: [0, 2, 0, 0] }] : []),
+              ...linhasDoTotal.map((linha, i) => ({ text: linha, fontSize: 8.5, color: COR.branco, margin: [0, i === 0 ? 2 : 1, 0, 0] })),
             ],
           },
           {
             largura: larguraTotal,
             altura: alturaPagamento,
             fundo: COR.laranjaFundo,
-            padding: [15, Math.max(10, (alturaPagamento - (linhaDoDesconto ? 58 : 46)) / 2), 15, 8],
+            // com uma linha ou nenhuma, a mesma conta de sempre; com duas, um respiro a mais
+            padding: [15, Math.max(10, (alturaPagamento - 46 - 12 * linhasDoTotal.length - 4 * Math.max(0, linhasDoTotal.length - 1)) / 2), 15, 8],
           },
         ) as object),
       },

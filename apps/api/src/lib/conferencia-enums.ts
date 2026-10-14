@@ -14,6 +14,7 @@ export type ConferenciaEnums = [
   Confere<'TipoPessoa', Igual<Banco.TipoPessoa, Compartilhado.TipoPessoa>>,
   Confere<'CategoriaProduto', Igual<Banco.CategoriaProduto, Compartilhado.CategoriaProduto>>,
   Confere<'Unidade', Igual<Banco.Unidade, Compartilhado.Unidade>>,
+  Confere<'GrupoNaProposta', Igual<Banco.GrupoNaProposta, Compartilhado.GrupoNaProposta>>,
   Confere<'StatusOrcamento', Igual<Banco.StatusOrcamento, Compartilhado.StatusOrcamento>>,
   Confere<'TipoDesconto', Igual<Banco.TipoDesconto, Compartilhado.TipoDesconto>>,
   Confere<'CondicaoPagamento', Igual<Banco.CondicaoPagamento, Compartilhado.CondicaoPagamento>>,

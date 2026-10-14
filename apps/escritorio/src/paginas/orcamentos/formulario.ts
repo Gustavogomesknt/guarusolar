@@ -34,6 +34,10 @@ export type FormularioOrcamento = {
   margem: string;
   descontoTipo: TipoDesconto;
   descontoValor: string;
+  /** imposto em %, somado depois dos descontos (padrão 0) */
+  impostoPct: string;
+  /** linha "Impostos (X%)" no PDF; desligado, o imposto sai embutido nos preços */
+  mostrarImpostosNoPdf: boolean;
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct: string;
   entradaPct: string;
@@ -89,6 +93,8 @@ export function valoresIniciais(): FormularioOrcamento {
     margem: formatarDecimal(MARGEM_PADRAO),
     descontoTipo: 'PERCENTUAL',
     descontoValor: '0',
+    impostoPct: '0',
+    mostrarImpostosNoPdf: true,
     condicaoPagamento: 'A_VISTA',
     descontoAVistaPct: '0',
     entradaPct: '30',
@@ -137,6 +143,7 @@ export function entradaDoCalculo(f: FormularioOrcamento): EntradaCalculo {
     margem: Math.max(numeroOuZero(f.margem), 0),
     descontoTipo: f.descontoTipo,
     descontoValor: numeroOuZero(f.descontoValor),
+    impostoPct: numeroOuZero(f.impostoPct),
     condicaoPagamento: f.condicaoPagamento,
     descontoAVistaPct: numeroOuZero(f.descontoAVistaPct),
     entradaPct: numeroOuZero(f.entradaPct),
@@ -158,6 +165,15 @@ export function problemaNoDesconto(f: Pick<FormularioOrcamento, 'descontoTipo' |
   if (f.descontoTipo === 'VALOR' && valor > subtotal) {
     return `O desconto não pode passar do subtotal (${formatarBRL(subtotal)})`;
   }
+  return null;
+}
+
+/** Problema no imposto (%), mostrado enquanto se digita. Em branco vale zero. */
+export function problemaNoImposto(valorDigitado: string) {
+  if (valorDigitado.trim() === '') return null;
+  const valor = lerNumero(valorDigitado);
+  if (!(valor >= 0)) return 'Informe um percentual válido (use 0 para nenhum)';
+  if (valor > 100) return 'O imposto não pode passar de 100%';
   return null;
 }
 
@@ -183,6 +199,8 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
   }
   const desconto = problemaNoDesconto(f, subtotal);
   if (desconto) problemas.push({ campo: 'descontoValor', mensagem: desconto });
+  const imposto = problemaNoImposto(f.impostoPct);
+  if (imposto) problemas.push({ campo: 'impostoPct', mensagem: imposto });
   if (f.condicaoPagamento === 'A_VISTA') {
     const pct = lerNumero(f.descontoAVistaPct || '0');
     if (!(pct >= 0 && pct <= 100)) {
@@ -206,6 +224,8 @@ export function paraApi(f: FormularioOrcamento) {
     margem: Math.max(numeroOuZero(f.margem), 0),
     descontoTipo: f.descontoTipo,
     descontoValor: numeroOuZero(f.descontoValor),
+    impostoPct: numeroOuZero(f.impostoPct),
+    mostrarImpostosNoPdf: f.mostrarImpostosNoPdf,
     condicaoPagamento: f.condicaoPagamento,
     ...(f.condicaoPagamento === 'A_VISTA' ? { descontoAVistaPct: numeroOuZero(f.descontoAVistaPct) } : {}),
     ...(f.condicaoPagamento === 'ENTRADA_PARCELAS'
@@ -246,6 +266,8 @@ export type OrcamentoSalvo = {
   subtotal: string;
   margem?: string;
   descontoAplicado: string;
+  /** imposto em R$; ausente em resposta da versão anterior da API */
+  impostoAplicado?: string;
   valorTotal: string;
   resumoPagamento: string;
   /** chave do link público do PDF */
@@ -360,6 +382,8 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     descontoTipo: o.descontoTipo,
     descontoValor:
       o.descontoTipo === 'VALOR' ? formatarDecimal(Number(o.descontoValor)) : numeroTexto(o.descontoValor, '0'),
+    impostoPct: numeroTexto(o.impostoPct, '0'),
+    mostrarImpostosNoPdf: o.mostrarImpostosNoPdf ?? true,
     condicaoPagamento: o.condicaoPagamento,
     descontoAVistaPct: numeroTexto(o.descontoAVistaPct, '0'),
     // os selects só têm estas opções; valores fora delas voltam ao padrão
@@ -384,6 +408,7 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   status: o.status,
   subtotal: o.subtotal,
   descontoAplicado: o.descontoAplicado,
+  impostoAplicado: o.impostoAplicado,
   valorTotal: o.valorTotal,
   resumoPagamento,
   tokenPdf: o.tokenPdf,

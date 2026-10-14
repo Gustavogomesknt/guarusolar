@@ -266,7 +266,8 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                some se já instalado; "Agora não" vale por 7 dias
 packages/compartilhado/        código usado pela API e pelos fronts (ESM, compilado com tsc)
   src/enums.ts                 enums do banco como listas `as const` + tipos
-  src/calculo.ts               totais, desconto e condições de pagamento; calcularCartao
+  src/calculo.ts               totais (margem, descontos, imposto: a ORDEM está comentada lá),
+                               condições de pagamento; calcularCartao
   src/taxasCartao.ts           EDITÁVEL: tabela de taxas do Mercado Pago (débito, 1x a 18x) e a
                                data da última atualização
   src/textosDaProposta.ts      EDITÁVEL: GARANTIA_PADRAO (texto de garantia de todo orçamento novo) e
@@ -339,18 +340,32 @@ O `.env` da API fica em `apps/api/.env`.
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
-   percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo:
-   itens + margem = `subtotal` -> desconto geral -> desconto à vista -> total -> entrada e cartão.
+   percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
+   (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista
+   -> + imposto -> total -> entrada e cartão.
    A margem entra ANTES do desconto (decisão): o cliente não a vê, e "10% de desconto" tem de ser
    10% do preço que ele vê; a tela avisa, sem bloquear, quando o desconto passa da margem.
    **O cliente NUNCA vê a margem**: nem linha no PDF, nem no WhatsApp. Com "detalhar preços", o PDF
    distribui a margem nos preços dos itens (`distribuirMargem`, centavos inteiros: a soma das
    linhas fecha com o subtotal); os preços gravados nos itens não mudam. Fica GRAVADA em
    `Orcamento.margem`; orçamento anterior ao campo tem zero e abre com zero (não com o padrão).
+   **Imposto do orçamento** (14/10/2026): `impostoPct`, editável por proposta, padrão 0; incide
+   sobre o valor JÁ com os dois descontos (`impostoAplicado`, em R$) e `valorTotal` já o inclui,
+   então entrada e parcelas da maquininha saem do total com imposto. No PDF, linha "Impostos (X%)"
+   junto com a do desconto; com `mostrarImpostosNoPdf` desligado, o imposto vai embutido nos preços
+   e no subtotal mostrado, como a margem (a conta subtotal − desconto continua fechando).
+   `valorTotal` (indicadores, "valor aprovado") inclui o imposto; o valor sem ele é
+   `valorTotal − impostoAplicado`.
 2. **Item do orçamento é cópia.** `descricao`, `unidade`, `precoUnitario` e `precoTabela` ficam
    gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
    não altera orçamento antigo. Na edição (PUT),
    itens que já estavam no orçamento mantêm a cópia gravada; só itens novos copiam o catálogo.
+   O `grupoNaProposta` também é cópia: MATERIAL ou DOCUMENTACAO (ART, diagrama unifilar, memorial
+   descritivo, Kit IT 41...), marcado pelo cliente no catálogo; nenhum item foi classificado
+   automaticamente (o campo `categoria`, que já existia, NÃO decide isso). Com algum item de
+   documentação, o PDF divide a tabela em "Materiais e equipamentos" e "Documentação e
+   engenharia", cada uma com subtotal (margem e imposto embutido distribuídos); sem nenhum, o PDF
+   é o de antes. Marcar no catálogo depois não muda orçamento já montado.
    **Os dados do cliente também são cópia** (`clienteNome`, `clienteDocumento`, `clienteWhatsapp`,
    `clienteEmail`, endereço e `clienteCopiadoEm` no orçamento): o PDF e o texto do WhatsApp usam a
    cópia, e editar o cadastro não muda proposta salva. A cópia é feita ao criar, ao trocar de

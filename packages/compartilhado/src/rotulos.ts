@@ -1,4 +1,4 @@
-import type { CategoriaProduto, StatusAgendamento, StatusProjeto, TipoServico, Unidade } from './enums.js';
+import type { CategoriaProduto, GrupoNaProposta, StatusAgendamento, StatusProjeto, TipoServico, Unidade } from './enums.js';
 
 /** Como cada categoria aparece para o usuário (telas, PDF, WhatsApp). */
 export const ROTULO_CATEGORIA: Record<CategoriaProduto, string> = {
@@ -14,6 +14,16 @@ export const ROTULO_CATEGORIA: Record<CategoriaProduto, string> = {
   MAO_DE_OBRA: 'Mão de obra',
   PROJETO: 'Projeto e documentação',
   OUTROS: 'Outros',
+};
+
+/** Grupo do item: rótulo curto (catálogo) e título da seção na proposta em PDF. */
+export const ROTULO_GRUPO_NA_PROPOSTA: Record<GrupoNaProposta, string> = {
+  MATERIAL: 'Material',
+  DOCUMENTACAO: 'Documentação',
+};
+export const TITULO_GRUPO_NA_PROPOSTA: Record<GrupoNaProposta, string> = {
+  MATERIAL: 'Materiais e equipamentos',
+  DOCUMENTACAO: 'Documentação e engenharia',
 };
 
 /** Unidade abreviada, usada em "por un", "40 m", "1 kit". */

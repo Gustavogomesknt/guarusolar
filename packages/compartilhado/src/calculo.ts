@@ -17,6 +17,8 @@ export type EntradaCalculo = {
   margem?: number | null;
   descontoTipo: TipoDesconto;
   descontoValor: number;
+  /** imposto em %, somado sobre o valor JÁ com todos os descontos (ver a ordem em calcularOrcamento) */
+  impostoPct?: number | null;
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct?: number | null;
   entradaPct?: number | null;
@@ -58,6 +60,9 @@ export type ResultadoCalculo = {
   /** itens + margem: o subtotal que o cliente vê e a base dos descontos */
   subtotal: number;
   descontoAplicado: number;
+  /** imposto em R$ (base: o valor depois dos descontos) */
+  impostoAplicado: number;
+  /** com o imposto: é a base do pagamento (entrada, cartão) */
   valorTotal: number;
   entrada: number;
   valorParcela: number;
@@ -104,9 +109,16 @@ export function calcularCartao(saldo: number, parcelas: number, debito: boolean,
  * Regra de negócio dos totais do orçamento.
  * Fica isolada aqui para ser usada pela API e testada sem banco.
  *
- * Ordem: itens + margem = subtotal -> desconto geral (% ou R$) ->
- * desconto adicional à vista (quando a condição for A_VISTA).
- * A margem entra ANTES dos descontos (o cliente não a vê: o desconto é sobre o preço que ele vê).
+ * ORDEM DO CÁLCULO (é a parte que mais confunde; não troque sem combinar com o cliente):
+ *   1. subtotal dos itens       soma de quantidade × preço unitário
+ *   2. + margem                 em R$; o resultado é o "subtotal" que o cliente vê
+ *   3. − desconto geral         % ou R$, sobre o subtotal do passo 2
+ *   4. − desconto à vista       só em A_VISTA; %, sobre o valor do passo 3
+ *   5. + imposto                %, sobre o valor JÁ com os dois descontos (passo 4)
+ *   = valorTotal                a base do pagamento: entrada e cartão (parcelas da maquininha,
+ *                               com a taxa repassada) saem daqui, já com o imposto
+ * A margem entra ANTES dos descontos (o cliente não a vê: o desconto é sobre o preço que ele vê),
+ * e o imposto DEPOIS (é cobrado sobre o que o cliente de fato paga, não sobre o preço cheio).
  */
 export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
   const subtotalItens = cent(
@@ -131,8 +143,12 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
     descontoAVista = cent((aposDesconto * Number(entrada.descontoAVistaPct || 0)) / 100);
   }
 
-  const valorTotal = cent(aposDesconto - descontoAVista);
+  const aposDescontos = cent(aposDesconto - descontoAVista);
   const descontoAplicado = cent(descontoGeralLimitado + descontoAVista);
+
+  // 5. imposto sobre o valor já com os descontos
+  const impostoAplicado = cent((aposDescontos * Math.max(Number(entrada.impostoPct || 0), 0)) / 100);
+  const valorTotal = cent(aposDescontos + impostoAplicado);
 
   let entradaValor = 0;
   let valorParcela = 0;
@@ -166,7 +182,7 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
   }
 
   const valorTotalCliente = cartao ? cent(entradaValor + cartao.valorCobrado) : valorTotal;
-  return { subtotalItens, margem, subtotal, descontoAplicado, valorTotal, entrada: entradaValor, valorParcela, resumoPagamento, valorTotalCliente, cartao };
+  return { subtotalItens, margem, subtotal, descontoAplicado, impostoAplicado, valorTotal, entrada: entradaValor, valorParcela, resumoPagamento, valorTotalCliente, cartao };
 }
 
 export const formatarBRL = brl;

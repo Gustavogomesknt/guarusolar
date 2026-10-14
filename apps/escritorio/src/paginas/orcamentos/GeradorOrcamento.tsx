@@ -85,6 +85,7 @@ export function GeradorOrcamento({
         margem: Number(salvo.margem ?? 0),
         subtotal: Number(salvo.subtotal),
         descontoAplicado: Number(salvo.descontoAplicado),
+        impostoAplicado: Number(salvo.impostoAplicado ?? 0),
         valorTotal: Number(salvo.valorTotal),
         resumoPagamento: salvo.resumoPagamento,
         // o cartão como foi gravado: proposta salva não muda com a tabela de taxas
