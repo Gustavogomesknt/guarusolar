@@ -4,7 +4,7 @@ import { prisma } from './prisma';
 /*
  * Fotos no Supabase Storage (STORAGE_PROVIDER=supabase). Foi o destino das fotos até a Guarusolar
  * passar a enviar vídeo: cerca de 1 GB no plano gratuito não comporta. O destino novo é o
- * Cloudflare R2 (lib/r2.ts); este provedor continua para LER as fotos antigas até a migração
+ * bucket S3 (lib/s3.ts: Backblaze B2); este provedor continua para LER as fotos antigas até a migração
  * terminar (npm run fotos:migrar) e como alternativa.
  * O SharePoint saiu do escopo: o cliente usa conta PESSOAL da Microsoft (sem tenant, sem Entra,
  * sem SharePoint), e o provedor "sharepoint" exige tenant corporativo (CLAUDE.md).

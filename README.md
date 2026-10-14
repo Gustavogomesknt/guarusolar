@@ -328,17 +328,22 @@ sistema não mede o egress: o relatório imprime uma conta aproximada (fotos que
 aberturas da foto inteira + 10 da miniatura) e o número exato está no painel do Supabase, em
 Settings → Usage.
 
-**Cloudflare R2 (`STORAGE_PROVIDER=r2`).** Com a Guarusolar passando a enviar vídeo dos serviços,
-o 1 GB do Supabase não comporta. O R2 dá 10 GB grátis por mês, US$ 0,015 por GB-mês acima disso e
-não cobra egress. Variáveis: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
-`R2_BUCKET` e o teto `R2_STORAGE_LIMITE_MB` (padrão 10240). `npm run r2:conferir` testa tudo antes
-de ligar; `npm run storage:relatorio` e o aviso de 70% funcionam igual (no R2 o uso é medido
-listando o bucket). As fotos continuam saindo só pela API, com login. **Passo a passo da troca e da
-migração: SOCORRO.md, item 8.** O Supabase Pro (US$ 25 por mês, 100 GB) só vale para quem precisar
-do resto do pacote. Apagar fotos antigas é decisão do cliente.
+**Bucket compatível com S3 (`STORAGE_PROVIDER=s3`): Backblaze B2.** Com a Guarusolar passando a
+enviar vídeo dos serviços, o 1 GB do Supabase não comporta. O B2 dá 10 GB sempre gratuitos, não
+pede cartão no cadastro e não cobra egress até 3 vezes o armazenado. O provedor é genérico: o
+mesmo código atende o B2, o Cloudflare R2 e qualquer serviço que fale a API do S3; mudam só o
+endereço e a região. Variáveis: `S3_ENDPOINT` (no B2, `https://s3.<região>.backblazeb2.com`),
+`S3_REGION` (o trecho do meio do endpoint; entra na assinatura, tem de estar certa),
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET` e o teto `S3_STORAGE_LIMITE_MB` (padrão
+10240). `r2` continua valendo como apelido (`STORAGE_PROVIDER=r2` e as antigas `R2_*`).
+`npm run s3:conferir` testa tudo antes de ligar; `npm run storage:relatorio` e o aviso de 70%
+funcionam igual (o uso é medido listando o bucket). As fotos continuam saindo só pela API, com
+login. **Passo a passo da troca e da migração: SOCORRO.md, item 8.** O Supabase Pro (US$ 25 por
+mês, 100 GB) só vale para quem precisar do resto do pacote. Apagar fotos antigas é decisão do
+cliente.
 
 **Referência antiga: o mesmo roteiro para o SharePoint**, que saiu do escopo (exige Microsoft 365
-empresarial). Para o R2, siga o SOCORRO.md, item 8:
+empresarial). Para o Backblaze B2, siga o SOCORRO.md, item 8:
 
 1. Configure as variáveis `MS_*` e rode `npm run sharepoint:conferir`.
 2. Faça o Backup do banco (Actions › Backup do banco).

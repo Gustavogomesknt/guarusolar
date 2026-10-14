@@ -167,8 +167,8 @@ quando isto for resolvido. Peça para ele não limpar os dados do navegador nem 
      das fotos (mensagem "espaço cheio": tabela do item 2).
    - `"recebendo":false` → a hospedagem está sem a configuração das fotos. Siga.
 2. Painel da Render → serviço **guarusolar** → **Environment**. Confira:
-   - se `STORAGE_PROVIDER` é `r2`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e
-     `R2_BUCKET` têm de estar preenchidas;
+   - se `STORAGE_PROVIDER` é `s3` (ou `r2`, que é o mesmo): `S3_ENDPOINT`, `S3_REGION`,
+     `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` e `S3_BUCKET` têm de estar preenchidas;
    - se `STORAGE_PROVIDER` é `supabase`: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` e `SUPABASE_BUCKET`
      têm de estar preenchidas;
    - qualquer outro valor em `STORAGE_PROVIDER` está errado.
@@ -181,55 +181,69 @@ quando isto for resolvido. Peça para ele não limpar os dados do navegador nem 
 5. Se `STORAGE_PROVIDER` voltar sozinho para outro valor, ou a publicação falhar, ligue para o
    desenvolvedor.
 
-## 8. Trocar onde as fotos ficam guardadas (do Supabase para o Cloudflare R2)
+## 8. Trocar onde as fotos ficam guardadas (do Supabase para o Backblaze B2)
 
-Para quê: o Supabase gratuito guarda cerca de 1 GB; o Cloudflare R2 guarda 10 GB sem custo e não
-cobra pelo que sai. **Faça com o desenvolvedor na linha.** Nenhuma foto se perde em nenhum passo: a
-troca só muda onde as fotos NOVAS entram, e as antigas continuam abrindo de onde estão.
+Para quê: o Supabase gratuito guarda cerca de 1 GB; o Backblaze B2 guarda 10 GB sem custo e não
+pede cartão no cadastro. **Faça com o desenvolvedor na linha.** Nenhuma foto se perde em nenhum
+passo: a troca só muda onde as fotos NOVAS entram, e as antigas continuam abrindo de onde estão.
 
-**A. No painel da Cloudflare (uma vez)**
+Os valores anotados abaixo vão para o cofre de senhas e para a Render. **Nunca por mensagem, e-mail
+ou chat.**
 
-1. Crie a conta em dash.cloudflare.com e abra **R2 Object Storage**. A Cloudflare pede um cartão
-   para ativar o R2, mesmo no uso gratuito.
-2. **Create bucket**: nome `guarusolar-fotos` (minúsculas, sem espaço); localização automática.
-   Não ligue **Public Development URL** nem domínio público: o bucket tem de ficar privado.
-3. Na página do R2, **Manage API Tokens → Create API Token**: permissão **Object Read & Write**,
-   aplicada **só ao bucket `guarusolar-fotos`**, sem data de validade. Ao criar, a tela mostra o
-   **Access Key ID** e o **Secret Access Key** UMA vez: guarde os dois no cofre de senhas.
-4. Anote o **Account ID** (32 letras e números), que aparece na página do R2.
+**A. No painel do Backblaze (uma vez)**
+
+1. Crie a conta em backblaze.com (produto **B2 Cloud Storage**). No cadastro há a escolha da
+   **região** onde os arquivos ficam: ela não muda depois. Não é pedido cartão.
+2. **Buckets → Create a Bucket**: um nome só seu (letras minúsculas, números e hífen; o nome é
+   único no mundo inteiro, então `guarusolar-fotos` pode já existir: use outro, qualquer um serve).
+   **Files in Bucket are: Private.** Object Lock: desligado. **Anote o nome** (`S3_BUCKET`).
+3. No cartão do bucket aparece **Endpoint**, algo como `s3.us-west-004.backblazeb2.com`.
+   **Anote**: é o `S3_ENDPOINT` (com `https://` na frente). O trecho do meio (`us-west-004`) é a
+   `S3_REGION`. Os dois têm de combinar: a região entra na assinatura de cada pedido.
+4. No mesmo cartão, **Lifecycle Settings → Keep only the last version of the file**. Sem isso o
+   B2 guarda para sempre as versões antigas de cada arquivo regravado ou apagado, e o espaço
+   ocupado fica acima do que o sistema mede.
+5. **Application Keys → Add a New Application Key**: um nome (ex.: `guarusolar-api`); **Allow
+   access to Bucket(s)**: só o bucket das fotos; **Type of Access: Read and Write**; o resto em
+   branco. Ao criar, a tela mostra **keyID** (`S3_ACCESS_KEY_ID`) e **applicationKey**
+   (`S3_SECRET_ACCESS_KEY`) UMA única vez: guarde os dois no cofre de senhas na hora. **Não use a
+   "Master Application Key"**: ela não funciona nesta forma de acesso.
 
 **B. Na Render e no computador**
 
-5. Render → serviço **guarusolar** → **Environment**: preencha `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
-   `R2_SECRET_ACCESS_KEY` e `R2_BUCKET`. **Não apague as `SUPABASE_*`** e não mexa em
-   `STORAGE_PROVIDER` ainda.
-6. Numa janela do PowerShell, na pasta do sistema, defina as mesmas quatro variáveis (entre aspas
-   SIMPLES, como no item 6) e rode **`npm run r2:conferir`**. Tem de terminar em "Tudo certo".
-   Se parar num passo, a mensagem diz qual valor conferir.
-7. O desenvolvedor troca `STORAGE_PROVIDER` para `r2` **no arquivo `render.yaml`** (mudar só no
+6. Render → serviço **guarusolar** → **Environment**: preencha `S3_ENDPOINT`, `S3_REGION`,
+   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` e `S3_BUCKET`. **Não apague as `SUPABASE_*`** e não
+   mexa em `STORAGE_PROVIDER` ainda.
+7. Numa janela do PowerShell, na pasta do sistema, defina as mesmas cinco variáveis (entre aspas
+   SIMPLES, como no item 6) e rode **`npm run s3:conferir`**. Tem de terminar em "Tudo certo".
+   Se parar num passo, a mensagem diz qual valor conferir (o primeiro passo é a região).
+8. O desenvolvedor troca `STORAGE_PROVIDER` para `s3` **no arquivo `render.yaml`** (mudar só no
    painel não basta: a Render devolve o valor do arquivo). Faça o **Backup** (Actions → Backup do
    banco) e depois **Actions → Publicar**.
-8. Abra o `/saude`: tem de mostrar `"fotos":{"destino":"r2","recebendo":true}`. Daqui em diante as
-   fotos novas vão para o R2; as antigas continuam abrindo do Supabase.
+9. Abra o `/saude`: tem de mostrar `"fotos":{"destino":"s3","recebendo":true}`. Daqui em diante as
+   fotos novas vão para o B2; as antigas continuam abrindo do Supabase.
 
 **C. Levar as fotos antigas (a migração)**
 
-9. Numa janela do PowerShell ligada ao banco de produção (como no item 6), com as três
-   `SUPABASE_*`, as quatro `R2_*` e `$env:STORAGE_PROVIDER='r2'`, rode **`npm run fotos:migrar`**:
-   ele só MOSTRA quantas fotos há a levar, sem mexer em nada.
-10. Rode **`npm run fotos:migrar -- --executar`**. Cada foto é copiada para o R2 com o mesmo nome,
+10. Numa janela do PowerShell ligada ao banco de produção (como no item 6), com as três
+    `SUPABASE_*`, as cinco `S3_*` e `$env:STORAGE_PROVIDER='s3'`, rode **`npm run fotos:migrar`**:
+    ele só MOSTRA quantas fotos há a levar, sem mexer em nada.
+11. Rode **`npm run fotos:migrar -- --executar`**. Cada foto é copiada para o B2 com o mesmo nome,
     conferida, e só então o sistema passa a buscá-la lá. No fim aparece a linha
     `RESULTADO: movidas N, falhas N, já estavam no destino N`.
-11. Se houver falhas (queda de internet, por exemplo), **rode o mesmo comando de novo**: ele pode
+12. Se houver falhas (queda de internet, por exemplo), **rode o mesmo comando de novo**: ele pode
     ser repetido quantas vezes for preciso, não duplica nada e só tenta o que faltou. Está pronto
-    quando disser `falhas 0` e "A migrar para r2: 0".
-12. Confira no sistema: abra a Validação e a ficha de dois ou três projetos antigos e veja as fotos.
-13. **Não apague nada do Supabase por enquanto.** As cópias antigas ficam lá, intocadas, como
+    quando disser `falhas 0` e "A migrar para s3: 0".
+13. Confira no sistema: abra a Validação e a ficha de dois ou três projetos antigos e veja as fotos.
+14. **Não apague nada do Supabase por enquanto.** As cópias antigas ficam lá, intocadas, como
     reserva. Semanas depois, com tudo conferido, o desenvolvedor decide esvaziar o bucket antigo.
 
 Para **voltar atrás** antes da migração: `STORAGE_PROVIDER` de volta a `supabase` no `render.yaml`
-e Publicar. As fotos que entraram no R2 nesse meio-tempo continuam abrindo de lá enquanto as
-`R2_*` estiverem na Render.
+e Publicar. As fotos que entraram no B2 nesse meio-tempo continuam abrindo de lá enquanto as
+`S3_*` estiverem na Render.
+
+O mesmo roteiro serve para outro serviço compatível com S3 (o Cloudflare R2, por exemplo): mudam
+só o painel onde se cria o bucket e os valores de `S3_ENDPOINT` e `S3_REGION`.
 
 ## 9. Quem contatar
 

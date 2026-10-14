@@ -65,7 +65,7 @@ rotasFotos.get(
 
 /**
  * Espaço das fotos (só GESTOR e ADMIN), para o aviso do escritório. Só há o que medir nos buckets
- * (Supabase Storage: SUPABASE_STORAGE_LIMITE_MB; Cloudflare R2: R2_STORAGE_LIMITE_MB): com disco
+ * (Supabase Storage: SUPABASE_STORAGE_LIMITE_MB; bucket S3: S3_STORAGE_LIMITE_MB): com disco
  * ou SharePoint, `limitado: false`.
  */
 export const rotasArmazenamento = Router();

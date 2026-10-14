@@ -43,8 +43,8 @@ e não há CORS no navegador.
 - **Front:** React + Vite + Tailwind CSS + shadcn/ui
 - **Auth:** JWT com papéis
 - **Fotos dos serviços:** em disco local no desenvolvimento; em produção num bucket privado:
-  **Cloudflare R2** (`STORAGE_PROVIDER=r2`, o destino desde que a Guarusolar passou a enviar
-  vídeo) ou **Supabase Storage** (`supabase`, onde ficaram até a troca). Ver "Onde ficam as
+  **Backblaze B2**, pelo provedor genérico `STORAGE_PROVIDER=s3` (o destino desde que a
+  Guarusolar passou a enviar vídeo) ou **Supabase Storage** (`supabase`, onde ficaram até a troca). Ver "Onde ficam as
   fotos", abaixo. O PDF do orçamento não é guardado: é gerado a cada pedido
 - **Hospedagem:** custo zero: Render (plano gratuito, região Virginia; dorme após 15 min) e
   Supabase (gratuito); backup noturno do banco pelo GitHub Actions. **Banco de produção em São
@@ -92,20 +92,26 @@ apps/api/                      API (Express + Prisma)
   src/lib/codigos.ts           GS-2026-0148 (orçamento) e PRJ-2026-0146 (projeto); contador
                                atômico por ano na tabela SequenciaCodigo (nunca contar linhas)
   src/lib/armazenamento.ts     camada das fotos: STORAGE_PROVIDER escolhe onde as NOVAS vão
-                               ("disco" padrão; "r2" e "supabase", os dois buckets de produção;
+                               ("disco" padrão; "s3" e "supabase", os dois buckets de produção;
+                               "r2" é apelido de "s3";
                                "sharepoint" fora de escopo, mantido no código: exige tenant
                                corporativo); a leitura segue a chave ("sp:<id>" = SharePoint,
-                               "sb:<caminho>" = Supabase, "r2:<caminho>" = R2; o resto, disco). O banco guarda a CHAVE
+                               "sb:<caminho>" = Supabase, "s3:<caminho>" (ou o apelido "r2:") =
+                               bucket S3; o resto, disco). O banco guarda a CHAVE
                                (FotoServico.arquivoChave), nunca uma URL. Foto refeita: o arquivo
                                antigo vai para "Substituídas/". Chave que saia da pasta é recusada
-  src/lib/r2.ts                Cloudflare R2 ("r2:<caminho>", os MESMOS caminhos do Supabase), pela
-                               API S3: pedidos assinados aqui mesmo (Signature V4 com o crypto do
-                               Node, sem SDK). Uso medido LISTANDO o bucket (no máximo a cada 30
-                               min) contra R2_STORAGE_LIMITE_MB: avisa em 70%, recusa em 95%.
-                               linkAssinadoDoR2 existe, mas NENHUMA rota o usa (regra 6)
-  scripts/r2-conferir.ts       npm run r2:conferir: chaves e bucket, envio, leitura, não abre sem
+  src/lib/s3.ts                provedor GENÉRICO da API S3 ("s3:<caminho>", os MESMOS caminhos do
+                               Supabase): atende Backblaze B2 (o escolhido), Cloudflare R2 e
+                               qualquer compatível; endereço e região vêm de S3_ENDPOINT e
+                               S3_REGION (a região entra na assinatura). Pedidos assinados aqui
+                               mesmo (Signature V4 com o crypto do Node, sem SDK). Uso medido
+                               LISTANDO o bucket (no máximo a cada 30 min) contra
+                               S3_STORAGE_LIMITE_MB: avisa em 70%, recusa em 95%.
+                               linkAssinadoDoS3 existe, mas NENHUMA rota o usa (regra 6)
+  scripts/s3-conferir.ts       npm run s3:conferir (r2:conferir é o nome antigo): região × endereço,
+                               chaves e bucket, envio, regravar não duplica, leitura, não abre sem
                                assinatura, link assinado expira, mover, medição. Só em "_conferencia/"
-  src/lib/supabaseStorage.ts   Supabase Storage ("sb:<caminho>"; README), destino até a troca para o R2:
+  src/lib/supabaseStorage.ts   Supabase Storage ("sb:<caminho>"; README), destino até a troca para o B2:
                                bucket PRIVADO (recusa gravar em público), só a chave secreta no
                                servidor, nenhum link público ou assinado. Mede o uso em
                                storage.objects contra o teto SUPABASE_STORAGE_LIMITE_MB: avisa em
@@ -564,7 +570,7 @@ npm run db:zerar-para-entrega -- --admin email        # idem, e remove os usuár
 npm run build            # compila todos os workspaces
 npm run sharepoint:conferir  # testa a configuração MS_* do SharePoint (envio e leitura reais)
 npm run storage:conferir     # testa o Supabase Storage (bucket privado, envio, leitura, sem link público)
-npm run r2:conferir          # testa o Cloudflare R2 (chaves, envio, leitura, link assinado que expira)
+npm run s3:conferir          # testa o bucket S3 (B2/R2): região, chaves, envio, leitura, link assinado que expira
 npm run storage:relatorio    # espaço das fotos do STORAGE_PROVIDER atual (só leitura)
 npm run fotos:migrar         # mostra as fotos que estão fora do STORAGE_PROVIDER atual; -- --executar migra
 ```
@@ -622,7 +628,7 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   **A API NUNCA encerra o processo por causa do armazenamento** (decisão de 09/10/2026): no plano
   gratuito a Render derruba o serviço por inatividade e ele sobe de novo a cada primeiro acesso,
   sem publicação; uma recusa de inicialização por variável ausente deixaria o sistema INTEIRO
-  fora do ar por causa das fotos. Provedor inexistente ou `SUPABASE_*`/`MS_*` faltando =
+  fora do ar por causa das fotos. Provedor inexistente ou `S3_*`/`SUPABASE_*`/`MS_*` faltando =
   `configuracaoIncompleta()` -> a API sobe em MODO DEGRADADO (`recebendo: false`, envio de foto
   503 com o motivo, leitura de foto 503). Não reintroduza `throw` na inicialização por
   configuração opcional. A única variável cuja falta impede a subida é `JWT_SECRET` (sem ela não
@@ -671,32 +677,52 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   uma CONTA APROXIMADA (fotos que entraram no mês × 3 aberturas da foto inteira + 10 da
   miniatura; hipóteses em `supabaseStorage.ts`); o número exato está no painel do Supabase, em
   Settings → Usage. O tráfego do banco usa o mesmo limite.
-  **Cloudflare R2: o provedor `r2` EXISTE (13/10/2026)** e é para onde as fotos vão. Motivo: a
-  Guarusolar vai enviar vídeo de até 1 minuto por serviço, e o 1 GB do Supabase não cobriria um
-  mês. R2: 10 GB grátis por mês, US$ 0,015 por GB-mês acima disso, SEM cobrança de egress.
-  Variáveis `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (todas
-  `sync: false` no render.yaml) e o teto `R2_STORAGE_LIMITE_MB` (10240). Supabase e R2 são os dois
-  "buckets" de `armazenamento.ts` (`BUCKETS`): mesmos caminhos, mesma miniatura guardada, mesma
-  pasta `substituidas/`; a chave só muda de prefixo (`sb:` / `r2:`), e a leitura segue o prefixo,
-  então os dois convivem. **O fluxo das fotos não mudou**: tudo sai por `GET /api/fotos/:id`,
-  nenhum link do R2 vai para o navegador. O "decisão fechada: Supabase é o destino DEFINITIVO",
-  acima, vale como história: o que continua valendo é SharePoint fora de escopo.
-  **Como trocar de provedor** (passo a passo para o cliente: SOCORRO.md, item 8): (1) as quatro
-  `R2_*` no painel da Render, mantendo as `SUPABASE_*`; (2) `npm run r2:conferir`; (3)
-  `STORAGE_PROVIDER: r2` NO `render.yaml` (o `value:` do arquivo é reaplicado: mudar só no painel
-  não dura) e Publicar; (4) `/saude` com `"destino":"r2","recebendo":true`.
+  **Bucket S3 (Backblaze B2): o provedor `s3` EXISTE (13/10/2026)** e é para onde as fotos vão.
+  Motivo: a Guarusolar vai enviar vídeo de até 1 minuto por serviço, e o 1 GB do Supabase não
+  cobriria um mês. **O serviço escolhido é o Backblaze B2** (10 GB sempre gratuitos, egress livre
+  até 3x o armazenado, SEM cartão no cadastro; o Cloudflare R2, a primeira escolha, pede cartão).
+  **O MESMO provedor (`lib/s3.ts`) atende B2, R2 e qualquer outro compatível com S3**: não crie um
+  provedor por serviço; o que muda é o endereço e a região, que vêm de variável. Variáveis:
+  `S3_ENDPOINT` (B2: `https://s3.<região>.backblazeb2.com`), `S3_REGION` (B2: o trecho do meio do
+  endpoint), `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET` (todas `sync: false` no
+  render.yaml) e o teto `S3_STORAGE_LIMITE_MB` (10240). **A região faz parte da assinatura V4**:
+  errada, o serviço recusa os pedidos mesmo com as chaves certas; para endereço do B2 o código
+  confere região × endereço sem chamar ninguém (`avisoDeRegiaoDoS3`: erro no log ao subir e
+  primeiro passo do `s3:conferir`).
+  **`r2` é APELIDO de `s3`**, para não quebrar o que já estava escrito: `STORAGE_PROVIDER=r2` vale
+  o mesmo; as antigas `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`,
+  `R2_STORAGE_LIMITE_MB` e `R2_ACCOUNT_ID`/`R2_ENDPOINT` valem onde a `S3_*` correspondente não
+  existir (região "auto"); `npm run r2:conferir` roda o `s3:conferir`; chave `r2:<caminho>` é lida
+  do mesmo bucket. Nada novo é gravado com `r2:`: o prefixo das chaves é `s3:`, e `/saude` mostra
+  `"destino":"s3"` também com o apelido.
+  Supabase e S3 são os dois "buckets" de `armazenamento.ts` (`BUCKETS`): mesmos caminhos, mesma
+  miniatura guardada, mesma pasta `substituidas/`; a chave só muda de prefixo (`sb:` / `s3:`), e a
+  leitura segue o prefixo, então os dois convivem. **O fluxo das fotos não mudou**: tudo sai por
+  `GET /api/fotos/:id`, nenhum link do bucket vai para o navegador. O "decisão fechada: Supabase é
+  o destino DEFINITIVO", acima, vale como história: o que continua valendo é SharePoint fora de
+  escopo.
+  **B2 guarda VERSÕES**: arquivo regravado (miniatura refeita, reenvio, migração repetida) ou
+  apagado (o original de uma foto refeita, depois de copiado para `substituidas/`) continua
+  ocupando espaço como versão antiga, que a listagem da API S3 não mostra. O bucket tem de estar
+  com Lifecycle "Keep only the last version of the file" (SOCORRO.md, item 8, passo 4); sem isso
+  o espaço ocupado passa do que `usoDoS3` mede.
+  **Como trocar de provedor** (passo a passo para o cliente: SOCORRO.md, item 8): (1) as cinco
+  `S3_*` no painel da Render, mantendo as `SUPABASE_*`; (2) `npm run s3:conferir`; (3)
+  `STORAGE_PROVIDER: s3` NO `render.yaml` (o `value:` do arquivo é reaplicado: mudar só no painel
+  não dura) e Publicar; (4) `/saude` com `"destino":"s3","recebendo":true`.
   **Como migrar** (`scripts/migrar-fotos.ts`; quem roda é o usuário, na janela dele): com a
-  `DATABASE_URL` de produção, as `SUPABASE_*`, as `R2_*` e `STORAGE_PROVIDER=r2`, `npm run
+  `DATABASE_URL` de produção, as `SUPABASE_*`, as `S3_*` e `STORAGE_PROVIDER=s3`, `npm run
   fotos:migrar` (só mostra) e `npm run fotos:migrar -- --executar`. De bucket para bucket o
-  caminho é MANTIDO (`copiarParaOBucketAtual`); cada foto é gravada, lida de volta e só então a
-  chave muda no banco; as `substituidas/` vão junto (lidas de `storage.objects`); miniaturas não
-  (a API refaz). Imprime `RESULTADO: movidas N, falhas N, já estavam no destino N`. **Pode rodar
-  quantas vezes for preciso sem duplicar**: a migrada sai da lista, a que parou no meio regrava o
-  mesmo caminho. Sem `--apagar-origem` nada sai do Supabase; não apague a origem por conta própria.
+  caminho é MANTIDO (`copiarParaOBucketAtual`): a chave só troca `sb:` por `s3:`; cada foto é
+  gravada, lida de volta e só então a chave muda no banco; as `substituidas/` vão junto (lidas de
+  `storage.objects`); miniaturas não (a API refaz). Imprime `RESULTADO: movidas N, falhas N, já
+  estavam no destino N`. **Pode rodar quantas vezes for preciso sem duplicar**: a migrada sai da
+  lista, a que parou no meio regrava o mesmo caminho. Sem `--apagar-origem` nada sai do Supabase;
+  não apague a origem por conta própria.
   **Pendente de decisão, não implementado:** receber VÍDEO (o envio hoje só aceita JPG, PNG e
   WEBP, cada arquivo passa inteiro pela memória da API, e cada chamada ao bucket tem 30 s); e
-  ONDE os dados ficam: o R2 não tem região no Brasil (o banco está em São Paulo por decisão do
-  cliente, LGPD).
+  ONDE os dados ficam: nem o B2 nem o R2 têm região no Brasil (o banco está em São Paulo por
+  decisão do cliente, LGPD).
   **Supabase Pro (US$ 25 por mês, 100 GB) NÃO é o caminho para as fotos:** só vale para quem
   precisar do resto do pacote (banco maior, backups gerenciados, projeto que não pausa por
   inatividade). Nesse caso basta mudar `SUPABASE_STORAGE_LIMITE_MB`, sem migração.

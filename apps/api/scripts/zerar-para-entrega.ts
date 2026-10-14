@@ -36,7 +36,7 @@ async function main() {
   const { apagarArquivo, destinoDaChave } = await import('../src/lib/armazenamento');
   const { apagarDoSupabase, bucketDasFotos, conferirBucketPrivado, variaveisDoSupabaseFaltando } = await import('../src/lib/supabaseStorage');
   const { variaveisFaltando: variaveisDoSharepointFaltando } = await import('../src/lib/sharepoint');
-  const { apagarDoR2, conferirBucketDoR2, listarDoR2, variaveisDoR2Faltando } = await import('../src/lib/r2');
+  const { apagarDoS3, conferirBucketDoS3, listarDoS3, variaveisDoS3Faltando } = await import('../src/lib/s3');
 
   const argumentos = process.argv.slice(2);
   const posicao = argumentos.indexOf('--admin');
@@ -110,14 +110,14 @@ async function main() {
     const chavesDasFotos = (await prisma.fotoServico.findMany({ select: { arquivoChave: true } })).map((f) => f.arquivoChave);
     const codigosDosProjetos = (await prisma.projeto.findMany({ select: { codigo: true } })).map((p) => p.codigo);
     const noSupabase = chavesDasFotos.filter((c) => destinoDaChave(c) === 'supabase');
-    const noR2 = chavesDasFotos.filter((c) => destinoDaChave(c) === 'r2');
+    const noS3 = chavesDasFotos.filter((c) => destinoDaChave(c) === 's3');
     const noSharepoint = chavesDasFotos.filter((c) => destinoDaChave(c) === 'sharepoint');
     const noDisco = chavesDasFotos.filter((c) => destinoDaChave(c) === 'disco');
     const semArquivos = argumentos.includes('--sem-arquivos');
     if (!semArquivos) {
       const falta: string[] = [];
       if (noSupabase.length && variaveisDoSupabaseFaltando().length) falta.push(`${noSupabase.length} foto(s) no Supabase Storage, e faltam nesta janela: ${variaveisDoSupabaseFaltando().join(', ')}`);
-      if (noR2.length && variaveisDoR2Faltando().length) falta.push(`${noR2.length} foto(s) no Cloudflare R2, e faltam nesta janela: ${variaveisDoR2Faltando().join(', ')}`);
+      if (noS3.length && variaveisDoS3Faltando().length) falta.push(`${noS3.length} foto(s) no bucket S3, e faltam nesta janela: ${variaveisDoS3Faltando().join(', ')}`);
       if (noSharepoint.length && variaveisDoSharepointFaltando().length) falta.push(`${noSharepoint.length} foto(s) no SharePoint, e faltam nesta janela: ${variaveisDoSharepointFaltando().join(', ')}`);
       if (falta.length) {
         console.error(
@@ -130,7 +130,7 @@ async function main() {
         return;
       }
       if (noSupabase.length) await conferirBucketPrivado(true); // prova que a chave e o bucket desta janela funcionam
-      if (noR2.length) await conferirBucketDoR2();
+      if (noS3.length) await conferirBucketDoS3();
     }
     // No Supabase sai a pasta inteira de cada projeto (com miniaturas e substituídas, que não têm registro)
     let objetosNoSupabase: string[] = [];
@@ -141,14 +141,14 @@ async function main() {
         .catch(() => [] as { name: string }[]);
       objetosNoSupabase = [...new Set([...linhas.map((l) => l.name), ...noSupabase.map((c) => c.slice(3))])];
     }
-    // No R2, o mesmo: a pasta inteira de cada projeto, pela listagem do bucket
-    let objetosNoR2: string[] = [];
-    if (!semArquivos && !variaveisDoR2Faltando().length && codigosDosProjetos.length) {
+    // No bucket S3, o mesmo: a pasta inteira de cada projeto, pela listagem do bucket
+    let objetosNoS3: string[] = [];
+    if (!semArquivos && !variaveisDoS3Faltando().length && codigosDosProjetos.length) {
       const listados: string[] = [];
       for (const prefixo of codigosDosProjetos.flatMap((c) => [`${c}/`, `miniaturas/${c}/`])) {
-        listados.push(...(await listarDoR2(prefixo)).map((o) => o.caminho));
+        listados.push(...(await listarDoS3(prefixo)).map((o) => o.caminho));
       }
-      objetosNoR2 = [...new Set([...listados, ...noR2.map((c) => c.slice(3))])];
+      objetosNoS3 = [...new Set([...listados, ...noS3.map((c) => c.slice(3))])]; // "s3:" e "r2:" têm 3 letras
     }
 
     const [produtos, produtosAtivos, equipes, checklist] = await Promise.all([
@@ -172,7 +172,7 @@ async function main() {
       console.log('          os ARQUIVOS das fotos NÃO serão apagados (--sem-arquivos)');
     } else {
       if (objetosNoSupabase.length) linha('arquivos no Supabase Storage (fotos, miniaturas e substituídas dos projetos apagados)', objetosNoSupabase.length);
-      if (objetosNoR2.length) linha('arquivos no Cloudflare R2 (fotos, miniaturas e substituídas dos projetos apagados)', objetosNoR2.length);
+      if (objetosNoS3.length) linha('arquivos no bucket S3 (fotos, miniaturas e substituídas dos projetos apagados)', objetosNoS3.length);
       if (noSharepoint.length) linha('arquivos no SharePoint', noSharepoint.length);
       if (noDisco.length) linha('arquivos no disco deste computador (se existirem aqui)', noDisco.length);
     }
@@ -265,11 +265,11 @@ async function main() {
           (erro) => falhas.push(`Supabase Storage: ${(erro as Error).message}`),
         );
       }
-      for (let i = 0; i < objetosNoR2.length; i += 100) {
-        const lote = objetosNoR2.slice(i, i + 100);
-        await apagarDoR2(lote).then(
+      for (let i = 0; i < objetosNoS3.length; i += 100) {
+        const lote = objetosNoS3.slice(i, i + 100);
+        await apagarDoS3(lote).then(
           () => (apagados += lote.length),
-          (erro) => falhas.push(`Cloudflare R2: ${(erro as Error).message}`),
+          (erro) => falhas.push(`Bucket S3: ${(erro as Error).message}`),
         );
       }
       for (const chave of [...noSharepoint, ...noDisco]) {
@@ -281,7 +281,7 @@ async function main() {
           },
         );
       }
-      if (objetosNoSupabase.length || objetosNoR2.length || noSharepoint.length || noDisco.length) console.log(`Arquivos de fotos apagados do armazenamento: ${apagados}.`);
+      if (objetosNoSupabase.length || objetosNoS3.length || noSharepoint.length || noDisco.length) console.log(`Arquivos de fotos apagados do armazenamento: ${apagados}.`);
       if (falhas.length) {
         console.log(`ATENÇÃO: ${falhas.length} arquivo(s) não foram apagados (os registros já saíram do banco). Apague as pastas dos projetos pelo painel do armazenamento:`);
         for (const f of falhas.slice(0, 5)) console.log(`  ${f}`);

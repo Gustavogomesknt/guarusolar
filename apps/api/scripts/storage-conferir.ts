@@ -6,8 +6,8 @@
  * - supabase: lê a tabela storage.objects (precisa só da DATABASE_URL do projeto do Supabase);
  *   teto em SUPABASE_STORAGE_LIMITE_MB. No fim, uma CONTA APROXIMADA do egress do mês (o outro
  *   teto do plano gratuito): o número exato só existe no painel.
- * - r2: lista o bucket (precisa das quatro R2_*); teto em R2_STORAGE_LIMITE_MB. O R2 não cobra
- *   egress. Conferência do R2: npm run r2:conferir.
+ * - s3 (Backblaze B2, Cloudflare R2...): lista o bucket (precisa das S3_*); teto em
+ *   S3_STORAGE_LIMITE_MB. Conferência do bucket: npm run s3:conferir.
  *
  * Confere o Supabase Storage antes de ligar em produção (e mostra o relatório no fim):
  *   npm run storage:conferir
@@ -36,7 +36,7 @@ import {
   usoDoStorage,
   variaveisDoSupabaseFaltando,
 } from '../src/lib/supabaseStorage';
-import { relatorioDoR2, variaveisDoR2Faltando } from '../src/lib/r2';
+import { relatorioDoS3, servicoDoS3, variaveisDoS3Faltando } from '../src/lib/s3';
 import { destinoAtual } from '../src/lib/armazenamento';
 import { prisma } from '../src/lib/prisma';
 
@@ -62,14 +62,14 @@ const inteiro = (n: number) => n.toLocaleString('pt-BR');
 
 /** Só leitura: quanto o Storage ocupa, como cresce e quando chega ao teto. */
 async function relatorio() {
-  const noR2 = destinoAtual() === 'r2';
-  if (noR2 && variaveisDoR2Faltando().length) {
-    console.log(`Não deu para medir: STORAGE_PROVIDER=r2, e faltam nesta janela ${variaveisDoR2Faltando().join(', ')}.`);
+  const noS3 = destinoAtual() === 's3';
+  if (noS3 && variaveisDoS3Faltando().length) {
+    console.log(`Não deu para medir: STORAGE_PROVIDER=s3, e faltam nesta janela ${variaveisDoS3Faltando().join(', ')}.`);
     return false;
   }
-  const r = noR2 ? await relatorioDoR2() : await relatorioDoStorage();
-  const nome = noR2 ? 'Cloudflare R2' : 'Supabase Storage';
-  const variavel = noR2 ? 'R2_STORAGE_LIMITE_MB' : 'SUPABASE_STORAGE_LIMITE_MB';
+  const r = noS3 ? await relatorioDoS3() : await relatorioDoStorage();
+  const nome = noS3 ? servicoDoS3() : 'Supabase Storage';
+  const variavel = noS3 ? 'S3_STORAGE_LIMITE_MB' : 'SUPABASE_STORAGE_LIMITE_MB';
   if (!r) {
     console.log(
       'Não deu para medir: a tabela storage.objects não existe neste banco.\n' +
@@ -104,10 +104,18 @@ async function relatorio() {
     if (dias < 30) console.log('                    (menos de 30 dias de dados: a previsão ainda oscila muito)');
   }
 
-  if (noR2) {
-    console.log('\n  Egress: o R2 não cobra pelo que SAI (abrir fotos não tem teto nem custo).');
-    console.log('    O plano gratuito limita operações por mês (1 milhão de gravações e listagens, 10 milhões de');
-    console.log('    leituras), muito acima do uso do sistema. O número exato está no painel da Cloudflare, em R2.');
+  if (noS3) {
+    if (nome === 'Backblaze B2') {
+      console.log('\n  Egress: o B2 não cobra pelo que SAI até 3 vezes o que está armazenado, por mês.');
+      console.log('    Além do espaço, a conta gratuita tem limites DIÁRIOS de operações (downloads e listagens).');
+      console.log('    Os números e o consumo do dia estão no painel do Backblaze, em "Caps & Alerts".');
+    } else if (nome === 'Cloudflare R2') {
+      console.log('\n  Egress: o R2 não cobra pelo que SAI (abrir fotos não tem teto nem custo).');
+      console.log('    O plano gratuito limita operações por mês (1 milhão de gravações e listagens, 10 milhões de');
+      console.log('    leituras), muito acima do uso do sistema. O número exato está no painel da Cloudflare, em R2.');
+    } else {
+      console.log('\n  Egress e limites de operações: veja no painel do serviço onde o bucket está.');
+    }
     return true;
   }
 

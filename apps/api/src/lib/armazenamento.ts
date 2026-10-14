@@ -25,7 +25,7 @@ import {
   variaveisDoSupabaseFaltando,
   type UsoDoStorage,
 } from './supabaseStorage';
-import { apagarDoR2, baixarDoR2, conferirBucketDoR2, enviarAoR2, moverNoR2, usoDoR2, variaveisDoR2Faltando } from './r2';
+import { apagarDoS3, avisoDeRegiaoDoS3, baixarDoS3, conferirBucketDoS3, enviarAoS3, moverNoS3, servicoDoS3, usoDoS3, variaveisDoS3Faltando } from './s3';
 
 export { ArmazenamentoCheio, ArmazenamentoIndisponivel, ArquivoNaoEncontrado };
 export type { DestinoDaFoto };
@@ -36,8 +36,10 @@ export type { DestinoDaFoto };
  * - "disco" (padrão, desenvolvimento): pasta STORAGE_DIR (uploads/). Chave = caminho relativo.
  * - "supabase": bucket PRIVADO do Supabase Storage (lib/supabaseStorage.ts), cerca de 1 GB no
  *   plano gratuito. Chave = "sb:<caminho no bucket>".
- * - "r2": bucket PRIVADO do Cloudflare R2 (lib/r2.ts), 10 GB gratuitos e sem cobrança de egress.
- *   Chave = "r2:<caminho no bucket>", com os mesmos caminhos do Supabase.
+ * - "s3": bucket PRIVADO de qualquer serviço compatível com S3 (lib/s3.ts): Backblaze B2 (o
+ *   escolhido, 10 GB gratuitos), Cloudflare R2 e outros; o endereço e a região vêm de variável.
+ *   Chave = "s3:<caminho no bucket>", com os mesmos caminhos do Supabase. "r2" é APELIDO: como
+ *   STORAGE_PROVIDER vale o mesmo que "s3", e chave "r2:<caminho>" é lida do mesmo bucket.
  * - "sharepoint" (FORA DE ESCOPO, mantido no código): biblioteca do SharePoint pelo Microsoft
  *   Graph (lib/sharepoint.ts). EXIGE TENANT CORPORATIVO da Microsoft (Entra ID + SharePoint);
  *   o cliente usa conta pessoal, que não tem nenhum dos dois. Chave = "sp:<id do arquivo>".
@@ -54,45 +56,60 @@ export type ArquivoLido = { dados: Buffer; tipo: string };
 
 const PREFIXO_SHAREPOINT = 'sp:';
 const PREFIXO_SUPABASE = 'sb:';
+const PREFIXO_S3 = 's3:';
+/** Apelido de "s3:" (o provedor nasceu com o nome r2): só para LER; nada novo é gravado assim. */
 const PREFIXO_R2 = 'r2:';
 const LADO_DA_MINIATURA = 480;
 const TIPOS: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 
-export type Destino = 'disco' | 'sharepoint' | 'supabase' | 'r2';
+export type Destino = 'disco' | 'sharepoint' | 'supabase' | 's3';
 export const destinoAtual = (): Destino => {
   // maiúsculas e aspas digitadas no painel da hospedagem não mudam o destino
   const valor = provedorDeclarado();
-  return valor === 'sharepoint' || valor === 'supabase' || valor === 'r2' ? valor : 'disco';
+  if (valor === 'r2') return 's3'; // apelido
+  return valor === 'sharepoint' || valor === 'supabase' || valor === 's3' ? valor : 'disco';
 };
 
 /** Em qual destino está guardado o arquivo desta chave. */
 export const destinoDaChave = (chave: string): Destino =>
-  chave.startsWith(PREFIXO_SHAREPOINT) ? 'sharepoint' : chave.startsWith(PREFIXO_SUPABASE) ? 'supabase' : chave.startsWith(PREFIXO_R2) ? 'r2' : 'disco';
+  chave.startsWith(PREFIXO_SHAREPOINT)
+    ? 'sharepoint'
+    : chave.startsWith(PREFIXO_SUPABASE)
+      ? 'supabase'
+      : chave.startsWith(PREFIXO_S3) || chave.startsWith(PREFIXO_R2)
+        ? 's3'
+        : 'disco';
 
 /**
- * Os dois destinos que são "bucket" (Supabase Storage e Cloudflare R2) guardam os arquivos com os
+ * Os dois destinos que são "bucket" (Supabase Storage e o compatível com S3) guardam os arquivos com os
  * MESMOS caminhos e as mesmas regras (miniatura guardada, pasta "substituidas"); só muda quem
  * recebe a chamada. Tudo o que vale para um vale para o outro por aqui.
  */
 type Bucket = {
+  /** Prefixo das chaves novas. */
   prefixo: string;
+  /** Outros prefixos lidos como deste bucket. */
+  apelidos?: string[];
   enviar: (caminho: string, dados: Buffer, tipo: string, opcoes?: { conferir?: boolean }) => Promise<void>;
   baixar: (caminho: string) => Promise<Buffer>;
   mover: (de: string, para: string) => Promise<void>;
   apagar: (caminhos: string[]) => Promise<void>;
 };
-const BUCKETS: Record<'supabase' | 'r2', Bucket> = {
+const BUCKETS: Record<'supabase' | 's3', Bucket> = {
   supabase: { prefixo: PREFIXO_SUPABASE, enviar: enviarAoSupabase, baixar: baixarDoSupabase, mover: moverNoSupabase, apagar: apagarDoSupabase },
-  r2: { prefixo: PREFIXO_R2, enviar: enviarAoR2, baixar: baixarDoR2, mover: moverNoR2, apagar: apagarDoR2 },
+  s3: { prefixo: PREFIXO_S3, apelidos: [PREFIXO_R2], enviar: enviarAoS3, baixar: baixarDoS3, mover: moverNoS3, apagar: apagarDoS3 },
 };
 const bucketAtual = (): Bucket | null => {
   const destino = destinoAtual();
-  return destino === 'supabase' || destino === 'r2' ? BUCKETS[destino] : null;
+  return destino === 'supabase' || destino === 's3' ? BUCKETS[destino] : null;
 };
 /** O bucket onde está o arquivo desta chave e o caminho dele lá dentro; null se não é de bucket. */
 function noBucket(chave: string): { bucket: Bucket; caminho: string } | null {
-  const bucket = Object.values(BUCKETS).find((b) => chave.startsWith(b.prefixo));
-  return bucket ? { bucket, caminho: chave.slice(bucket.prefixo.length) } : null;
+  for (const bucket of Object.values(BUCKETS)) {
+    const prefixo = [bucket.prefixo, ...(bucket.apelidos ?? [])].find((p) => chave.startsWith(p));
+    if (prefixo) return { bucket, caminho: chave.slice(prefixo.length) };
+  }
+  return null;
 }
 
 const provedorDeclarado = () => process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '').toLowerCase();
@@ -104,12 +121,12 @@ const provedorDeclarado = () => process.env.STORAGE_PROVIDER?.trim().replace(/^[
  */
 export function configuracaoIncompleta(): string | null {
   const valor = provedorDeclarado();
-  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase' && valor !== 'r2') {
-    return `STORAGE_PROVIDER="${valor}" não existe (use "r2" ou "supabase"; em desenvolvimento, "disco").`;
+  if (valor && valor !== 'disco' && valor !== 'sharepoint' && valor !== 'supabase' && valor !== 's3' && valor !== 'r2') {
+    return `STORAGE_PROVIDER="${valor}" não existe (use "s3" ou "supabase"; em desenvolvimento, "disco").`;
   }
-  if (destinoAtual() === 'r2') {
-    const faltam = variaveisDoR2Faltando();
-    if (faltam.length) return `STORAGE_PROVIDER=r2, mas faltam: ${faltam.join(', ')}.`;
+  if (destinoAtual() === 's3') {
+    const faltam = variaveisDoS3Faltando();
+    if (faltam.length) return `STORAGE_PROVIDER=${valor}, mas faltam: ${faltam.join(', ')}.`;
   }
   if (destinoAtual() === 'supabase') {
     const faltam = variaveisDoSupabaseFaltando();
@@ -145,8 +162,8 @@ export function conferirArmazenamentoAoIniciar() {
             ? `  ${incompleta}`
             : `  NODE_ENV=production e STORAGE_PROVIDER="${process.env.STORAGE_PROVIDER ?? '(sem valor)'}" (destino: ${destinoAtual()}): o disco deste servidor é apagado a cada publicação.`,
           '  A API está no ar em MODO DEGRADADO: tudo funciona, menos o envio de fotos, que é RECUSADO (503).',
-          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=r2, com R2_ACCOUNT_ID,',
-          '  R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY e R2_BUCKET (ou STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
+          '  Corrija na hospedagem (Render › Environment): STORAGE_PROVIDER=s3, com S3_ENDPOINT, S3_REGION,',
+          '  S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY e S3_BUCKET (ou STORAGE_PROVIDER=supabase, com SUPABASE_URL,',
           '  SUPABASE_SERVICE_KEY e SUPABASE_BUCKET), e publique de novo. Confira em /saude: "recebendo":true.',
           '################################################################################',
           '',
@@ -174,16 +191,18 @@ export function conferirArmazenamentoAoIniciar() {
     setInterval(() => void conferir(), 24 * 60 * 60 * 1000).unref();
     return;
   }
-  if (destinoAtual() === 'r2') {
-    // Confere as chaves e o bucket e deixa o espaço no log. Falha aqui não derruba o servidor.
+  if (destinoAtual() === 's3') {
+    // Confere a região, as chaves e o bucket e deixa o espaço no log. Falha aqui não derruba o servidor.
     const conferir = async () => {
       try {
-        await conferirBucketDoR2();
-        const uso = await usoDoR2(true);
+        const regiaoErrada = avisoDeRegiaoDoS3();
+        if (regiaoErrada) console.error(`[armazenamento] ${servicoDoS3()}: ${regiaoErrada}`);
+        await conferirBucketDoS3();
+        const uso = await usoDoS3(true);
         const espaco = uso ? `${(uso.fracao * 100).toFixed(1)}% de ${(uso.limiteBytes / 1024 / 1024).toFixed(0)} MB em uso` : 'uso não medido';
-        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] Cloudflare R2: bucket conferido; ${espaco}.`);
+        console[uso && uso.nivel !== 'ok' ? 'warn' : 'log'](`[armazenamento] ${servicoDoS3()}: bucket conferido; ${espaco}.`);
       } catch (erro) {
-        console.error(`[armazenamento] Cloudflare R2: ${(erro as Error).message}`);
+        console.error(`[armazenamento] ${servicoDoS3()}: ${(erro as Error).message}`);
       }
     };
     void conferir();
@@ -201,14 +220,14 @@ export function conferirArmazenamentoAoIniciar() {
 
 /**
  * Espaço do destino atual, para o aviso de 70% do escritório. Só os buckets têm teto a medir
- * (SUPABASE_STORAGE_LIMITE_MB e R2_STORAGE_LIMITE_MB); disco e SharePoint devolvem null.
+ * (SUPABASE_STORAGE_LIMITE_MB e S3_STORAGE_LIMITE_MB); disco e SharePoint devolvem null.
  */
 export const usoDoDestinoAtual = (): Promise<UsoDoStorage | null> =>
   // em modo degradado (faltam variáveis) não há o que medir: quem avisa é a faixa vermelha
-  configuracaoIncompleta() !== null ? Promise.resolve(null) : destinoAtual() === 'supabase' ? usoDoStorage() : destinoAtual() === 'r2' ? usoDoR2() : Promise.resolve(null);
+  configuracaoIncompleta() !== null ? Promise.resolve(null) : destinoAtual() === 'supabase' ? usoDoStorage() : destinoAtual() === 's3' ? usoDoS3() : Promise.resolve(null);
 
 /**
- * As fotos sobrevivem a uma publicação? No Supabase Storage, no R2 (e no SharePoint), sim. No disco, só
+ * As fotos sobrevivem a uma publicação? No Supabase Storage, no bucket S3 (e no SharePoint), sim. No disco, só
  * se ele for persistente (FOTOS_EM_DISCO_PERSISTENTE=sim; na Render, só plano pago com disco): o
  * disco comum do servidor é apagado a cada publicação, reinício e sono. Em produção sem isso, a
  * API NÃO RECEBE FOTOS (melhor não receber do que perder), e só isso: o login e a agenda do app
@@ -225,7 +244,7 @@ export const appTecnicoLiberado = () =>
   (process.env.NODE_ENV !== 'production' ||
     destinoAtual() === 'sharepoint' ||
     destinoAtual() === 'supabase' ||
-    destinoAtual() === 'r2' ||
+    destinoAtual() === 's3' ||
     process.env.FOTOS_EM_DISCO_PERSISTENTE?.trim() === 'sim');
 
 /** Para o técnico (tela do serviço e fila de fotos): o motivo de verdade, e a quem avisar. */
@@ -255,7 +274,7 @@ async function lerDoDisco(chave: string): Promise<Buffer> {
 }
 
 // ------------------------------------------------------------------------------------------
-// Buckets (Supabase Storage e R2): caminhos (só ASCII: o Supabase recusa acento no nome do objeto)
+// Buckets (Supabase Storage e S3): caminhos (só ASCII: o Supabase recusa acento no nome do objeto)
 // ------------------------------------------------------------------------------------------
 
 const PASTA_SUBSTITUIDAS_NO_BUCKET = 'substituidas';
@@ -325,7 +344,7 @@ export async function lerMiniatura(chave: string): Promise<ArquivoLido> {
   }
   const guardado = noBucket(chave);
   if (guardado) {
-    // gerada uma vez e guardada no bucket (nem o Supabase gratuito nem o R2 reduzem imagens)
+    // gerada uma vez e guardada no bucket (nem o Supabase gratuito nem os buckets S3 reduzem imagens)
     const miniatura = miniaturaNoBucket(guardado.caminho);
     try {
       return { dados: await guardado.bucket.baixar(miniatura), tipo: 'image/jpeg' };
@@ -386,8 +405,8 @@ export async function apagarArquivo(chave: string) {
 }
 
 /**
- * Migração de um bucket para outro (Supabase Storage -> R2): grava no destino atual com o MESMO
- * caminho da origem, de modo que a chave só troca de prefixo ("sb:…" vira "r2:…"). Gravar de
+ * Migração de um bucket para outro (Supabase Storage -> S3): grava no destino atual com o MESMO
+ * caminho da origem, de modo que a chave só troca de prefixo ("sb:…" vira "s3:…"). Gravar de
  * novo o mesmo caminho substitui o arquivo: rodar a migração duas vezes não duplica nada.
  * null quando a origem ou o destino atual não é bucket (aí a migração usa salvarFoto).
  */

@@ -10,7 +10,7 @@ const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
 /**
  * Aviso do espaço das fotos para o gestor e o admin (montado no Layout, em todas as telas deles).
- * As fotos ficam num bucket com teto: Cloudflare R2 (10 GB gratuitos; R2_STORAGE_LIMITE_MB na
+ * As fotos ficam num bucket com teto: Backblaze B2 (10 GB gratuitos; S3_STORAGE_LIMITE_MB na
  * API) ou Supabase Storage (cerca de 1 GB; SUPABASE_STORAGE_LIMITE_MB). Aparece a partir de 70% de uso, bem
  * antes de a API começar a recusar fotos novas (95%): dá tempo de decidir (README, "Espaço das fotos").
  */
