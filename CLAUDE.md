@@ -122,7 +122,9 @@ apps/api/                      API (Express + Prisma)
                                médio, crescimento por mês e meses até o teto no ritmo atual
   scripts/migrar-fotos.ts      npm run fotos:migrar [-- --executar [--apagar-origem]]: leva as fotos
                                de outro destino para o STORAGE_PROVIDER atual (copia, confere, troca
-                               a chave); serve se um dia o destino das fotos mudar
+                               a chave); serve se um dia o destino das fotos mudar. RECUSA sem
+                               STORAGE_PROVIDER na janela (não assume "disco") e com banco de
+                               produção + destino "disco" (só com --forcar-disco)
   src/lib/sharepoint.ts        FORA DE ESCOPO (exige tenant corporativo; o cliente tem conta pessoal).
                                Microsoft Graph com credencial de aplicativo (Sites.Selected):
                                token em memória, novas tentativas (Retry-After), falha vira

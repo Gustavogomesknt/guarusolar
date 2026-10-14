@@ -227,7 +227,9 @@ ou chat.**
 
 10. Numa janela do PowerShell ligada ao banco de produção (como no item 6), com as três
     `SUPABASE_*`, as cinco `S3_*` e `$env:STORAGE_PROVIDER='s3'`, rode **`npm run fotos:migrar`**:
-    ele só MOSTRA quantas fotos há a levar, sem mexer em nada.
+    ele só MOSTRA quantas fotos há a levar, sem mexer em nada. Sem a `STORAGE_PROVIDER` na janela
+    ele se recusa e diz o que falta: nunca rode sem ela (já levou as fotos de produção para o
+    disco de um PC, por engano).
 11. Rode **`npm run fotos:migrar -- --executar`**. Cada foto é copiada para o B2 com o mesmo nome,
     conferida, e só então o sistema passa a buscá-la lá. No fim aparece a linha
     `RESULTADO: movidas N, falhas N, já estavam no destino N`.

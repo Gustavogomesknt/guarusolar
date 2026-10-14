@@ -15,6 +15,7 @@
  *   npm run fotos:migrar                         só mostra o que seria migrado (não grava nada)
  *   npm run fotos:migrar -- --executar           copia para o destino atual e troca a chave no banco
  *   npm run fotos:migrar -- --executar --apagar-origem   e apaga a cópia antiga, já conferida
+ *   --forcar-disco                               aceita destino "disco" com banco de produção (ver GUARDAS)
  *
  * Para cada foto cuja chave é de outro destino: lê o arquivo de onde está, grava no destino atual
  * (com os mesmos nomes e pastas de uma foto nova), LÊ DE VOLTA para conferir o tamanho e só então
@@ -26,10 +27,19 @@
  * são migradas: continuam no armazenamento antigo.
  *
  * No fim: quantas foram movidas, quantas falharam e quantas já estavam no destino.
+ *
+ * GUARDAS (antes de ler qualquer foto):
+ * - STORAGE_PROVIDER é obrigatória NESTA janela: sem ela o script para e não escolhe destino
+ *   nenhum. (Já aconteceu: sem a variável, o destino virou "disco" e as fotos de produção foram
+ *   copiadas para o PC de quem rodou, com as chaves trocadas no banco de produção.)
+ * - Banco de produção + destino "disco" é recusado: produção nunca usa disco (o da Render é
+ *   apagado a cada publicação, e o do PC de quem roda a API de produção não alcança). Só passa
+ *   com --forcar-disco, que existe para um caso excepcional e decidido de propósito.
+ * - Nome de destino que não existe, ou destino sem as próprias variáveis, também param.
  */
 import 'dotenv/config';
 import path from 'node:path';
-import { apagarArquivo, copiarParaOBucketAtual, destinoAtual, destinoDaChave, lerArquivo, salvarFoto } from '../src/lib/armazenamento';
+import { apagarArquivo, configuracaoIncompleta, copiarParaOBucketAtual, destinoAtual, destinoDaChave, lerArquivo, salvarFoto } from '../src/lib/armazenamento';
 import { enviarAoS3, tamanhoNoS3 } from '../src/lib/s3';
 import { apagarDoSupabase, baixarDoSupabase, bucketDasFotos, variaveisDoSupabaseFaltando } from '../src/lib/supabaseStorage';
 import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
@@ -39,7 +49,45 @@ async function main() {
   const argumentos = process.argv.slice(2);
   const executar = argumentos.includes('--executar');
   const apagarOrigem = argumentos.includes('--apagar-origem');
+  const forcarDisco = argumentos.includes('--forcar-disco');
+
+  // sem STORAGE_PROVIDER, destinoAtual() cairia em "disco": aqui isso nunca é escolhido sozinho
+  if (!process.env.STORAGE_PROVIDER?.trim().replace(/^["']|["']$/g, '')) {
+    console.error(
+      [
+        '\nRecusado: falta a variável STORAGE_PROVIDER nesta janela. Nada foi lido nem gravado.',
+        'O script não escolhe destino sozinho. Defina para onde as fotos vão e rode de novo. No PowerShell:',
+        '  $env:STORAGE_PROVIDER = "s3"        (Backblaze B2, com as cinco S3_* nesta mesma janela)',
+        'Em desenvolvimento, para o disco deste computador: $env:STORAGE_PROVIDER = "disco"',
+      ].join('\n'),
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const incompleta = configuracaoIncompleta();
+  if (incompleta) {
+    console.error(`\nRecusado: ${incompleta} Nada foi lido nem gravado.`);
+    process.exitCode = 1;
+    return;
+  }
   const para = destinoAtual();
+  const producao = process.env.NODE_ENV === 'production' || (await bancoDeProducao(prisma));
+  if (producao && para === 'disco') {
+    if (!forcarDisco) {
+      console.error(
+        [
+          '\nRecusado: este é o banco de PRODUÇÃO e o destino é "disco" (STORAGE_PROVIDER=disco). Nada foi lido nem gravado.',
+          'Produção nunca guarda fotos em disco: o disco da Render é apagado a cada publicação, e o deste',
+          'computador a API de produção não alcança. As chaves do banco passariam a apontar para arquivos',
+          'que a produção não acha. Para o Backblaze B2: $env:STORAGE_PROVIDER = "s3" (com as cinco S3_*).',
+          'Se houver um motivo excepcional, decidido de propósito, acrescente --forcar-disco.',
+        ].join('\n'),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.warn('\nATENÇÃO: --forcar-disco com o banco de PRODUÇÃO. As fotos vão para o disco DESTE computador, e a produção deixa de achá-las.');
+  }
 
   const fotos = await prisma.fotoServico.findMany({
     orderBy: { criadoEm: 'asc' },
@@ -59,7 +107,7 @@ async function main() {
   const porOrigem = new Map<string, number>();
   for (const f of fotos) porOrigem.set(destinoDaChave(f.arquivoChave), (porOrigem.get(destinoDaChave(f.arquivoChave)) ?? 0) + 1);
 
-  console.log(`\nMigração de fotos — banco de ${(await bancoDeProducao(prisma)) ? 'PRODUÇÃO' : 'desenvolvimento'}`);
+  console.log(`\nMigração de fotos — banco de ${producao ? 'PRODUÇÃO' : 'desenvolvimento'}`);
   console.log(`Destino atual (STORAGE_PROVIDER): ${para}`);
   console.log(`Fotos no banco: ${fotos.length} (${[...porOrigem].map(([d, n]) => `${n} em ${d}`).join(', ') || 'nenhuma'})`);
   console.log(`A migrar para ${para}: ${aMigrar.length} (já estão em ${para}: ${fotos.length - aMigrar.length})`);
