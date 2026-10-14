@@ -780,6 +780,13 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   em base64; falha de reprodução é ignorada) e aviso no canto por 10 s com cliente e tipo de
   serviço (fora da tela de Validação; o som toca também nela). Botão "Som da validação" no rodapé
   do menu desliga só o som, guardado por navegador (localStorage). Para após 30 min sem uso.
+- **Técnico espera no local durante a validação** (acordado com o cliente, 14/10/2026): com a tela
+  de um serviço EM VALIDAÇÃO aberta, o app pergunta `GET /api/tecnico/versao` (mesma versão em
+  memória, sem banco) a cada 10 s, só com o app em primeiro plano, e para quando o serviço sai de
+  "em validação". Aprovado: "Serviço aprovado", toque curto e o botão "Encerrar e voltar para a
+  agenda". Devolvido: toque, o aviso com o motivo e a rolagem até a primeira foto a refazer, com
+  o foco nela. Mesmo som do escritório (`packages/web/src/somDeAviso.ts`, `criarSomDeAviso`), com
+  botão de silenciar próprio de cada app (chaves diferentes no localStorage).
   A versão fica em MEMÓRIA na API (`lib/versaoDaOperacao.ts`): rota nova que mude agendamento,
   validação ou crie projeto chama `operacaoMudou()` depois de gravar. Decisão: nada de Supabase
   Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)

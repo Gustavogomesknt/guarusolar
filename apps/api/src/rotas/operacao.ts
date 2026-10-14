@@ -676,6 +676,13 @@ function conferirServicoAberto(status: StatusAgendamento) {
   if (status === 'CANCELADO') throw new ErroHttp(409, 'Este serviço foi cancelado pelo escritório.');
 }
 
+// Mesma versão da operação do escritório (sem banco). O app do técnico pergunta a cada 10 s só
+// enquanto a tela de um serviço EM VALIDAÇÃO está aberta (técnico esperando no local) e, quando
+// muda, recarrega o serviço para ver se o gestor aprovou ou devolveu.
+rotasTecnico.get('/versao', (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ versao: versaoDaOperacao() });
+});
+
 rotasTecnico.get(
   '/agenda',
   rota(async (req, res) => {

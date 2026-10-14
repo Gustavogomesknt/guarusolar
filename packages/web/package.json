@@ -16,7 +16,8 @@
     "./FormularioTrocaSenha": "./src/FormularioTrocaSenha.tsx",
     "./AvisoDeConexao": "./src/AvisoDeConexao.tsx",
     "./SituacaoServico": "./src/SituacaoServico.tsx",
-    "./recarga": "./src/recarga.tsx"
+    "./recarga": "./src/recarga.tsx",
+    "./somDeAviso": "./src/somDeAviso.ts"
   },
   "peerDependencies": {
     "@guarusolar/compartilhado": "^0.1.0",

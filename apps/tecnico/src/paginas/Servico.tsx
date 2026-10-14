@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, Loader2, LocateFixed, MapPin } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, Check, Clock, Loader2, LocateFixed, MapPin } from 'lucide-react';
 import { diaDaApi, diaDeHoje, diaMes, nomeLongo, ROTEIRO_DO_SERVICO, somarDias } from '@guarusolar/compartilhado';
 import { toast } from 'sonner';
 import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
@@ -11,6 +11,7 @@ import { enderecoEscrito } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
+import { criarSomDeAviso } from '@guarusolar/web/somDeAviso';
 import { BlocoFoto, FotosExtras, type EstadoBloco } from '@/components/BlocoFoto';
 import { useFotos } from '@/fotos/useFotos';
 import type { Posicao } from '@/fotos/metadados';
@@ -34,6 +35,40 @@ function gravarRascunho(id: string, rascunho: Rascunho | null) {
   } catch {
     /* armazenamento bloqueado: o rascunho vive só enquanto a tela está aberta */
   }
+}
+
+/** Toque quando o gestor aprova ou devolve o serviço que o técnico espera no local (mesmo som do escritório). */
+const somDoResultado = criarSomDeAviso('guarusolar.tecnico.somDaValidacao');
+const INTERVALO_NA_VALIDACAO = 10_000;
+
+/**
+ * Técnico esperando no local (combinado com o cliente): enquanto `ativo` (serviço em validação
+ * com esta tela aberta), pergunta a versão da operação a cada 10 s (GET /api/tecnico/versao, sem
+ * banco, o mesmo sinal do escritório) e, quando muda, recarrega o serviço. Com o app em segundo
+ * plano o intervalo para (refetchIntervalInBackground: false) e, ao voltar, pergunta na hora
+ * (refetchOnWindowFocus). Sai de "em validação", `ativo` vira false e para de perguntar.
+ */
+function useAcompanharValidacao(id: string, ativo: boolean) {
+  const clienteConsultas = useQueryClient();
+  const versao = useQuery({
+    queryKey: ['versao'],
+    queryFn: ({ signal }) => api.get<{ versao: string }>('/api/tecnico/versao', { signal }),
+    enabled: ativo,
+    refetchInterval: ativo ? INTERVALO_NA_VALIDACAO : false,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+    retry: false,
+    // sem sinal ou servidor acordando: tenta de novo em 10 s, sem aviso a cada falha
+    meta: { semAvisoDeErro: true },
+  });
+  const atual = versao.data?.versao;
+  const vista = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!ativo || !atual || atual === vista.current) return;
+    // a primeira resposta também recarrega: o gestor pode ter decidido antes dela
+    vista.current = atual;
+    void clienteConsultas.invalidateQueries({ queryKey: ['servico', id] });
+  }, [ativo, atual, id, clienteConsultas]);
 }
 
 /** "Hoje, 28/09", "Amanhã, 29/09" ou "quarta, 30/09"; período quando tem vários dias. */
@@ -127,6 +162,38 @@ export function Servico() {
   const caixaTeste = useRef<HTMLInputElement>(null);
   const campoObservacoes = useRef<HTMLTextAreaElement>(null);
 
+  // Em validação com a tela aberta: acompanha até o gestor decidir.
+  const status = servico.data?.status;
+  const emValidacao = status === 'AGUARDANDO_VALIDACAO' || (enviadoAgora && status !== 'DEVOLVIDO' && status !== 'APROVADO');
+  useAcompanharValidacao(id, emValidacao);
+
+  // O gestor decidiu enquanto o técnico esperava: toque curto e o resultado na tela.
+  const [devolvidoAgora, setDevolvidoAgora] = useState(false);
+  const statusAnterior = useRef(status);
+  useEffect(() => {
+    const antes = statusAnterior.current;
+    statusAnterior.current = status;
+    if (antes !== 'AGUARDANDO_VALIDACAO' || antes === status) return;
+    if (status === 'APROVADO' || status === 'DEVOLVIDO') {
+      somDoResultado.tocar();
+      void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
+    }
+    if (status === 'DEVOLVIDO') {
+      setEnviadoAgora(false);
+      setDevolvidoAgora(true);
+    }
+  }, [status, clienteConsultas]);
+
+  // devolvido agora: leva o técnico direto à primeira foto a refazer, pronta para tocar
+  useEffect(() => {
+    if (!devolvidoAgora || status !== 'DEVOLVIDO') return;
+    const quadro = primeiroQueFalta.current;
+    if (!quadro) return;
+    const suave = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    quadro.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'center' });
+    quadro.querySelector('button')?.focus({ preventScroll: true });
+  }, [devolvidoAgora, status]);
+
   if (servico.isPending) {
     return (
       <div className="min-h-svh bg-background">
@@ -158,8 +225,7 @@ export function Servico() {
   const tipo = TIPOS_SERVICO_AGENDA[s.tipo];
   const endereco = enderecoEscrito(cliente);
 
-  if (enviadoAgora || s.status === 'AGUARDANDO_VALIDACAO' || s.status === 'APROVADO') {
-    const obrigatorias = s.checklist.filter((i) => i.obrigatoria).length;
+  if (s.status === 'APROVADO') {
     return (
       <div className="flex min-h-svh flex-col bg-background">
         <Cabecalho titulo={cliente.nome} subtitulo={<span className="font-mono">{s.projeto.codigo}</span>} voltarPara="/agenda" />
@@ -167,16 +233,44 @@ export function Servico() {
           <span className="flex size-[72px] items-center justify-center rounded-full bg-[#DCF0E3] text-[#17653E]">
             <Check className="size-9" strokeWidth={2.5} aria-hidden />
           </span>
+          <h2 role="status" className="text-2xl font-bold text-[#17653E]">
+            Serviço aprovado
+          </h2>
+          <p className="leading-relaxed text-[#3A4A5E]">O gestor validou as fotos deste serviço. Pode encerrar e sair do local.</p>
+          <Link
+            to="/agenda"
+            className="flex h-14 w-full max-w-xs items-center justify-center rounded-2xl bg-primary text-base font-semibold text-primary-foreground active:bg-primary/90"
+          >
+            Encerrar e voltar para a agenda
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (emValidacao) {
+    const obrigatorias = s.checklist.filter((i) => i.obrigatoria).length;
+    return (
+      <div className="flex min-h-svh flex-col bg-background">
+        <Cabecalho titulo={cliente.nome} subtitulo={<span className="font-mono">{s.projeto.codigo}</span>} voltarPara="/agenda" />
+        <main className="flex flex-1 flex-col items-center gap-4 px-7 py-12 text-center">
+          <span className="flex size-[72px] items-center justify-center rounded-full bg-[#EDF1F6] text-primary">
+            <Clock className="size-9" strokeWidth={2.25} aria-hidden />
+          </span>
           <h2 role="status" className="text-2xl font-bold">
-            {s.status === 'APROVADO' ? 'Serviço concluído' : 'Enviado para validação'}
+            Enviado para validação
           </h2>
           <p className="leading-relaxed text-[#3A4A5E]">
-            {s.status === 'APROVADO'
-              ? 'O gestor validou as fotos deste serviço.'
-              : `As ${obrigatorias} fotos obrigatórias foram enviadas. Você será avisado se o gestor pedir alguma foto novamente.`}
+            As {obrigatorias} fotos obrigatórias foram enviadas. Aguarde no local: o gestor está conferindo, e o
+            resultado aparece aqui sozinho, sem precisar atualizar.
           </p>
-          <Link to="/agenda" className="flex h-12 items-center rounded-xl border bg-card px-5 font-medium">
-            Voltar para a agenda
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Aguardando o gestor…
+          </p>
+          <BotaoSom />
+          <Link to="/agenda" className="mt-2 text-sm font-medium text-muted-foreground underline underline-offset-4">
+            Voltar para a agenda sem esperar
           </Link>
         </main>
       </div>
@@ -275,7 +369,11 @@ export function Servico() {
         </section>
 
         {s.status === 'DEVOLVIDO' && (
-          <section className="flex gap-2.5 rounded-2xl border border-destaque bg-destaque-suave p-4 text-destaque-texto">
+          // devolvido com a tela aberta: role="alert" para o leitor de tela anunciar na hora
+          <section
+            role={devolvidoAgora ? 'alert' : undefined}
+            className="flex gap-2.5 rounded-2xl border border-destaque bg-destaque-suave p-4 text-destaque-texto"
+          >
             <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden />
             <div className="flex flex-col gap-1">
               <p className="font-semibold">O gestor pediu fotos novamente</p>
@@ -429,6 +527,26 @@ export function Servico() {
         </p>
       </footer>
     </div>
+  );
+}
+
+/** Liga e desliga o toque do resultado da validação, guardado neste celular. */
+function BotaoSom() {
+  const ligado = somDoResultado.useSomLigado();
+  const Icone = ligado ? Bell : BellOff;
+  return (
+    <button
+      type="button"
+      aria-pressed={ligado}
+      onClick={() => somDoResultado.definirSomLigado(!ligado)}
+      className={cn(
+        'flex h-12 items-center gap-2 rounded-xl border px-4 text-sm font-medium',
+        ligado ? 'bg-card text-foreground' : 'border-destaque bg-destaque-suave text-destaque-texto',
+      )}
+    >
+      <Icone className="size-4" aria-hidden />
+      {ligado ? 'Som do resultado: ligado' : 'Som do resultado: desligado'}
+    </button>
   );
 }
 

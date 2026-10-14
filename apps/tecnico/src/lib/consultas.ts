@@ -11,6 +11,10 @@ declare module '@tanstack/react-query' {
       /** A tela mostra o erro no próprio lugar; não precisa de aviso global. */
       erroTratadoNaTela?: boolean;
     };
+    queryMeta: {
+      /** Consulta repetida em segundo plano (ex.: a versão, a cada 10 s): falha não vira aviso. */
+      semAvisoDeErro?: boolean;
+    };
   }
 }
 
@@ -29,7 +33,7 @@ function avisarErro(erro: unknown) {
 const SETE_DIAS = 7 * 24 * 60 * 60 * 1000;
 
 export const clienteConsultas = new QueryClient({
-  queryCache: new QueryCache({ onError: avisarErro }),
+  queryCache: new QueryCache({ onError: (erro, consulta) => !consulta.meta?.semAvisoDeErro && avisarErro(erro) }),
   mutationCache: new MutationCache({
     onError: (erro, _variaveis, _contexto, mutacao) => {
       if (!mutacao.meta?.erroTratadoNaTela) avisarErro(erro);
