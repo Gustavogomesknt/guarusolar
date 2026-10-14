@@ -3,7 +3,9 @@ import { useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useFilaDeValidacao, useVersaoDaOperacao } from '@/paginas/validacao/fila';
+import { ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
 import type { ServicoNaFila } from '@/lib/tipos';
+import { tocarSomDeChegada } from './somDaValidacao';
 
 /** Sem mexer no sistema por este tempo, para de perguntar (PC esquecido ligado não mantém a Render acordada). */
 const PAUSA_SEM_USO = 30 * 60_000;
@@ -14,8 +16,11 @@ const TITULO = document.title;
  * - pergunta a versão da operação a cada 20 s; quando muda, recarrega a validação, a agenda e
  *   os projetos (só as consultas em tela vão ao servidor);
  * - título da aba com quantos aguardam: "(2) Guarusolar — Escritório";
- * - aviso de chegada, sem som, UMA vez por envio (o reenvio depois de uma devolução é um envio
- *   novo), e só fora da tela de Validação (lá a própria fila mostra).
+ * - chegada: UMA vez por envio (o reenvio depois de uma devolução é um envio novo), nunca na
+ *   primeira carga da página. Toca o som curto (somDaValidacao: some se o botão do menu o
+ *   desligou ou se o navegador não deixar) e mostra o aviso no canto por 10 s, com cliente e
+ *   tipo de serviço; o aviso só fora da tela de Validação (lá a própria fila mostra), o som
+ *   também nela.
  * Para depois de 30 min sem uso; o primeiro movimento ou a volta à aba retoma na hora.
  */
 export function AcompanhamentoOperacao() {
@@ -72,19 +77,22 @@ export function AcompanhamentoOperacao() {
     const jaVistos = vistos.current;
     const novos = chegados.filter((s) => !jaVistos.has(chave(s)));
     for (const s of novos) jaVistos.add(chave(s));
-    if (novos.length === 0 || naValidacao.current) return;
+    if (novos.length === 0) return;
+    tocarSomDeChegada();
+    if (naValidacao.current) return;
     const abrir = (id?: string) => navegar(id ? `/validacao?servico=${id}` : '/validacao');
     if (novos.length === 1) {
       const s = novos[0];
       toast.info(`Novo serviço para validar: ${s.projeto.cliente.nome}`, {
-        description: `${s.projeto.codigo}${s.reenviado ? ' · reenviado após devolução' : ''}`,
+        description: `${ROTULO_TIPO_SERVICO[s.tipo]} · ${s.projeto.codigo}${s.reenviado ? ' · reenviado após devolução' : ''}`,
         action: { label: 'Abrir', onClick: () => abrir(s.id) },
-        duration: 15_000,
+        duration: 10_000,
       });
     } else {
       toast.info(`${novos.length} serviços novos para validar`, {
+        description: novos.map((s) => `${s.projeto.cliente.nome} (${ROTULO_TIPO_SERVICO[s.tipo]})`).join(', '),
         action: { label: 'Abrir', onClick: () => abrir() },
-        duration: 15_000,
+        duration: 10_000,
       });
     }
   }, [fila.data, navegar]);

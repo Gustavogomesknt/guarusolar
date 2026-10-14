@@ -775,8 +775,11 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   aquele orçamento (200) em vez de criar outro. Formulário novo de criação = UUID novo.
 - **Fila de validação quase em tempo real** (`app/AcompanhamentoOperacao.tsx`, só GESTOR/ADMIN):
   pergunta `GET /api/validacao/versao` a cada 20 s (também com a aba em segundo plano) e, quando a
-  versão muda, recarrega validação, agenda e projetos; título da aba "(2) …" e aviso de chegada
-  sem som, uma vez por envio, fora da tela de Validação. Para após 30 min sem uso do sistema.
+  versão muda, recarrega validação, agenda e projetos; título da aba "(2) …", contador no menu e,
+  uma vez por envio (nunca na primeira carga): som curto embutido (`app/somDaValidacao.ts`, WAV
+  em base64; falha de reprodução é ignorada) e aviso no canto por 10 s com cliente e tipo de
+  serviço (fora da tela de Validação; o som toca também nela). Botão "Som da validação" no rodapé
+  do menu desliga só o som, guardado por navegador (localStorage). Para após 30 min sem uso.
   A versão fica em MEMÓRIA na API (`lib/versaoDaOperacao.ts`): rota nova que mude agendamento,
   validação ou crie projeto chama `operacaoMudou()` depois de gravar. Decisão: nada de Supabase
   Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)

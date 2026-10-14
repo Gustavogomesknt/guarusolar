@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { KeyRound, Loader2, LogOut } from "lucide-react";
+import { Bell, BellOff, KeyRound, Loader2, LogOut } from "lucide-react";
 import { useSessao } from "@guarusolar/web/sessao";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
@@ -8,6 +8,7 @@ import { Selo } from "@/components/Selo";
 import { MENU, type ItemMenu } from "./menu";
 import { AcompanhamentoOperacao } from "./AcompanhamentoOperacao";
 import { AvisoDoArmazenamento } from "./AvisoDoArmazenamento";
+import { definirSomLigado, useSomLigado } from "./somDaValidacao";
 
 const GRUPOS: ItemMenu["grupo"][] = ["Comercial", "Operação", "Administração"];
 import { NOME_DO_PAPEL, podeAcessar } from "./permissoes";
@@ -84,6 +85,7 @@ export function Layout() {
           <p className="text-xs text-sidebar-foreground/70">
             {NOME_DO_PAPEL[usuario.papel]}
           </p>
+          {podeAcessar(usuario.papel, ["GESTOR"]) && <BotaoSomDaValidacao />}
           <Link
             to="/conta/senha"
             className="mt-3 flex min-h-10 items-center gap-2 text-sm text-sidebar-foreground/80 hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-ring"
@@ -120,5 +122,29 @@ export function Layout() {
         </Suspense>
       </main>
     </div>
+  );
+}
+
+/**
+ * Liga e desliga o som de "chegou serviço para validar", guardado neste navegador. O aviso visual
+ * (contador, título da aba, aviso no canto) continua com o som desligado.
+ */
+function BotaoSomDaValidacao() {
+  const ligado = useSomLigado();
+  const Icone = ligado ? Bell : BellOff;
+  return (
+    <button
+      type="button"
+      aria-pressed={ligado}
+      onClick={() => definirSomLigado(!ligado)}
+      title={ligado ? "Toca um som quando chega serviço para validar. Clique para desligar." : "Som desligado: só o aviso na tela. Clique para ligar."}
+      className={cn(
+        "mt-3 flex min-h-10 w-full items-center gap-2 rounded-md text-left text-sm focus-visible:outline-2 focus-visible:outline-sidebar-ring",
+        ligado ? "text-sidebar-foreground/80 hover:text-white" : "text-destaque-claro hover:text-white",
+      )}
+    >
+      <Icone className="size-4" aria-hidden />
+      {ligado ? "Som da validação: ligado" : "Som da validação: desligado"}
+    </button>
   );
 }
