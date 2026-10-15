@@ -502,7 +502,18 @@ export async function abreSemAssinatura(caminho: string): Promise<boolean> {
 /** Resposta de uma configuração do bucket: o XML, ou null quando o bucket não tem nenhuma. */
 type ConfiguracaoLida = { xml: string | null; erro?: string };
 
-async function lerConfiguracaoDoBucket(subrecurso: 'cors' | 'lifecycle', semConfiguracao: string): Promise<ConfiguracaoLida> {
+/**
+ * "Não há configuração" NÃO é falha: é a resposta padrão (404) de um bucket que ainda não tem
+ * regra, e vale como lista vazia. A grafia muda de serviço para serviço (a AWS e o simulador
+ * dizem NoSuchCORSConfiguration; o Backblaze, NoSuchCorsConfiguration): a comparação ignora
+ * maiúsculas. Outro 404 (NoSuchBucket: bucket errado; sem código nenhum) continua sendo falha.
+ */
+const SEM_CONFIGURACAO: Record<'cors' | 'lifecycle', RegExp> = {
+  cors: /^NoSuchCorsConfiguration$/i,
+  lifecycle: /^NoSuchLifecycleConfiguration$/i,
+};
+
+async function lerConfiguracaoDoBucket(subrecurso: 'cors' | 'lifecycle'): Promise<ConfiguracaoLida> {
   let resposta: Response;
   try {
     resposta = await chamar('GET', undefined, { consulta: { [subrecurso]: '' } });
@@ -512,17 +523,17 @@ async function lerConfiguracaoDoBucket(subrecurso: 'cors' | 'lifecycle', semConf
   }
   if (resposta.ok) return { xml: await resposta.text() };
   const texto = await resposta.text().catch(() => '');
-  if (resposta.status === 404 && texto.includes(semConfiguracao)) return { xml: null };
-  const codigo = /<Code>([^<]*)<\/Code>/.exec(texto)?.[1] ?? '';
+  const codigo = /<Code>([^<]*)<\/Code>/.exec(texto)?.[1]?.trim() ?? '';
+  if (resposta.status === 404 && SEM_CONFIGURACAO[subrecurso].test(codigo)) return { xml: null };
   const mensagem = /<Message>([^<]*)<\/Message>/.exec(texto)?.[1] ?? '';
   return { xml: null, erro: `${resposta.status} ${codigo} ${mensagem}`.replace(/\s+/g, ' ').trim() };
 }
 
 /** GetBucketCors: as regras de CORS do bucket (as da API S3; as da API nativa do B2 não aparecem). */
-export const lerCorsDoS3 = () => lerConfiguracaoDoBucket('cors', 'NoSuchCORSConfiguration');
+export const lerCorsDoS3 = () => lerConfiguracaoDoBucket('cors');
 
 /** GetBucketLifecycleConfiguration: só leitura, para comparar antes e depois. */
-export const lerLifecycleDoS3 = () => lerConfiguracaoDoBucket('lifecycle', 'NoSuchLifecycleConfiguration');
+export const lerLifecycleDoS3 = () => lerConfiguracaoDoBucket('lifecycle');
 
 /**
  * PutBucketCors: SUBSTITUI a configuração de CORS do bucket inteira (quem chama manda também as

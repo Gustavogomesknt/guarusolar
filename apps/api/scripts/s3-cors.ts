@@ -79,8 +79,8 @@ const equivalente = (r: Regra, d: Regra) =>
   d.expostos.every((e) => r.expostos.map((x) => x.toLowerCase()).includes(e.toLowerCase()));
 
 function mostrar(titulo: string, regras: Regra[]) {
+  if (regras.length === 0) return console.log(`\n${titulo} nenhuma regra`);
   console.log(`\n${titulo}`);
-  if (regras.length === 0) return console.log('  (nenhuma regra de CORS)');
   for (const r of regras) {
     console.log(`  - ${r.id ?? '(sem nome)'}`);
     console.log(`      origem:    ${r.origens.join(', ')}`);
@@ -129,13 +129,15 @@ async function main() {
   console.log(`Regra de CORS do bucket "${bucketDoS3()}" (${servicoDoS3()}) para ${origem}`);
 
   const corsAntes = await lerCorsDoS3();
+  // bucket sem nenhuma regra (404 NoSuchCorsConfiguration) chega aqui como lista vazia, sem erro;
+  // erro é falha de verdade (403, 5xx, rede, bucket errado): aí gravar poderia apagar o que não se leu
   if (corsAntes.erro) {
     console.error(`\nNão deu para ler o CORS atual: ${corsAntes.erro}`);
     console.error('Sem ler, gravar apagaria regras que já existam. Nada foi alterado.');
     throw new Parar();
   }
   const atuais = lerRegras(corsAntes.xml);
-  mostrar('CORS atual do bucket (API S3):', atuais);
+  mostrar('CORS atual:', atuais);
   const lifecycleAntes = await lerLifecycleDoS3();
   console.log(`\nLifecycle antes: ${resumoDoLifecycle(lifecycleAntes)}`);
 
