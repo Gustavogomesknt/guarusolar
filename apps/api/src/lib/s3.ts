@@ -493,3 +493,49 @@ export async function abreSemAssinatura(caminho: string): Promise<boolean> {
   const resposta = await fetch(`${endpoint().origin}${caminhoNaUrl(caminho)}`, { signal: AbortSignal.timeout(15_000) });
   return resposta.ok;
 }
+
+// ------------------------------------------------------------------------------------------
+// Configuração do bucket: CORS (npm run s3:cors) e leitura do Lifecycle (para conferir que o
+// CORS não mexeu nele). Mesma assinatura dos outros pedidos.
+// ------------------------------------------------------------------------------------------
+
+/** Resposta de uma configuração do bucket: o XML, ou null quando o bucket não tem nenhuma. */
+type ConfiguracaoLida = { xml: string | null; erro?: string };
+
+async function lerConfiguracaoDoBucket(subrecurso: 'cors' | 'lifecycle', semConfiguracao: string): Promise<ConfiguracaoLida> {
+  let resposta: Response;
+  try {
+    resposta = await chamar('GET', undefined, { consulta: { [subrecurso]: '' } });
+  } catch (erro) {
+    // sem resposta, ou 5xx depois das novas tentativas (ex.: 501, serviço que não implementa)
+    return { xml: null, erro: (erro as Error).message };
+  }
+  if (resposta.ok) return { xml: await resposta.text() };
+  const texto = await resposta.text().catch(() => '');
+  if (resposta.status === 404 && texto.includes(semConfiguracao)) return { xml: null };
+  const codigo = /<Code>([^<]*)<\/Code>/.exec(texto)?.[1] ?? '';
+  const mensagem = /<Message>([^<]*)<\/Message>/.exec(texto)?.[1] ?? '';
+  return { xml: null, erro: `${resposta.status} ${codigo} ${mensagem}`.replace(/\s+/g, ' ').trim() };
+}
+
+/** GetBucketCors: as regras de CORS do bucket (as da API S3; as da API nativa do B2 não aparecem). */
+export const lerCorsDoS3 = () => lerConfiguracaoDoBucket('cors', 'NoSuchCORSConfiguration');
+
+/** GetBucketLifecycleConfiguration: só leitura, para comparar antes e depois. */
+export const lerLifecycleDoS3 = () => lerConfiguracaoDoBucket('lifecycle', 'NoSuchLifecycleConfiguration');
+
+/**
+ * PutBucketCors: SUBSTITUI a configuração de CORS do bucket inteira (quem chama manda também as
+ * regras que quer manter). Não mexe no Lifecycle nem em outra configuração: cada uma é um
+ * subrecurso separado (?cors, ?lifecycle) e o Lifecycle exige outra permissão para ser gravado.
+ * No Backblaze, exige uma chave com `writeBuckets`, que chave restrita a um bucket NÃO tem.
+ */
+export async function gravarCorsDoS3(xml: string) {
+  const corpo = Buffer.from(xml, 'utf8');
+  const resposta = await chamar('PUT', undefined, {
+    consulta: { cors: '' },
+    corpo,
+    cabecalhos: { 'content-type': 'application/xml', 'content-md5': createHash('md5').update(corpo).digest('base64') },
+  });
+  if (!resposta.ok) throw new ArmazenamentoIndisponivel(await motivo(resposta));
+}

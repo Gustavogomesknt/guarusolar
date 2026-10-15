@@ -19,6 +19,7 @@
     "sharepoint:conferir": "tsx scripts/sharepoint-conferir.ts",
     "storage:conferir": "tsx scripts/storage-conferir.ts",
     "s3:conferir": "tsx scripts/s3-conferir.ts",
+    "s3:cors": "tsx scripts/s3-cors.ts",
     "r2:conferir": "tsx scripts/s3-conferir.ts",
     "storage:relatorio": "tsx scripts/storage-conferir.ts --relatorio",
     "fotos:migrar": "tsx scripts/migrar-fotos.ts",

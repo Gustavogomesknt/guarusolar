@@ -421,7 +421,8 @@ O `.env` da API fica em `apps/api/.env`.
    tempo máximo pelo tamanho; depois de chegar ao bucket só repete a confirmação). O gestor assiste
    por link de LEITURA de 5 min, gerado só depois de conferir o login (`GET /api/videos/:id/link`);
    a capa sai pela API como as fotos. Só o destino "s3" recebe vídeo, e o bucket precisa de CORS
-   liberando PUT do endereço do app (SOCORRO.md, item 9; `s3:conferir` testa). O relatório de
+   liberando PUT do endereço do app (`npm run s3:cors`, com API_URL_PUBLICA e uma chave com
+   `writeBuckets`, que a do sistema não tem; SOCORRO.md, item 9; `s3:conferir` testa). O relatório de
    espaço separa fotos e vídeos; o aviso de 70% vale para a soma. Vídeo NÃO bloqueia o envio para
    validação por falta; um vídeo ainda na fila, sim (pode ser descartado).
    **Cache das fotos: um ano, privado, SEM `Vary`, de propósito** (decisão do Gustavo, 13/10/2026).
@@ -630,6 +631,7 @@ npm run build            # compila todos os workspaces
 npm run sharepoint:conferir  # testa a configuração MS_* do SharePoint (envio e leitura reais)
 npm run storage:conferir     # testa o Supabase Storage (bucket privado, envio, leitura, sem link público)
 npm run s3:conferir          # testa o bucket S3 (B2/R2): região, chaves, envio, leitura, link assinado que expira
+npm run s3:cors              # regra de CORS do bucket (envio direto do vídeo); lê de volta e confere o Lifecycle
 npm run storage:relatorio    # espaço das fotos do STORAGE_PROVIDER atual (só leitura)
 npm run fotos:migrar         # mostra as fotos que estão fora do STORAGE_PROVIDER atual; -- --executar migra
 ```

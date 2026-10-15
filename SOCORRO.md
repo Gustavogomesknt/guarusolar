@@ -258,17 +258,20 @@ guardado no celular, na fila, e não sobe (as fotos continuam normais).
    endereço do sistema, sem barra no fim:
    `$env:API_URL_PUBLICA='https://<endereço do sistema>'`, depois **`npm run s3:conferir`**.
    O passo "o navegador do app pode enviar direto (CORS de PUT…)" diz se a regra existe.
-2. **Criar a regra.** Pelo que sei, as opções prontas do painel do Backblaze (Bucket Settings →
-   CORS Rules) liberam só a LEITURA; o envio precisa de uma regra personalizada, feita pela
-   ferramenta de linha de comando do Backblaze (`b2`), com uma chave que possa alterar o bucket
-   (a "Master Application Key" ou uma com permissão `writeBuckets`, que você usa só na sua
-   janela, nunca na Render). O comando é parecido com este (troque os dois valores entre `< >`):
-
-   `b2 bucket update --cors-rules '[{"corsRuleName":"envioDeVideo","allowedOrigins":["https://<endereço do sistema>"],"allowedOperations":["s3_put","s3_get","s3_head"],"allowedHeaders":["content-type"],"exposeHeaders":["etag"],"maxAgeSeconds":3600}]' <nome do bucket> allPrivate`
-
-   O `allPrivate` no fim mantém o bucket PRIVADO: confira que ele continua assim. Os nomes dos
-   parâmetros podem ter mudado na versão da ferramenta; o `npm run s3:conferir` do passo 1 é a
-   prova de que deu certo.
+2. **Criar a regra** com o comando do próprio sistema (não precisa instalar nada):
+   **`npm run s3:cors`**. Ele mostra a regra (envio e leitura, só para o endereço do sistema),
+   pergunta antes de gravar (`-- --executar` grava sem perguntar), lê de volta o que ficou no
+   bucket e compara o Lifecycle antes e depois (tem de continuar "Keep only the last version").
+   Rodar de novo não duplica nada; regras de outra origem que já existam continuam lá.
+   **A chave:** gravar CORS no Backblaze exige uma permissão (`writeBuckets`) que a chave do
+   sistema, restrita ao bucket, NÃO tem. Para este comando, crie uma chave TEMPORÁRIA em
+   Application Keys → Add a New Application Key, com **All** em "Allow access to Bucket(s)" e
+   **Read and Write**; use o keyID e a applicationKey dela só nesta janela, nas
+   `S3_ACCESS_KEY_ID` e `S3_SECRET_ACCESS_KEY`; depois **apague a chave** no painel. A Render
+   continua com a chave dela, sem mudança. Se a chave não tiver a permissão, o comando avisa e
+   não grava nada.
+   Depois, volte as duas variáveis para a chave do sistema e rode o `npm run s3:conferir` do
+   passo 1: tem de terminar em "Tudo certo".
 3. **O gestor não consegue assistir:** o link de leitura vale 5 minutos. Feche o vídeo e abra de
    novo, que sai um link novo. Se nem assim tocar, rode o `npm run s3:conferir` do passo 1.
 

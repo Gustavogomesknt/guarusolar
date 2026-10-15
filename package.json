@@ -30,6 +30,7 @@
     "sharepoint:conferir": "npm run sharepoint:conferir -w @guarusolar/api --",
     "storage:conferir": "npm run storage:conferir -w @guarusolar/api --",
     "s3:conferir": "npm run s3:conferir -w @guarusolar/api --",
+    "s3:cors": "npm run s3:cors -w @guarusolar/api --",
     "r2:conferir": "npm run s3:conferir -w @guarusolar/api --",
     "storage:relatorio": "npm run storage:relatorio -w @guarusolar/api --",
     "fotos:migrar": "npm run fotos:migrar -w @guarusolar/api --",
