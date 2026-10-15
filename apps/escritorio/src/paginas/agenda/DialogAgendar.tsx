@@ -132,7 +132,7 @@ export function DialogAgendar({
           </Campo>
 
           <div className="grid grid-cols-2 gap-3">
-            <Campo id="ag-tipo" rotulo="Tipo de serviço" obrigatorio ajuda={EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipo].aoValidar]}>
+            <Campo id="ag-tipo" rotulo="Etapa" obrigatorio ajuda={EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipo].aoValidar]}>
               <select id="ag-tipo" required value={tipo} onChange={(e) => setTipo(e.target.value as TipoServico)} className={CLASSE_SELECT}>
                 {TIPOS_SERVICO_AGENDAVEIS.map((t) => (
                   <option key={t} value={t}>

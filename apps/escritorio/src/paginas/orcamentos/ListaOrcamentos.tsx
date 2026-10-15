@@ -21,15 +21,17 @@ import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus'
 import { AlternadorVisao } from './AlternadorVisao';
 import { opcoesDePeriodo, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
+import { ClassificarTipo, FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
-const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_100px_100px_136px_170px_96px]';
+const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_minmax(0,0.8fr)_100px_100px_136px_170px_96px]';
 
 export function ListaOrcamentos() {
   const [status, setStatus] = useState<FiltroStatus>('TODOS');
   const [busca, setBusca] = useState('');
   const [periodo, setPeriodo] = useState<Periodo>('ESTE_MES');
+  const [tipo, setTipo] = useState<FiltroTipo>('');
   const buscaAtrasada = useValorAtrasado(busca.trim(), 300);
   const opcoes = useMemo(opcoesDePeriodo, []);
   const mudancaDeStatus = useMudancaDeStatus();
@@ -37,8 +39,9 @@ export function ListaOrcamentos() {
   const filtrosBase = useMemo(() => {
     const p = parametrosDoPeriodo(periodo);
     if (buscaAtrasada) p.set('q', buscaAtrasada);
+    if (tipo) p.set('tipo', tipo);
     return p;
-  }, [buscaAtrasada, periodo]);
+  }, [buscaAtrasada, periodo, tipo]);
 
   // Sem o filtro de status: alimenta as contagens dos chips
   const todos = useQuery({
@@ -60,7 +63,7 @@ export function ListaOrcamentos() {
 
   const contagem = (s: FiltroStatus) =>
     todos.data ? (s === 'TODOS' ? todos.data.length : todos.data.filter((o) => o.status === s).length) : null;
-  const filtrando = status !== 'TODOS' || buscaAtrasada !== '' || periodo !== 'ESTE_MES';
+  const filtrando = status !== 'TODOS' || buscaAtrasada !== '' || periodo !== 'ESTE_MES' || tipo !== '';
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,6 +119,7 @@ export function ListaOrcamentos() {
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </label>
+          <FiltroDeTipo valor={tipo} onChange={setTipo} />
           <SeletorPeriodo valor={periodo} onChange={setPeriodo} />
         </div>
       </div>
@@ -131,6 +135,7 @@ export function ListaOrcamentos() {
           setStatus('TODOS');
           setBusca('');
           setPeriodo('ESTE_MES');
+          setTipo('');
         }}
         pedir={mudancaDeStatus.pedir}
         pendenteId={mudancaDeStatus.pendenteId}
@@ -152,6 +157,7 @@ function Indicadores() {
   const valor = (v: number | undefined) => (r ? formatarBRL(v ?? 0) : '–');
 
   return (
+    <div className="flex flex-col gap-4">
     <section aria-label="Indicadores do mês" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Cartao titulo="Total orçado no mês" valor={valor(r?.totalOrcadoMes)}>
         {r ? `${r.quantidadeMes} ${r.quantidadeMes === 1 ? 'orçamento emitido' : 'orçamentos emitidos'}` : ' '}
@@ -178,6 +184,52 @@ function Indicadores() {
       <Cartao titulo="Valor aprovado no mês" valor={valor(r?.valorAprovadoMes)} escuro>
         Aprovados neste mês, confirmados para instalação
       </Cartao>
+    </section>
+    {r?.porTipo && r.porTipo.length > 0 && <PorTipo linhas={r.porTipo} />}
+    </div>
+  );
+}
+
+/**
+ * Quantidade e valor por tipo de serviço, com os mesmos critérios de data dos cartões: orçados
+ * pela criação no mês, aprovados pela aprovação no mês. A taxa de aprovação continua geral.
+ */
+function PorTipo({ linhas }: { linhas: NonNullable<ResumoOrcamentos['porTipo']> }) {
+  const celula = (q: number, v: number) =>
+    q === 0 ? (
+      <span className="text-muted-foreground">—</span>
+    ) : (
+      <>
+        <span className="font-mono">{q}</span>
+        <span className="text-muted-foreground"> · {formatarBRL(v)}</span>
+      </>
+    );
+  return (
+    <section aria-labelledby="titulo-por-tipo" className="rounded-[14px] border bg-card px-[22px] py-4">
+      <h2 id="titulo-por-tipo" className="pb-2 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
+        Por tipo de serviço, no mês
+      </h2>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+            <th scope="col" className="py-1.5 font-semibold">Tipo</th>
+            <th scope="col" className="py-1.5 font-semibold">Orçados</th>
+            <th scope="col" className="py-1.5 font-semibold">Aprovados</th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((l) => (
+            <tr key={l.tipoDeServicoId ?? 'sem'} className="border-t">
+              <th scope="row" className={cn('py-1.5 text-left font-medium', l.tipoDeServicoId === null && 'text-destaque-texto')}>
+                {l.nome}
+                {!l.ativo && <span className="font-normal text-muted-foreground"> (desativado)</span>}
+              </th>
+              <td className="py-1.5">{celula(l.orcados.quantidade, l.orcados.valor)}</td>
+              <td className="py-1.5">{celula(l.aprovados.quantidade, l.aprovados.valor)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }
@@ -237,7 +289,7 @@ function Tabela({
 
   return (
     <section aria-label="Lista de orçamentos" className="relative overflow-x-auto rounded-[14px] border bg-card">
-      <div role="table" aria-label="Orçamentos" className="min-w-[980px]">
+      <div role="table" aria-label="Orçamentos" className="min-w-[1120px]">
         <div role="rowgroup">
           <div
             role="row"
@@ -245,6 +297,7 @@ function Tabela({
           >
             <span role="columnheader">Código</span>
             <span role="columnheader">Cliente</span>
+            <span role="columnheader">Tipo de serviço</span>
             <span role="columnheader">Criado em</span>
             <span role="columnheader">Validade</span>
             <span role="columnheader" className="text-right">
@@ -361,6 +414,9 @@ function Linha({
         <span className="truncate text-xs text-muted-foreground">
           {[o.cliente.cidade, o.cliente.uf].filter(Boolean).join(' · ') || 'Cidade não informada'}
         </span>
+      </span>
+      <span role="cell" className="min-w-0 text-[13px]">
+        {o.tipoDeServico ? <span className="line-clamp-2">{o.tipoDeServico.nome}</span> : <ClassificarTipo orcamentoId={o.id} codigo={o.codigo} />}
       </span>
       <span role="cell" className="text-sm">
         {formatarData(o.criadoEm)}

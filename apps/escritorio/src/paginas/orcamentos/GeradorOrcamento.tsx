@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CartaoCliente } from './CartaoCliente';
+import { CartaoTipoDeServico } from './CartaoTipoDeServico';
 import { CartaoItens } from './CartaoItens';
 import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
 import {
@@ -262,6 +263,7 @@ export function GeradorOrcamento({
           {/* fieldset desabilitado trava todos os campos e botões no modo leitura */}
           <fieldset disabled={somenteLeitura} className={`flex min-w-0 flex-col gap-5 ${ESTILO_SOMENTE_LEITURA}`}>
             <legend className="sr-only">Cliente e itens</legend>
+            <CartaoTipoDeServico />
             <CartaoCliente gravado={salvo} somenteLeitura={somenteLeitura} />
             <CartaoItens subtotal={totais.subtotalItens} />
           </fieldset>

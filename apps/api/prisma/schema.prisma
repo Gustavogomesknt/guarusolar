@@ -227,6 +227,26 @@ enum CondicaoPagamento {
   FINANCIAMENTO
 }
 
+/// TIPO DE SERVIÇO VENDIDO (instalação fotovoltaica, carregador veicular, manutenção...): o que
+/// o orçamento vende, para separar os números do painel. Gerenciado pelo escritório (ADMIN e
+/// GESTOR), como o catálogo: desativar não apaga, só tira das escolhas novas.
+/// NÃO confundir com o enum TipoServico do agendamento, que é a ETAPA da execução (instalação,
+/// visita técnica, vistoria...) e aparece na tela como "Etapa".
+model TipoDeServico {
+  id        String   @id @default(uuid())
+  nome      String   @unique
+  ativo     Boolean  @default(true)
+  /// ordem de exibição nas escolhas e no painel (menor primeiro)
+  ordem     Int      @default(0)
+  criadoEm  DateTime @default(now())
+  editadoEm DateTime @updatedAt
+
+  orcamentos Orcamento[]
+  projetos   Projeto[]
+
+  @@index([ativo, ordem])
+}
+
 model Orcamento {
   id         String          @id @default(uuid())
   codigo     String          @unique // GS-2026-0148
@@ -237,6 +257,9 @@ model Orcamento {
   vendedorId String
   vendedor   Usuario         @relation("VendedorOrcamentos", fields: [vendedorId], references: [id])
   status     StatusOrcamento @default(RASCUNHO)
+  /// obrigatório na API (criar e editar); null só nos orçamentos anteriores ao campo ("Sem tipo")
+  tipoDeServicoId String?
+  tipoDeServico   TipoDeServico? @relation(fields: [tipoDeServicoId], references: [id])
 
   // valores calculados no servidor a cada gravação (nunca confiar no front)
   /// itens + margem (o subtotal que o cliente vê)
@@ -327,6 +350,7 @@ model Orcamento {
 
   @@index([status, criadoEm])
   @@index([clienteId])
+  @@index([tipoDeServicoId])
 }
 
 model ItemOrcamento {
@@ -390,6 +414,9 @@ model Projeto {
   clienteId                String
   cliente                  Cliente       @relation(fields: [clienteId], references: [id])
   status                   StatusProjeto @default(AGUARDANDO_AGENDAMENTO)
+  /// copiado do orçamento na aprovação (e quando o orçamento é classificado depois)
+  tipoDeServicoId          String?
+  tipoDeServico            TipoDeServico? @relation(fields: [tipoDeServicoId], references: [id])
   potenciaKwp              Decimal?      @db.Decimal(8, 2)
   observacoes              String?
   concluidoEm              DateTime?
@@ -411,6 +438,7 @@ model Projeto {
   eventos      EventoProjeto[]
 
   @@index([status])
+  @@index([tipoDeServicoId])
 }
 
 // ---------------------------------------------------------------------------

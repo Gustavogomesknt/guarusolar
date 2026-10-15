@@ -88,6 +88,10 @@ packages/web/               o que os dois fronts usam no navegador
 | GET | `/api/orcamentos/resumo` | comercial | indicadores do mês |
 | POST/PUT | `/api/orcamentos` | comercial | criar/editar (totais no servidor) |
 | PATCH | `/api/orcamentos/:id/status` | comercial | mudança em 1 clique |
+| PATCH | `/api/orcamentos/:id/tipo` | comercial | classifica o tipo de serviço (qualquer status; o projeto acompanha) |
+| GET | `/api/tipos-de-servico?incluirInativos=` | comercial, gestor | tipos de serviço vendidos, na ordem |
+| POST/PUT | `/api/tipos-de-servico` | gestor | cadastrar, renomear, ativar/desativar |
+| POST | `/api/tipos-de-servico/:id/mover` | gestor | subir/descer na ordem |
 | POST | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me`; rascunho passa a ENVIADO |
 | GET | `/api/agenda?inicio&fim` | gestor | semana por equipe |
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |

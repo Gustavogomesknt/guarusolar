@@ -22,6 +22,7 @@ import { AlternadorVisao } from './AlternadorVisao';
 import { textoDoErro } from '@/lib/consultas';
 import { deMesAnterior, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
+import { FiltroDeTipo, SEM_TIPO, type FiltroTipo } from '@/lib/tiposDeServico';
 
 /*
  * Pipeline (Kanban) de orçamentos: uma coluna por status, com a mesma listagem da API
@@ -67,10 +68,15 @@ function contexto(o: OrcamentoNaLista) {
 
 export function Pipeline() {
   const [periodo, setPeriodo] = useState<Periodo>('ESTE_MES');
+  const [tipo, setTipo] = useState<FiltroTipo>('');
   const mudanca = useMudancaDeStatus();
   const [arrastando, setArrastando] = useState<DadosArrasto | null>(null);
 
-  const parametros = useMemo(() => parametrosDoPeriodo(periodo).toString(), [periodo]);
+  const parametros = useMemo(() => {
+    const p = parametrosDoPeriodo(periodo);
+    if (tipo) p.set('tipo', tipo);
+    return p.toString();
+  }, [periodo, tipo]);
 
   // mesma chave da lista: as duas telas compartilham o cache e a atualização otimista
   const consulta = useQuery({
@@ -117,6 +123,7 @@ export function Pipeline() {
           <h1 className="text-4xl font-bold tracking-[-0.02em]">Pipeline de orçamentos</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <FiltroDeTipo valor={tipo} onChange={setTipo} />
           <SeletorPeriodo valor={periodo} onChange={setPeriodo} />
           <AlternadorVisao />
         </div>
@@ -276,6 +283,9 @@ function Cartao({ orcamento: o, pedir, pendente }: { orcamento: OrcamentoNaLista
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="truncate text-sm font-semibold">{o.cliente.nome}</p>
         {cidade && <p className="truncate text-xs text-muted-foreground">{cidade}</p>}
+        <p className={cn('truncate text-xs', o.tipoDeServico ? 'text-foreground/80' : 'text-destaque-texto')}>
+          {o.tipoDeServico?.nome ?? SEM_TIPO}
+        </p>
       </div>
       <ValorDaProposta
         valorTotal={o.valorTotal}

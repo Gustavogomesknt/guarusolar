@@ -12,6 +12,7 @@ import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
 import { rotasArmazenamento, rotasFotos, rotasVideos } from './rotas/fotos';
 import { rotasProjetos } from './rotas/projetos';
 import { rotasUsuarios } from './rotas/usuarios';
+import { rotasTiposDeServico } from './rotas/tiposDeServico';
 import { appTecnicoLiberado, conferirArmazenamentoAoIniciar, destinoAtual } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
@@ -75,6 +76,7 @@ app.use('/api', conferirVersaoDoApp);
 app.use('/api/auth', rotasAuth);
 app.use('/api/clientes', rotasClientes);
 app.use('/api/produtos', rotasProdutos);
+app.use('/api/tipos-de-servico', rotasTiposDeServico);
 // antes das rotas com login: o PDF é aberto pelo cliente final, com token no link
 app.use('/api/orcamentos', rotasOrcamentoPdf);
 app.use('/api/orcamentos', rotasOrcamentos);

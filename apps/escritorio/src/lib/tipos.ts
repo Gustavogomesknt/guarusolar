@@ -92,10 +92,24 @@ export type FichaDoCliente = Cliente & {
 };
 
 /** Linha da lista (GET /api/orcamentos). */
+/** Tipo de serviço VENDIDO (GET /api/tipos-de-servico); não é a etapa do agendamento. */
+export type TipoDeServico = {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  ordem: number;
+  usadoEmOrcamentos: number;
+};
+
+/** Tipo resumido nas listas; null = orçamento ou projeto anterior ao campo ("Sem tipo"). */
+export type TipoResumido = { id: string; nome: string } | null;
+
 export type OrcamentoNaLista = {
   id: string;
   codigo: string;
   status: StatusOrcamento;
+  /** ausente em resposta da versão anterior da API */
+  tipoDeServico?: TipoResumido;
   criadoEm: string;
   validade: string;
   valorTotal: string;
@@ -121,6 +135,14 @@ export type ResumoOrcamentos = {
   quantidadeEmAberto: number;
   valorEmAberto: number;
   valorAprovadoMes: number;
+  /** por tipo de serviço, com os mesmos critérios de data dos cartões (mês da empresa) */
+  porTipo?: {
+    tipoDeServicoId: string | null;
+    nome: string;
+    ativo: boolean;
+    orcados: { quantidade: number; valor: number };
+    aprovados: { quantidade: number; valor: number };
+  }[];
 };
 
 /** Orçamento completo (GET /api/orcamentos/:id), usado para abrir no gerador. */
@@ -128,6 +150,9 @@ export type OrcamentoCompleto = {
   id: string;
   codigo: string;
   status: StatusOrcamento;
+  /** null nos orçamentos anteriores ao campo */
+  tipoDeServicoId?: string | null;
+  tipoDeServico?: { id: string; nome: string; ativo: boolean } | null;
   cliente: Cliente;
   validade: string;
   descontoTipo: TipoDesconto;
@@ -285,6 +310,8 @@ export type ProjetoNaLista = {
   id: string;
   codigo: string;
   status: StatusProjeto;
+  /** copiado do orçamento; null nos anteriores ao campo */
+  tipoDeServico?: TipoResumido;
   criadoEm: string;
   concluidoEm: string | null;
   /** visita técnica validada: "Visita concluída — agendar instalação" */
@@ -320,6 +347,7 @@ export type FichaDoProjeto = {
   id: string;
   codigo: string;
   status: StatusProjeto;
+  tipoDeServico?: TipoResumido;
   potenciaKwp: string | null;
   observacoes: string | null;
   criadoEm: string;

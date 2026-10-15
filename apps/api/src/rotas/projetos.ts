@@ -27,11 +27,13 @@ const PENDENTES: StatusAgendamento[] = [...SERVICO_PENDENTE];
 rotasProjetos.get(
   '/',
   rota(async (req, res) => {
-    const { situacao, q, incluirCancelados } = z
+    const { situacao, q, incluirCancelados, tipo } = z
       .object({
         situacao: z.enum(['EM_ANDAMENTO', 'TODOS', ...STATUS_PROJETO]).default('EM_ANDAMENTO'),
         q: z.string().trim().optional(),
         incluirCancelados: z.enum(['true', 'false']).optional(),
+        // tipo de serviço vendido: um id, ou "sem" (projetos de orçamentos anteriores ao campo)
+        tipo: z.union([z.literal('sem'), z.string().uuid()]).optional(),
       })
       .parse(req.query);
 
@@ -43,14 +45,16 @@ rotasProjetos.get(
         { cliente: { textoBusca: { contains: p } } },
       ]) ?? {};
     const semCancelados: Prisma.ProjetoWhereInput = incluirCancelados === 'true' ? {} : { status: { not: 'CANCELADO' } };
+    const doTipo: Prisma.ProjetoWhereInput = tipo === 'sem' ? { tipoDeServicoId: null } : tipo ? { tipoDeServicoId: tipo } : {};
     const daSituacao: Prisma.ProjetoWhereInput =
       situacao === 'EM_ANDAMENTO' ? { status: { in: EM_ANDAMENTO } } : situacao === 'TODOS' ? semCancelados : { status: situacao };
 
     const [projetos, porStatus] = await Promise.all([
       prisma.projeto.findMany({
-        where: { AND: [busca, daSituacao] },
+        where: { AND: [busca, daSituacao, doTipo] },
         include: {
           cliente: { select: { nome: true, cidade: true, uf: true } },
+          tipoDeServico: { select: { id: true, nome: true } },
           orcamento: { select: { codigo: true, valorTotal: true, valorTotalCliente: true, clienteNome: true, clienteCidade: true, clienteUf: true } },
           // um projeto pode ter vários serviços: a lista mostra o da vez (servicoDaVez)
           agendamentos: {
@@ -59,7 +63,7 @@ rotasProjetos.get(
           },
         },
       }),
-      prisma.projeto.groupBy({ by: ['status'], where: busca, _count: true }),
+      prisma.projeto.groupBy({ by: ['status'], where: { AND: [busca, doTipo] }, _count: true }),
     ]);
 
     // em andamento: o que está mais para trás no fluxo primeiro, e o mais antigo antes;
@@ -113,6 +117,7 @@ rotasProjetos.get(
       where: { id: req.params.id },
       include: {
         cliente: { select: { id: true, nome: true, whatsapp: true, ativo: true } },
+        tipoDeServico: { select: { id: true, nome: true } },
         orcamento: {
           select: {
             id: true,

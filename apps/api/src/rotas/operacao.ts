@@ -276,7 +276,7 @@ rotasAgenda.post(
         projetoId: z.string().uuid(),
         equipeId: idEquipe,
         // obrigatório: é o tipo que decide o roteiro de fotos e o efeito da validação
-        tipo: z.enum(TIPOS_SERVICO_AGENDAVEIS, { message: 'Escolha o tipo de serviço' }),
+        tipo: z.enum(TIPOS_SERVICO_AGENDAVEIS, { message: 'Escolha a etapa' }),
         dataInicio: z.coerce.date(),
         dataFim: z.coerce.date(),
         // quem vai; ausente = os técnicos ativos da equipe (a composição padrão)
@@ -348,7 +348,7 @@ rotasAgenda.patch(
     // situação do projeto, então a troca pode levar o projeto junto (na transação).
     const tipoNovo = dados.tipo && dados.tipo !== atual.tipo ? dados.tipo : null;
     if (tipoNovo) {
-      if (atual.status !== 'AGENDADO') throw new ErroHttp(409, 'O tipo do serviço só pode mudar antes de o técnico começar. Cancele este serviço e agende outro.');
+      if (atual.status !== 'AGENDADO') throw new ErroHttp(409, 'A etapa só pode mudar antes de o técnico começar. Cancele este serviço e agende outro.');
       const projeto = await prisma.projeto.findUniqueOrThrow({ where: { id: atual.projetoId }, select: { id: true, status: true, codigo: true } });
       if (tipoNovo === 'VISITA_TECNICA') await conferirVisitaTecnica(projeto, atual.id);
       if (tipoNovo === 'INSTALACAO' && projeto.status === 'CONCLUIDO') {
@@ -413,7 +413,7 @@ rotasAgenda.patch(
             servico: { id: atual.id, projetoId: atual.projetoId, tipo: tipoNovo },
             tipoAnterior: atual.tipo,
             evento: 'SERVICO_REMARCADO',
-            descricao: `Tipo do serviço alterado: de ${servico} para ${rotuloDoServico(tipoNovo)}`,
+            descricao: `Etapa alterada: de ${servico} para ${rotuloDoServico(tipoNovo)}`,
             usuarioId: req.usuario!.id,
           });
         }

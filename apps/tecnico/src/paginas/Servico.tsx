@@ -358,7 +358,7 @@ export function Servico() {
       <main className="flex flex-col gap-3.5 px-4 pt-4 pb-44">
         {/* o tipo em destaque: é ele que define as fotos pedidas e o que o técnico veio fazer */}
         <p className={cn('flex flex-col rounded-2xl border-l-[6px] px-4 py-3', tipo.fundo, tipo.borda, tipo.texto)}>
-          <span className="text-[11px] font-semibold tracking-[0.08em] uppercase">Serviço agendado</span>
+          <span className="text-[11px] font-semibold tracking-[0.08em] uppercase">Etapa</span>
           <span className="font-titulo text-2xl leading-tight font-bold">{tipo.rotulo}</span>
         </p>
 

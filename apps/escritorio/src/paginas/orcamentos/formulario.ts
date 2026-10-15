@@ -29,6 +29,8 @@ export type ItemFormulario = {
 
 export type FormularioOrcamento = {
   cliente: Cliente | null;
+  /** tipo de serviço vendido (obrigatório para salvar); '' = ainda não escolhido */
+  tipoDeServicoId: string;
   itens: ItemFormulario[];
   /** margem de lucro em reais desta proposta (embutida no total; o cliente não vê) */
   margem: string;
@@ -88,6 +90,7 @@ export function dataDaquiA(dias: number) {
 export function valoresIniciais(): FormularioOrcamento {
   return {
     cliente: null,
+    tipoDeServicoId: '',
     itens: [],
     // orçamento novo já começa com a margem padrão (compartilhado/margemDoOrcamento.ts)
     margem: formatarDecimal(MARGEM_PADRAO),
@@ -182,6 +185,7 @@ export type ProblemaFormulario = { campo: string; mensagem: string };
 /** Confere o que a API exigiria, para mostrar tudo de uma vez antes de enviar. */
 export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): ProblemaFormulario[] {
   const problemas: ProblemaFormulario[] = [];
+  if (!f.tipoDeServicoId) problemas.push({ campo: 'tipoDeServicoId', mensagem: 'Escolha o tipo de serviço do orçamento' });
   if (!f.cliente) problemas.push({ campo: 'root.cliente', mensagem: 'Escolha o cliente do orçamento' });
   if (f.itens.length === 0) {
     problemas.push({ campo: 'root.itens', mensagem: 'Inclua ao menos um item do catálogo' });
@@ -219,6 +223,7 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
 export function paraApi(f: FormularioOrcamento) {
   return {
     clienteId: f.cliente!.id,
+    tipoDeServicoId: f.tipoDeServicoId,
     // meio-dia UTC: a data continua a mesma em qualquer fuso do Brasil
     validade: `${f.validade}T12:00:00Z`,
     margem: Math.max(numeroOuZero(f.margem), 0),
@@ -368,6 +373,8 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     v === null || v === undefined ? padrao : formatarQuantidade(Number(v));
   return {
     cliente: o.cliente,
+    // orçamento anterior ao campo abre sem tipo: para salvar, é preciso escolher
+    tipoDeServicoId: o.tipoDeServicoId ?? '',
     itens: o.itens.map((item) => ({
       produtoId: item.produtoId,
       nome: item.descricao,

@@ -187,9 +187,9 @@ export function DialogServico({
             {/* o tipo define o roteiro de fotos: só muda antes de o técnico começar */}
             <Campo
               id="rm-tipo"
-              rotulo="Tipo de serviço"
+              rotulo="Etapa"
               obrigatorio
-              ajuda={servico.status === 'AGENDADO' ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar] : 'O tipo só pode mudar antes de o técnico começar.'}
+              ajuda={servico.status === 'AGENDADO' ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar] : 'A etapa só pode mudar antes de o técnico começar.'}
             >
               <select
                 id="rm-tipo"

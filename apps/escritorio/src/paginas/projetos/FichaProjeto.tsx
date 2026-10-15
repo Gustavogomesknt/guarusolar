@@ -409,6 +409,10 @@ function CartaoOrcamento({ projeto: p }: { projeto: Ficha }) {
         <Dado rotulo="Pagamento">
           <span>{o.resumoPagamento ?? '—'}</span>
         </Dado>
+        <Dado rotulo="Tipo de serviço">
+          {/* copiado do orçamento na aprovação; os anteriores ao campo se classificam na lista de orçamentos */}
+          <span className={p.tipoDeServico ? undefined : 'text-destaque-texto'}>{p.tipoDeServico?.nome ?? 'Sem tipo'}</span>
+        </Dado>
         <Dado rotulo="Itens">
           <span>
             {o._count.itens} {o._count.itens === 1 ? 'item' : 'itens'}

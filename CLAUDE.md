@@ -835,6 +835,19 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)
   nem WebSocket (cai a cada publicação e sono da Render; o polling seria a reserva de qualquer jeito).
   Com mais de uma instância da API, a versão precisa ir para o banco.
+- **Tipo de serviço (vendido) × Etapa (agendamento)** (15/10/2026). `TipoDeServico` é uma TABELA
+  gerenciada pelo escritório (tela "Tipos de serviço", ADMIN e GESTOR; nome, ativo, ordem; nada é
+  apagado, desativar só tira das escolhas de orçamentos novos): o que o orçamento VENDE
+  (instalação fotovoltaica, carregador veicular, manutenção...). Obrigatório para criar orçamento
+  (a API recusa sem), copiado para o projeto na aprovação, filtro e coluna nas listas de
+  orçamentos, pipeline e projetos, e quebra "Por tipo de serviço, no mês" no painel (mesmos
+  critérios de data dos cartões; a taxa de aprovação continua GERAL). Orçamentos e projetos
+  anteriores ao campo ficam com `tipoDeServicoId` nulo ("Sem tipo"; filtro `tipo=sem`) e se
+  classificam pela lista (`PATCH /api/orcamentos/:id/tipo`, em qualquer status; o projeto vai
+  junto). Aprovar um antigo sem tipo continua permitido. NÃO entra no PDF (o título é o
+  `descricaoServico`). Já o enum `TipoServico` do agendamento (instalação, visita técnica,
+  vistoria...) aparece na tela como **"Etapa"**; o nome do enum e os dados não mudaram. Não
+  chame a etapa de "tipo de serviço" em texto que o usuário vê.
 - **Custo do produto é opcional** (`Produto.precoCusto` pode ser null): em branco = custo
   desconhecido, e a margem do item volta null (o catálogo mostra "—", nunca 100%); zero = custo
   zero de verdade (100%). `calcularMargem` trata os dois casos. O catálogo real da Guarusolar só

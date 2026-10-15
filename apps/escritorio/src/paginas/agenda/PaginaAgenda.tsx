@@ -300,7 +300,8 @@ export function PaginaAgenda() {
         </div>
       </section>
 
-      <footer aria-label="Legenda" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
+      <footer aria-label="Legenda das etapas" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
+        <span className="font-medium text-foreground/80">Etapa:</span>
         {TIPOS_SERVICO_AGENDAVEIS.map((t) => {
           const tipo = TIPOS_SERVICO_AGENDA[t];
           return (

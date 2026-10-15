@@ -6,6 +6,7 @@ import {
   FolderKanban,
   KanbanSquare,
   Package,
+  Tags,
   UserCog,
   Users,
   type LucideIcon,
@@ -39,6 +40,8 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação', contador: ContadorValidacao },
   // comercial consulta ("quando vão instalar?"); só o gestor edita e cancela
   { rotulo: 'Projetos', caminho: '/projetos', icone: FolderKanban, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Operação' },
+  // tipos de serviço vendidos (orçamento e painel): ADMIN e GESTOR mantêm a lista
+  { rotulo: 'Tipos de serviço', caminho: '/tipos-de-servico', icone: Tags, papeis: ['GESTOR'], disponivel: true, grupo: 'Administração' },
   // papeis vazio: só o ADMIN (que acessa tudo)
   { rotulo: 'Usuários', caminho: '/usuarios', icone: UserCog, papeis: [], disponivel: true, grupo: 'Administração' },
 ];

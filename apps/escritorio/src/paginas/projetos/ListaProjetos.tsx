@@ -20,10 +20,11 @@ import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { SeloProjeto } from './SeloProjeto';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
+import { FiltroDeTipo, SEM_TIPO, type FiltroTipo } from '@/lib/tiposDeServico';
 
 type Filtro = 'EM_ANDAMENTO' | StatusProjeto;
 const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'AGUARDANDO_CONCLUSAO', 'CONCLUIDO'];
-const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_150px_130px_150px_minmax(0,1.2fr)]';
+const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_150px_130px_150px_minmax(0,1.2fr)]';
 
 const dia = (iso: string) => iso.slice(0, 10);
 
@@ -37,6 +38,7 @@ export function ListaProjetos() {
   const gestor = usuario?.papel === 'GESTOR' || usuario?.papel === 'ADMIN';
   const [filtro, setFiltro] = useState<Filtro>('EM_ANDAMENTO');
   const [incluirCancelados, setIncluirCancelados] = useState(false);
+  const [tipo, setTipo] = useState<FiltroTipo>('');
   const [busca, setBusca] = useState('');
   const buscaAtrasada = useValorAtrasado(busca.trim(), 300);
 
@@ -44,8 +46,9 @@ export function ListaProjetos() {
     const p = new URLSearchParams({ situacao: filtro });
     if (buscaAtrasada) p.set('q', buscaAtrasada);
     if (incluirCancelados) p.set('incluirCancelados', 'true');
+    if (tipo) p.set('tipo', tipo);
     return p.toString();
-  }, [filtro, buscaAtrasada, incluirCancelados]);
+  }, [filtro, buscaAtrasada, incluirCancelados, tipo]);
 
   const lista = useQuery({
     queryKey: ['projetos', 'lista', parametros],
@@ -87,6 +90,7 @@ export function ListaProjetos() {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <FiltroDeTipo valor={tipo} onChange={setTipo} />
           <label className="flex h-10 w-[300px] max-w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-muted-foreground focus-within:ring-[3px] focus-within:ring-ring/30">
             <Search className="size-4 shrink-0" aria-hidden />
             <span className="sr-only">Buscar por código, cliente ou cidade</span>
@@ -113,9 +117,10 @@ export function ListaProjetos() {
       </div>
 
       <section aria-label="Projetos" className="relative min-w-0 overflow-x-auto rounded-[14px] border bg-card">
-        <div role="table" aria-label="Lista de projetos" aria-busy={lista.isFetching} className="min-w-[860px]">
+        <div role="table" aria-label="Lista de projetos" aria-busy={lista.isFetching} className="min-w-[1000px]">
           <div role="row" className={`grid ${COLUNAS} gap-4 border-b px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
             <span role="columnheader">Projeto</span>
+            <span role="columnheader">Tipo de serviço</span>
             <span role="columnheader">Cidade</span>
             <span role="columnheader" className="text-right">
               Valor
@@ -134,7 +139,7 @@ export function ListaProjetos() {
           ) : lista.data.itens.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-5 py-12 text-center text-sm text-muted-foreground">
               <FolderKanban className="size-6" aria-hidden />
-              {buscaAtrasada ? 'Nenhum projeto encontrado com essa busca.' : 'Nenhum projeto nesta situação.'}
+              {buscaAtrasada || tipo ? 'Nenhum projeto encontrado com esses filtros.' : 'Nenhum projeto nesta situação.'}
             </div>
           ) : (
             <div role="rowgroup">
@@ -154,6 +159,9 @@ export function ListaProjetos() {
                       {p.codigo}
                     </Link>
                     <span className="truncate text-sm font-semibold">{p.clienteNome}</span>
+                  </span>
+                  <span role="cell" className={cn('min-w-0 text-[13px]', !p.tipoDeServico && 'text-destaque-texto')}>
+                    <span className="line-clamp-2">{p.tipoDeServico?.nome ?? SEM_TIPO}</span>
                   </span>
                   <span role="cell" className="truncate text-sm">
                     {[p.clienteCidade, p.clienteUf].filter(Boolean).join('/') || '—'}

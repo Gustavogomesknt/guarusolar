@@ -34,6 +34,9 @@ const itemSchema = z.object({
 
 const orcamentoSchema = z.object({
   clienteId: z.string().uuid(),
+  // tipo de serviço VENDIDO (tabela TipoDeServico): obrigatório ao criar; ausente ao editar (tela
+  // da versão anterior, durante uma publicação) mantém o que estava gravado
+  tipoDeServicoId: z.string().uuid('Escolha o tipo de serviço').optional(),
   validade: z.coerce.date(),
   descontoTipo: z.enum(['PERCENTUAL', 'VALOR']).default('PERCENTUAL'),
   descontoValor: z.number().nonnegative().default(0),
@@ -131,6 +134,16 @@ export function linkDoPdf(orcamento: { id: string; tokenPdf: string }) {
   return `${base}/api/orcamentos/${orcamento.id}/pdf?token=${orcamento.tokenPdf}`;
 }
 
+/**
+ * O tipo escolhido existe e pode ser usado: ativo, ou o mesmo que o orçamento já tinha (um tipo
+ * desativado depois continua valendo para quem já o usava).
+ */
+async function conferirTipoDeServico(id: string, atual?: string | null) {
+  const tipo = await prisma.tipoDeServico.findUnique({ where: { id }, select: { ativo: true } });
+  if (!tipo) throw new ErroHttp(400, 'Tipo de serviço não encontrado. Escolha outro.');
+  if (!tipo.ativo && id !== atual) throw new ErroHttp(400, 'Este tipo de serviço foi desativado. Escolha outro.');
+}
+
 /** Dados do item que são cópia gravada no orçamento (regra 2 do CLAUDE.md). */
 type CopiaDoItem = {
   produtoId: string;
@@ -192,7 +205,7 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
 rotasOrcamentos.get(
   '/',
   rota(async (req, res) => {
-    const { status, clienteId, de, ate, q, abertosSempre } = req.query as Record<string, string>;
+    const { status, clienteId, de, ate, q, abertosSempre, tipo } = req.query as Record<string, string>;
     const periodo = de || ate ? { ...(de ? { gte: new Date(de) } : {}), ...(ate ? { lte: new Date(ate) } : {}) } : null;
 
     // abertosSempre (lista e pipeline): negociação em aberto não tem mês, aparece em qualquer
@@ -216,6 +229,8 @@ rotasOrcamentos.get(
     const where: Prisma.OrcamentoWhereInput = {
       ...(status ? { status: status as StatusOrcamento } : {}),
       ...(clienteId ? { clienteId } : {}),
+      // tipo de serviço: um id, ou "sem" para os orçamentos anteriores ao campo (a classificar)
+      ...(tipo === 'sem' ? { tipoDeServicoId: null } : tipo ? { tipoDeServicoId: tipo } : {}),
       ...filtroDoPeriodo,
       // por palavras: código, cliente e cidade da proposta, ou o nome atual do cadastro
       ...filtroDeBusca(q, (p) => [{ textoBusca: { contains: p } }, { cliente: { textoBusca: { contains: p } } }]),
@@ -227,6 +242,7 @@ rotasOrcamentos.get(
       include: {
         cliente: { select: { id: true, nome: true, cidade: true, uf: true, whatsapp: true } },
         vendedor: { select: { id: true, nome: true } },
+        tipoDeServico: { select: { id: true, nome: true } },
         _count: { select: { itens: true } },
       },
     });
@@ -256,7 +272,7 @@ rotasOrcamentos.get(
   rota(async (_req, res) => {
     const doMes = { gte: inicioDoMes(0), lt: inicioDoMes(1) };
 
-    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto] = await Promise.all([
+    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto, criadosPorTipo, aprovadosPorTipo, tipos] = await Promise.all([
       prisma.orcamento.aggregate({ where: { criadoEm: doMes }, _sum: { valorTotal: true }, _count: true }),
       prisma.orcamento.groupBy({ by: ['status'], where: { criadoEm: doMes }, _count: true }),
       prisma.orcamento.aggregate({
@@ -268,7 +284,27 @@ rotasOrcamentos.get(
         _sum: { valorTotal: true },
         _count: true,
       }),
+      // por tipo de serviço, com os MESMOS critérios de data dos cartões: orçado pela criação,
+      // aprovado pela aprovação no mês
+      prisma.orcamento.groupBy({ by: ['tipoDeServicoId'], where: { criadoEm: doMes }, _count: true, _sum: { valorTotal: true } }),
+      prisma.orcamento.groupBy({ by: ['tipoDeServicoId'], where: { status: 'APROVADO', aprovadoEm: doMes }, _count: true, _sum: { valorTotal: true } }),
+      prisma.tipoDeServico.findMany({ orderBy: [{ ordem: 'asc' }, { nome: 'asc' }], select: { id: true, nome: true, ativo: true } }),
     ]);
+
+    // uma linha por tipo ativo (mesmo sem movimento) e por desativado que teve movimento;
+    // "Sem tipo" (orçamentos anteriores ao campo) por último, só se houver
+    const linha = (id: string | null) => {
+      const c = criadosPorTipo.find((g) => g.tipoDeServicoId === id);
+      const a = aprovadosPorTipo.find((g) => g.tipoDeServicoId === id);
+      return {
+        orcados: { quantidade: c?._count ?? 0, valor: Number(c?._sum.valorTotal ?? 0) },
+        aprovados: { quantidade: a?._count ?? 0, valor: Number(a?._sum.valorTotal ?? 0) },
+      };
+    };
+    const porTipo = [
+      ...tipos.map((t) => ({ tipoDeServicoId: t.id as string | null, nome: t.nome, ativo: t.ativo, ...linha(t.id) })),
+      { tipoDeServicoId: null, nome: 'Sem tipo', ativo: true, ...linha(null) },
+    ].filter((t) => (t.ativo && t.tipoDeServicoId !== null) || t.orcados.quantidade > 0 || t.aprovados.quantidade > 0);
 
     // taxa de aprovação: turma dos criados no mês
     const quantos = (s: StatusOrcamento) => criadosPorStatus.find((p) => p.status === s)?._count ?? 0;
@@ -287,6 +323,7 @@ rotasOrcamentos.get(
       quantidadeEmAberto: emAberto._count,
       valorEmAberto: Number(emAberto._sum.valorTotal ?? 0),
       valorAprovadoMes: Number(aprovadosNoMes._sum.valorTotal ?? 0),
+      porTipo,
     });
   }),
 );
@@ -303,6 +340,7 @@ rotasOrcamentos.get(
         itens: { orderBy: { ordem: 'asc' }, include: { produto: { select: { categoria: true } } } },
         historico: { orderBy: { criadoEm: 'desc' }, include: { usuario: { select: { nome: true } } } },
         projeto: true,
+        tipoDeServico: { select: { id: true, nome: true, ativo: true } },
       },
     });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
@@ -325,6 +363,10 @@ rotasOrcamentos.post(
         return res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
       }
     }
+    if (!dados.tipoDeServicoId) {
+      throw new ErroHttp(400, 'Escolha o tipo de serviço do orçamento.');
+    }
+    await conferirTipoDeServico(dados.tipoDeServicoId);
     const cliente = await clienteDoOrcamento(dados.clienteId);
     const itens = await prepararItens(dados.itens);
     const totais = calcularOrcamento({
@@ -348,6 +390,7 @@ rotasOrcamentos.post(
           codigo: await gerarCodigoOrcamento(tx),
           idCriacao: dados.idCriacao,
           clienteId: dados.clienteId,
+          tipoDeServicoId: dados.tipoDeServicoId,
           ...copiaDoCliente(cliente),
           vendedorId: req.usuario!.id,
           validade: dados.validade,
@@ -392,6 +435,9 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
     throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
   }
 
+  // ausente: tela da versão anterior (a nova sempre manda); o que estava gravado continua
+  if (dados.tipoDeServicoId !== undefined) await conferirTipoDeServico(dados.tipoDeServicoId, atual.tipoDeServicoId);
+
   // só o rascunho fica sem prazo: quem já saiu para o cliente não pode perdê-lo numa edição
   if (atual.status !== 'RASCUNHO' && dados.prazoExecucao === '') {
     throw new ErroHttp(400, 'Este orçamento já foi enviado: o prazo de execução não pode ficar em branco.');
@@ -423,6 +469,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
       where: { id: id },
       data: {
         clienteId: dados.clienteId,
+        ...(dados.tipoDeServicoId === undefined ? {} : { tipoDeServicoId: dados.tipoDeServicoId }),
         ...novaCopia,
         validade: dados.validade,
         descontoTipo: dados.descontoTipo,
@@ -458,6 +505,29 @@ rotasOrcamentos.put(
   rota(async (req, res) => {
     const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body));
     res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+  }),
+);
+
+// --------------------------------------------------------------------------
+// Classificar o tipo de serviço em QUALQUER status (inclusive aprovado, que não se edita):
+// é como o escritório classifica os orçamentos anteriores ao campo. O projeto vai junto.
+// --------------------------------------------------------------------------
+rotasOrcamentos.patch(
+  '/:id/tipo',
+  rota(async (req, res) => {
+    const { tipoDeServicoId } = z.object({ tipoDeServicoId: z.string().uuid('Escolha o tipo de serviço') }).parse(req.body);
+    const atual = await prisma.orcamento.findUnique({ where: { id: req.params.id }, select: { id: true, tipoDeServicoId: true } });
+    if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
+    await conferirTipoDeServico(tipoDeServicoId, atual.tipoDeServicoId);
+    const orcamento = await prisma.$transaction(async (tx) => {
+      await tx.projeto.updateMany({ where: { orcamentoId: atual.id }, data: { tipoDeServicoId } });
+      return tx.orcamento.update({
+        where: { id: atual.id },
+        data: { tipoDeServicoId },
+        select: { id: true, tipoDeServico: { select: { id: true, nome: true } } },
+      });
+    });
+    res.json(orcamento);
   }),
 );
 
@@ -501,7 +571,7 @@ rotasOrcamentos.patch(
  */
 async function mudarStatus(
   tx: Prisma.TransactionClient,
-  orcamento: { id: string; status: StatusOrcamento; clienteId: string; enviadoEm: Date | null; aprovadoEm: Date | null; recusadoEm: Date | null; motivoRecusa: string | null },
+  orcamento: { id: string; status: StatusOrcamento; clienteId: string; tipoDeServicoId: string | null; enviadoEm: Date | null; aprovadoEm: Date | null; recusadoEm: Date | null; motivoRecusa: string | null },
   status: StatusOrcamento,
   usuarioId: string,
   observacao?: string,
@@ -529,6 +599,8 @@ async function mudarStatus(
         codigo: await gerarCodigoProjeto(tx),
         orcamentoId: orcamento.id,
         clienteId: orcamento.clienteId,
+        // o tipo de serviço vendido vai junto (null nos orçamentos anteriores ao campo)
+        tipoDeServicoId: orcamento.tipoDeServicoId,
       },
     });
     await registrarEvento(tx, {

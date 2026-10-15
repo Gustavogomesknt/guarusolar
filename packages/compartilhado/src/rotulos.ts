@@ -38,7 +38,7 @@ export const ROTULO_UNIDADE: Record<Unidade, string> = {
   KWP: 'kWp',
 };
 
-/** Tipo de serviço como aparece na agenda do escritório e no app do técnico. */
+/** ETAPA do serviço agendado (na tela: "Etapa"), na agenda do escritório e no app do técnico. Não é o tipo de serviço vendido do orçamento (tabela TipoDeServico). */
 export const ROTULO_TIPO_SERVICO: Record<TipoServico, string> = {
   INSTALACAO: 'Instalação',
   VISITA_TECNICA: 'Visita técnica',

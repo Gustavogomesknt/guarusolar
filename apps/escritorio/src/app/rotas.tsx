@@ -21,6 +21,7 @@ const PaginaCatalogo = lazyComRecarga(() => import('@/paginas/catalogo/PaginaCat
 const PaginaAgenda = lazyComRecarga(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
 const ListaProjetos = lazyComRecarga(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
 const FichaProjeto = lazyComRecarga(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
+const PaginaTiposDeServico = lazyComRecarga(() => import('@/paginas/tiposDeServico/PaginaTiposDeServico').then((m) => ({ default: m.PaginaTiposDeServico })));
 const PaginaUsuarios = lazyComRecarga(() => import('@/paginas/usuarios/PaginaUsuarios').then((m) => ({ default: m.PaginaUsuarios })));
 const PaginaValidacao = lazyComRecarga(() =>
   import('@/paginas/validacao/PaginaValidacao').then((m) => ({ default: m.PaginaValidacao })),
@@ -69,6 +70,7 @@ export const roteador = createBrowserRouter(
           <Route element={<RotaProtegida papeis={['GESTOR']} />}>
             <Route path="agenda" element={<PaginaAgenda />} />
             <Route path="validacao" element={<PaginaValidacao />} />
+            <Route path="tipos-de-servico" element={<PaginaTiposDeServico />} />
           </Route>
           {/* Administração: papeis vazio = só ADMIN */}
           <Route element={<RotaProtegida papeis={[]} />}>
