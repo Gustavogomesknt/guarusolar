@@ -7,6 +7,22 @@ import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { operacaoMudou, versaoDaOperacao } from '../lib/versaoDaOperacao';
+import {
+  caminhoDoVideo,
+  chaveDoVideo,
+  contarVideoNoUso,
+  linkParaEnviarVideo,
+  salvarCapaDoVideo,
+  tamanhoDoVideoEnviado,
+  VideoSemArmazenamento,
+} from '../lib/videos';
+import {
+  CODIGO_VIDEO_NAO_RECEBIDO,
+  MAXIMO_DE_VIDEOS_POR_SERVICO,
+  TIPOS_DE_VIDEO,
+  VIDEO_BYTES_MAXIMO,
+  VIDEO_SEGUNDOS_MAXIMO,
+} from '@guarusolar/compartilhado';
 import path from 'node:path';
 import {
   ArmazenamentoCheio,
@@ -476,6 +492,11 @@ rotasValidacao.get(
         ...ESCALA,
         enviadoPor: { select: { nome: true, telefone: true } },
         fotos: { orderBy: { criadoEm: 'asc' }, include: { enviadaPor: { select: { nome: true } } } },
+        // vídeos (opcionais): capa e link de leitura saem por /api/videos/:id, com login
+        videos: {
+          orderBy: { criadoEm: 'asc' },
+          select: { id: true, duracaoSegundos: true, tamanhoBytes: true, gravadoEm: true, criadoEm: true, capaChave: true, enviadoPor: { select: { nome: true } } },
+        },
         materiais: { include: { produto: { select: { nome: true, unidade: true } } } },
       },
     });
@@ -489,7 +510,8 @@ rotasValidacao.get(
         (a.chave ? (ordem.get(a.chave) ?? 999) : 1000) - (b.chave ? (ordem.get(b.chave) ?? 999) : 1000) ||
         a.criadoEm.getTime() - b.criadoEm.getTime(),
     );
-    res.json({ ...servico, fotos });
+    const videos = servico.videos.map(({ capaChave, ...v }) => ({ ...v, temCapa: capaChave !== null }));
+    res.json({ ...servico, fotos, videos });
   }),
 );
 
@@ -732,9 +754,16 @@ rotasTecnico.get(
 
     // ainda não começou e outro serviço do mesmo projeto está andando: o app avisa antes da foto
     const outro = servico.status === 'AGENDADO' ? await outroServicoAndando(prisma, servico) : null;
+    const videos = await prisma.videoServico.findMany({
+      where: { agendamentoId: servico.id },
+      orderBy: { criadoEm: 'asc' },
+      select: { id: true, idLocal: true, duracaoSegundos: true, tamanhoBytes: true, gravadoEm: true, capaChave: true },
+    });
 
     res.json({
       ...servico,
+      // vídeos já recebidos (opcionais; a capa sai por GET /api/videos/:id/capa)
+      videos: videos.map(({ capaChave, ...v }) => ({ ...v, temCapa: capaChave !== null })),
       aguardandoOutro: outro ? avisoDeOutroAndando(outro) : null,
       // produção sem lugar seguro para as fotos: o app avisa antes de o técnico fotografar
       fotosBloqueadas: appTecnicoLiberado() ? null : AVISO_FOTOS_BLOQUEADAS,
@@ -879,6 +908,120 @@ rotasTecnico.post(
     // primeira foto: o serviço passou a "Em execução" (agenda e projetos mostram a situação)
     if (servico.status === 'AGENDADO') operacaoMudou();
     res.status(201).json(foto);
+  }),
+);
+
+// ------------------------------------------------------------------------------------------
+// Vídeo do serviço (lib/videos.ts): o arquivo vai do celular DIRETO ao bucket
+// ------------------------------------------------------------------------------------------
+
+const RECUSA_SEM_ARMAZENAMENTO = (erro: unknown): never => {
+  if (erro instanceof VideoSemArmazenamento) throw new ErroHttp(409, erro.message);
+  if (erro instanceof ArmazenamentoCheio) {
+    throw new ErroHttp(409, 'O espaço de arquivos do sistema está cheio. Avise o escritório. O vídeo continua guardado no celular.');
+  }
+  throw erro;
+};
+
+/** Já chegou (reenvio da fila depois de a resposta se perder)? 409 se foi para outro serviço. */
+async function videoJaRecebido(idLocal: string, servicoId: string) {
+  const video = await prisma.videoServico.findUnique({ where: { idLocal } });
+  if (video && video.agendamentoId !== servicoId) throw new ErroHttp(409, 'Este vídeo já foi enviado para outro serviço');
+  return video;
+}
+
+async function conferirLimiteDeVideos(servicoId: string) {
+  const ja = await prisma.videoServico.count({ where: { agendamentoId: servicoId } });
+  if (ja >= MAXIMO_DE_VIDEOS_POR_SERVICO) {
+    throw new ErroHttp(409, `Este serviço já tem ${MAXIMO_DE_VIDEOS_POR_SERVICO} vídeos, o máximo. Use fotos para o restante.`);
+  }
+}
+
+/** 1. Link assinado de escrita: o celular envia o vídeo direto ao bucket. */
+rotasTecnico.post(
+  '/servicos/:id/videos/envio',
+  rota(async (req, res) => {
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
+    const { idLocal, tamanhoBytes, tipo } = z
+      .object({
+        idLocal: z.string().uuid(),
+        tamanhoBytes: z.number().int().positive().max(VIDEO_BYTES_MAXIMO, `O vídeo passa de ${VIDEO_BYTES_MAXIMO / 1024 / 1024} MB, o limite.`),
+        tipo: z.enum(TIPOS_DE_VIDEO),
+      })
+      .parse(req.body);
+    const ja = await videoJaRecebido(idLocal, servico.id);
+    if (ja) return res.json({ jaRecebido: ja });
+    conferirServicoAberto(servico.status);
+    if (servico.status === 'AGENDADO') await conferirQuePodeComecar(servico);
+    await conferirLimiteDeVideos(servico.id);
+    const caminho = caminhoDoVideo(servico.projeto.codigo, servico.id, idLocal, tipo);
+    const link = await linkParaEnviarVideo(caminho, tamanhoBytes).catch(RECUSA_SEM_ARMAZENAMENTO);
+    res.set('Cache-Control', 'no-store').json({ ...link, metodo: 'PUT', tipo });
+  }),
+);
+
+/** 2. O celular terminou de enviar: confere no bucket e só então registra (com a capa). */
+rotasTecnico.post(
+  '/servicos/:id/videos',
+  upload.single('capa'),
+  rota(async (req, res) => {
+    const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
+    const dados = z
+      .object({
+        idLocal: z.string().uuid(),
+        tipo: z.enum(TIPOS_DE_VIDEO),
+        duracaoSegundos: z.coerce.number().min(0).max(VIDEO_SEGUNDOS_MAXIMO + 5).optional(),
+        gravadoEm: z.coerce.date().optional(),
+      })
+      .parse(req.body);
+    const ja = await videoJaRecebido(dados.idLocal, servico.id);
+    if (ja) return res.status(200).json(ja);
+    conferirServicoAberto(servico.status);
+    await conferirLimiteDeVideos(servico.id);
+
+    const caminho = caminhoDoVideo(servico.projeto.codigo, servico.id, dados.idLocal, dados.tipo);
+    const tamanho = await tamanhoDoVideoEnviado(caminho).catch(RECUSA_SEM_ARMAZENAMENTO);
+    // não está no bucket (envio interrompido, link vencido): o app volta a enviar, sem erro
+    if (tamanho === null) throw new ErroHttp(409, 'O vídeo ainda não chegou ao armazenamento. Ele será enviado de novo.', CODIGO_VIDEO_NAO_RECEBIDO);
+    if (tamanho > VIDEO_BYTES_MAXIMO) throw new ErroHttp(413, 'O vídeo ficou maior que o limite. Grave um vídeo mais curto.');
+
+    // capa: JPEG pequeno gerado no celular; sem ela (aparelho não conseguiu), o vídeo entra igual
+    let capaChave: string | null = null;
+    if (req.file && req.file.size <= 500 * 1024 && /^image\/jpe?g$/.test(req.file.mimetype)) {
+      capaChave = await salvarCapaDoVideo(caminho, req.file.buffer).catch((erro) => {
+        console.error(`[vídeo] capa não gravada (serviço ${servico.id}): ${(erro as Error).message}`);
+        return null;
+      });
+    }
+
+    const video = await prisma.$transaction(async (tx) => {
+      // um vídeo também COMEÇA o serviço, como a primeira foto
+      if (servico.status === 'AGENDADO') {
+        await tx.agendamento.update({ where: { id: servico.id }, data: { status: 'EM_EXECUCAO' } });
+        await passoDoServico(tx, {
+          servico,
+          evento: 'SERVICO_INICIADO',
+          descricao: `${rotuloDoServico(servico.tipo)} em execução: primeiro vídeo enviado`,
+          usuarioId: req.usuario!.id,
+        });
+      }
+      return tx.videoServico.create({
+        data: {
+          agendamentoId: servico.id,
+          arquivoChave: chaveDoVideo(caminho),
+          tipo: dados.tipo,
+          tamanhoBytes: tamanho,
+          duracaoSegundos: dados.duracaoSegundos === undefined ? null : Math.round(dados.duracaoSegundos),
+          capaChave,
+          gravadoEm: dados.gravadoEm ?? null,
+          enviadoPorId: req.usuario!.id,
+          idLocal: dados.idLocal,
+        },
+      });
+    });
+    contarVideoNoUso(tamanho + (req.file?.size ?? 0));
+    operacaoMudou();
+    res.status(201).json(video);
   }),
 );
 

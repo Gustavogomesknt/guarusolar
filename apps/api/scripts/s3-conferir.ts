@@ -22,6 +22,7 @@ import {
   enviarAoS3,
   limiteDoS3Bytes,
   linkAssinadoDoS3,
+  linkDeEnvioDoS3,
   listarDoS3,
   motivo,
   moverNoS3,
@@ -65,6 +66,7 @@ async function main() {
 
   const caminho = `_conferencia/teste-${Date.now()}.jpg`;
   const movido = `_conferencia/substituidas/teste-${Date.now()}.jpg`;
+  const videoDeTeste = `_conferencia/videos/teste-${Date.now()}.webm`;
   const original = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#1257A6' } }).jpeg().toBuffer();
   await passo('envio de um arquivo de teste', () => enviarAoS3(caminho, original, 'image/jpeg'));
   try {
@@ -89,6 +91,32 @@ async function main() {
       if (!resposta.ok) throw new Error(`o link assinado não abriu: ${await motivo(resposta)}`);
       if (!Buffer.from(await resposta.arrayBuffer()).equals(original)) throw new Error('o link assinado devolveu outro arquivo');
     });
+    // VÍDEO: o celular envia direto ao bucket por link de escrita (lib/videos.ts)
+    await passo('link assinado de ESCRITA grava direto no bucket (envio de vídeo)', async () => {
+      const conteudo = Buffer.from('video de teste da conferencia');
+      const resposta = await fetch(linkDeEnvioDoS3(videoDeTeste, 300), { method: 'PUT', body: conteudo, headers: { 'Content-Type': 'video/webm' } });
+      if (!resposta.ok) throw new Error(`o envio pelo link não foi aceito: ${await motivo(resposta)}`);
+      if ((await tamanhoNoS3(videoDeTeste)) !== conteudo.length) throw new Error('o arquivo enviado pelo link não está no bucket com o tamanho certo');
+    });
+    // O navegador só envia direto se o bucket liberar (CORS) o endereço do app para PUT
+    const origemDoApp = (() => {
+      try {
+        return process.env.API_URL_PUBLICA ? new URL(process.env.API_URL_PUBLICA).origin : null;
+      } catch {
+        return null;
+      }
+    })();
+    await passo(`o navegador do app pode enviar direto (CORS de PUT para ${origemDoApp ?? 'o endereço do app'})`, async () => {
+      if (!origemDoApp) throw new Error('defina API_URL_PUBLICA nesta janela (o endereço do app, ex.: https://guarusolar.onrender.com) para conferir o CORS');
+      const resposta = await fetch(linkDeEnvioDoS3(videoDeTeste, 300), {
+        method: 'OPTIONS',
+        headers: { Origin: origemDoApp, 'Access-Control-Request-Method': 'PUT', 'Access-Control-Request-Headers': 'content-type' },
+      });
+      const liberada = resposta.headers.get('access-control-allow-origin');
+      if (!resposta.ok || (liberada !== '*' && liberada !== origemDoApp)) {
+        throw new Error(`o bucket não libera PUT a partir de ${origemDoApp} (resposta ${resposta.status}). Configure a regra de CORS: SOCORRO.md, item "Vídeo"`);
+      }
+    });
     await passo('link assinado vencido não abre (assinado há 10 minutos, com prazo de 1 minuto)', async () => {
       const resposta = await fetch(linkAssinadoDoS3(caminho, 60, new Date(Date.now() - 10 * 60_000)));
       if (resposta.ok) throw new Error('o link vencido abriu o arquivo');
@@ -109,7 +137,7 @@ async function main() {
       console.log('  ATENÇÃO: não deu para medir. Sem a medição, a API não avisa nem recusa quando o espaço acabar.');
     }
   } finally {
-    await passo('remoção dos arquivos de teste', () => apagarDoS3([caminho, movido]));
+    await passo('remoção dos arquivos de teste', () => apagarDoS3([caminho, movido, videoDeTeste]));
   }
 
   console.log('\nTudo certo. Para usar: STORAGE_PROVIDER=s3 (com as cinco variáveis S3_*).');

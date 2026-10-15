@@ -247,7 +247,32 @@ e Publicar. As fotos que entraram no B2 nesse meio-tempo continuam abrindo de l�
 O mesmo roteiro serve para outro serviço compatível com S3 (o Cloudflare R2, por exemplo): mudam
 só o painel onde se cria o bucket e os valores de `S3_ENDPOINT` e `S3_REGION`.
 
-## 9. Quem contatar
+## 9. Vídeo: o técnico não consegue enviar, ou o gestor não consegue assistir
+
+O vídeo dos serviços não passa pela API: o celular o envia **direto ao Backblaze B2**, por um link
+que vale poucos minutos. Para o navegador do celular poder fazer isso, o bucket precisa de uma
+**regra de CORS** que libere o envio (PUT) a partir do endereço do sistema. Sem ela, o vídeo fica
+guardado no celular, na fila, e não sobe (as fotos continuam normais).
+
+1. **Confira primeiro** numa janela do PowerShell com as cinco `S3_*` (como no item 8) e mais o
+   endereço do sistema, sem barra no fim:
+   `$env:API_URL_PUBLICA='https://<endereço do sistema>'`, depois **`npm run s3:conferir`**.
+   O passo "o navegador do app pode enviar direto (CORS de PUT…)" diz se a regra existe.
+2. **Criar a regra.** Pelo que sei, as opções prontas do painel do Backblaze (Bucket Settings →
+   CORS Rules) liberam só a LEITURA; o envio precisa de uma regra personalizada, feita pela
+   ferramenta de linha de comando do Backblaze (`b2`), com uma chave que possa alterar o bucket
+   (a "Master Application Key" ou uma com permissão `writeBuckets`, que você usa só na sua
+   janela, nunca na Render). O comando é parecido com este (troque os dois valores entre `< >`):
+
+   `b2 bucket update --cors-rules '[{"corsRuleName":"envioDeVideo","allowedOrigins":["https://<endereço do sistema>"],"allowedOperations":["s3_put","s3_get","s3_head"],"allowedHeaders":["content-type"],"exposeHeaders":["etag"],"maxAgeSeconds":3600}]' <nome do bucket> allPrivate`
+
+   O `allPrivate` no fim mantém o bucket PRIVADO: confira que ele continua assim. Os nomes dos
+   parâmetros podem ter mudado na versão da ferramenta; o `npm run s3:conferir` do passo 1 é a
+   prova de que deu certo.
+3. **O gestor não consegue assistir:** o link de leitura vale 5 minutos. Feche o vídeo e abra de
+   novo, que sai um link novo. Se nem assim tocar, rode o `npm run s3:conferir` do passo 1.
+
+## 10. Quem contatar
 
 | Quem | Para quê | Contato |
 |---|---|---|

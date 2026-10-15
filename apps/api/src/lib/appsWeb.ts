@@ -64,8 +64,8 @@ export function cabecalhosDeSeguranca(producao: boolean) {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      // o app do técnico usa câmera (pelo seletor de arquivo) e localização; nada além
-      'Permissions-Policy': 'camera=(self), geolocation=(self), microphone=(), payment=()',
+      // o app do técnico usa câmera, localização e, na gravação de vídeo, o microfone; nada além
+      'Permissions-Policy': 'camera=(self), geolocation=(self), microphone=(self), payment=()',
     });
     // só com HTTPS garantido (produção na Render, que só atende em https)
     if (producao) res.set('Strict-Transport-Security', 'max-age=31536000');

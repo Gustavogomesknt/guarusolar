@@ -1,8 +1,9 @@
 import { createStore, del, set, values } from 'idb-keyval';
-import { STATUS_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
+import { CODIGO_VIDEO_NAO_RECEBIDO, STATUS_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
 import { acordarServidor, conexaoAtual, ErroApi, ouvirConexao, SEM_CONEXAO } from '@guarusolar/web/api';
 import { clienteConsultas } from '@/lib/consultas';
 import { enviarFoto } from './envio';
+import { confirmarVideo, enviarAoBucket, pedirLinkDoVideo, tempoMaximoDoVideo } from './envioDeVideo';
 import { lerMetadados, type Posicao } from './metadados';
 import { reduzirFoto } from './reduzir';
 
@@ -31,6 +32,14 @@ import { reduzirFoto } from './reduzir';
  *    no tempo agendado. Não confia só no navigator.onLine, que mente com sinal fraco.
  * 5. Cada foto guarda quem a tirou e só é enviada com a sessão dessa pessoa.
  * 6. A API não duplica: cada envio leva o idLocal, e um reenvio devolve a foto já recebida.
+ *
+ * 7. VÍDEO (gravado no app, ~11 MB por minuto) entra nesta mesma fila, com as mesmas regras. Não
+ *    tem preparo (já sai comprimido) e vai DIRETO ao bucket por link assinado (envioDeVideo.ts),
+ *    sem passar pela API. Diferenças: o vídeo sobe numa FAIXA PRÓPRIA, em paralelo às fotos (em
+ *    sinal ruim, 12 MB levam minutos, e a foto de 300 KB não pode esperar atrás deles; no teste
+ *    a 40 KB/s, a foto esperava 100 s); um vídeo por vez; o tempo máximo de cada envio cresce com
+ *    o tamanho (até 15 min); depois de o arquivo chegar ao bucket, a fila só repete o aviso à API,
+ *    sem reenviar os megabytes. Um envio interrompido recomeça do zero (o bucket não retoma).
  *
  * Os dados ficam como ArrayBuffer, não Blob: guardar Blob no IndexedDB já falhou em versões
  * do Safari; ArrayBuffer funciona em todos.
@@ -61,12 +70,23 @@ type Registro = {
   adiadaEm?: number;
   /** recusa definitiva (API ou preparo): precisa do técnico */
   erro?: string;
+  /** VÍDEO gravado no app: vai direto ao bucket (sem `original` nem `foto`) */
+  video?: { dados: ArrayBuffer; tipo: string; duracaoSegundos: number; gravadoEm: string; capa?: ArrayBuffer };
+  /** o arquivo do vídeo já está no bucket: falta só a API confirmar (não reenvia os megabytes) */
+  videoNoBucket?: boolean;
 };
 
 export type EstadoNaFila = 'preparando' | 'na_fila' | 'enviando' | 'erro';
 
 export type FotoNaFila = {
   idLocal: string;
+  /** foto ou vídeo (a tela de fotos ignora os vídeos e vice-versa) */
+  midia: 'foto' | 'video';
+  /** vídeo: tamanho e duração, para mostrar ao técnico */
+  tamanhoBytes?: number;
+  duracaoSegundos?: number;
+  /** vídeo sendo enviado: quanto já subiu (0 a 1) */
+  progresso?: number;
   servicoId: string;
   chave: string | null;
   estado: EstadoNaFila;
@@ -103,11 +123,15 @@ const miniaturas = new Map<string, string>();
 const posicoes = new Map<string, Promise<Posicao | null>>();
 let usuarioAtual: string | null = null;
 let carregada = false;
+/** a foto e o vídeo que estão subindo agora (cada um na sua faixa) */
 let enviandoId: string | null = null;
+let enviandoVideoId: string | null = null;
+const subindo = (idLocal: string) => idLocal === enviandoId || idLocal === enviandoVideoId;
 let semConexao = false;
 let aguardandoServidor = false;
 let conexaoLenta = false;
 let appDesatualizado = false;
+let progressoDoEnvio: number | undefined;
 let temporizador: ReturnType<typeof setTimeout> | undefined;
 
 const ouvintes = new Set<() => void>();
@@ -116,10 +140,12 @@ let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semC
 const ordenados = () => [...registros.values()].sort((a, b) => a.criadoEm - b.criadoEm);
 
 function urlDe(r: Registro) {
-  if (!r.foto) return null;
+  // vídeo: a miniatura é a capa (quando o aparelho conseguiu gerar)
+  const imagem = r.foto ? new Blob([r.foto.dados], { type: r.foto.tipo ?? 'image/jpeg' }) : r.video?.capa ? new Blob([r.video.capa], { type: 'image/jpeg' }) : null;
+  if (!imagem) return null;
   let url = urls.get(r.idLocal);
   if (!url) {
-    url = URL.createObjectURL(new Blob([r.foto.dados], { type: r.foto.tipo ?? 'image/jpeg' }));
+    url = URL.createObjectURL(imagem);
     urls.set(r.idLocal, url);
   }
   return url;
@@ -130,12 +156,20 @@ function notificar() {
     .filter((r) => r.usuarioId === usuarioAtual)
     .map((r) => ({
       idLocal: r.idLocal,
+      midia: r.video ? ('video' as const) : ('foto' as const),
       servicoId: r.servicoId,
       chave: r.chave,
-      estado: r.erro ? 'erro' : r.idLocal === enviandoId ? 'enviando' : r.foto ? 'na_fila' : 'preparando',
+      estado: r.erro ? 'erro' : subindo(r.idLocal) ? 'enviando' : r.foto || r.video ? 'na_fila' : 'preparando',
       url: urlDe(r),
-      preparada: Boolean(r.foto),
+      preparada: Boolean(r.foto || r.video),
       erro: r.erro,
+      ...(r.video
+        ? {
+            tamanhoBytes: r.video.dados.byteLength,
+            duracaoSegundos: r.video.duracaoSegundos,
+            progresso: r.idLocal === enviandoVideoId ? (r.videoNoBucket ? 1 : progressoDoEnvio) : undefined,
+          }
+        : {}),
     }));
   retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor, conexaoLenta, appDesatualizado };
   ouvintes.forEach((ouvir) => ouvir());
@@ -261,6 +295,40 @@ export async function adicionarNaFila(entrada: {
   void processar();
 }
 
+/** Vídeo gravado no app: entra na fila já pronto (não há preparo). */
+export async function adicionarVideoNaFila(entrada: {
+  servicoId: string;
+  arquivo: Blob;
+  duracaoSegundos: number;
+  capa: Blob | null;
+}) {
+  if (!usuarioAtual) throw new Error('Entre de novo para gravar vídeos.');
+  const registro: Registro = {
+    idLocal: crypto.randomUUID(),
+    usuarioId: usuarioAtual,
+    servicoId: entrada.servicoId,
+    chave: null,
+    criadoEm: Date.now(),
+    video: {
+      dados: await entrada.arquivo.arrayBuffer(),
+      // o MediaRecorder informa "video/webm;codecs=vp8,opus": a API quer só o tipo
+      tipo: entrada.arquivo.type.split(';')[0] || 'video/webm',
+      duracaoSegundos: entrada.duracaoSegundos,
+      gravadoEm: new Date().toISOString(),
+      capa: entrada.capa ? await entrada.capa.arrayBuffer() : undefined,
+    },
+    tentativas: 0,
+    proximaTentativa: 0,
+  };
+  try {
+    await gravar(registro);
+  } catch {
+    throw new Error('Não há espaço no celular para guardar o vídeo. Libere espaço e tente de novo.');
+  }
+  notificar();
+  void processar();
+}
+
 export async function tentarDeNovo(idLocal: string) {
   const r = registros.get(idLocal);
   if (!r) return;
@@ -270,7 +338,7 @@ export async function tentarDeNovo(idLocal: string) {
 }
 
 export async function descartar(idLocal: string) {
-  if (idLocal === enviandoId) return; // já está subindo: não dá mais para desistir
+  if (subindo(idLocal)) return; // já está subindo: não dá mais para desistir
   await remover(idLocal);
   notificar();
 }
@@ -288,6 +356,7 @@ function acordar() {
 function processar() {
   void prepararProximas();
   void enviarProximas();
+  void enviarProximosVideos();
 }
 
 let preparando = false;
@@ -334,19 +403,21 @@ async function prepararProximas() {
   }
 }
 
+/** Próxima da faixa: a ordem em que foram feitas; a que estourou o tempo vai para o fim. */
+const proximaDaFaixa = (video: boolean) =>
+  [...registros.values()]
+    .filter((x) => x.usuarioId === usuarioAtual && (video ? x.video : x.foto) && !x.erro && x.proximaTentativa <= Date.now())
+    .sort((a, b) => (a.adiadaEm ?? a.criadoEm) - (b.adiadaEm ?? b.criadoEm))[0];
+
 let enviando = false;
 async function enviarProximas() {
   if (enviando || !usuarioAtual) return;
   enviando = true;
   try {
     for (;;) {
-      const agora = Date.now();
-      // a vez de cada uma: a ordem em que foram tiradas; a que estourou o tempo vai para o fim
-      const r = [...registros.values()]
-        .filter((x) => x.usuarioId === usuarioAtual && x.foto && !x.erro && x.proximaTentativa <= agora)
-        .sort((a, b) => (a.adiadaEm ?? a.criadoEm) - (b.adiadaEm ?? b.criadoEm))[0];
-      if (!r || !r.foto) break;
-      const seguir = await enviarUma(r, r.foto);
+      const r = proximaDaFaixa(false);
+      if (!r) break;
+      const seguir = await enviarUma(r);
       if (!seguir) break;
     }
   } finally {
@@ -355,27 +426,84 @@ async function enviarProximas() {
   }
 }
 
-/** Envia uma foto. Devolve false quando não adianta tentar as próximas agora (rede, sessão). */
-async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Promise<boolean> {
-  enviandoId = r.idLocal;
+/** A faixa dos vídeos: um por vez, em paralelo às fotos. */
+let enviandoVideos = false;
+async function enviarProximosVideos() {
+  if (enviandoVideos || !usuarioAtual) return;
+  enviandoVideos = true;
+  try {
+    for (;;) {
+      const r = proximaDaFaixa(true);
+      if (!r) break;
+      const seguir = await enviarUma(r);
+      if (!seguir) break;
+    }
+  } finally {
+    enviandoVideos = false;
+    agendarProximaTentativa();
+  }
+}
+
+/**
+ * Vídeo: link assinado, arquivo direto ao bucket e aviso à API. Depois que o arquivo chegou ao
+ * bucket, a fila guarda isso (videoNoBucket) e uma nova tentativa só repete o aviso.
+ */
+async function enviarVideo(r: Registro, definirLimite: (limite: AbortSignal) => void) {
+  const video = r.video!;
+  if (!r.videoNoBucket) {
+    const link = await pedirLinkDoVideo(r.servicoId, { idLocal: r.idLocal, tamanhoBytes: video.dados.byteLength, tipo: video.tipo });
+    if ('jaRecebido' in link) return; // já tinha entrado (a resposta da confirmação se perdeu)
+    const limite = AbortSignal.timeout(tempoMaximoDoVideo(video.dados.byteLength));
+    definirLimite(limite);
+    progressoDoEnvio = 0;
+    let avisado = 0;
+    await enviarAoBucket(link.url, new Blob([video.dados], { type: video.tipo }), limite, (fracao) => {
+      progressoDoEnvio = fracao;
+      // a tela acompanha o progresso sem redesenhar a cada pacote
+      if (fracao - avisado >= 0.05 || fracao === 1) {
+        avisado = fracao;
+        notificar();
+      }
+    });
+    r = { ...r, videoNoBucket: true };
+    await gravar(r);
+  }
+  await confirmarVideo(r.servicoId, { idLocal: r.idLocal, tipo: video.tipo, duracaoSegundos: video.duracaoSegundos, gravadoEm: video.gravadoEm, capa: video.capa });
+}
+
+/** Envia uma foto ou um vídeo. Devolve false quando não adianta tentar as próximas agora (rede, sessão). */
+async function enviarUma(r: Registro): Promise<boolean> {
+  if (r.video) {
+    enviandoVideoId = r.idLocal;
+    progressoDoEnvio = undefined;
+  } else {
+    enviandoId = r.idLocal;
+  }
   notificar();
   // o relógio dos 120 s só começa com o servidor de pé (a espera por ele tem o tempo dela)
   let limite: AbortSignal | undefined;
   try {
     await acordarServidor();
-    limite = AbortSignal.timeout(TEMPO_MAXIMO_DO_ENVIO);
-    const recebida = await enviarFoto(
-      {
-        servicoId: r.servicoId,
-        chave: r.chave,
-        idLocal: r.idLocal,
-        blob: new Blob([foto.dados], { type: foto.tipo ?? 'image/jpeg' }),
-        capturadaEm: new Date(foto.capturadaEm),
-        latitude: foto.latitude,
-        longitude: foto.longitude,
-      },
-      limite,
-    );
+    let recebidaId: string | undefined;
+    if (r.video) {
+      await enviarVideo(r, (l) => (limite = l));
+    } else {
+      const foto = r.foto!;
+      limite = AbortSignal.timeout(TEMPO_MAXIMO_DO_ENVIO);
+      const recebida = await enviarFoto(
+        {
+          servicoId: r.servicoId,
+          chave: r.chave,
+          idLocal: r.idLocal,
+          blob: new Blob([foto.dados], { type: foto.tipo ?? 'image/jpeg' }),
+          capturadaEm: new Date(foto.capturadaEm),
+          latitude: foto.latitude,
+          longitude: foto.longitude,
+        },
+        limite,
+      );
+      recebidaId = recebida.id;
+    }
     semConexao = false;
     aguardandoServidor = false;
     conexaoLenta = false;
@@ -389,16 +517,22 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
       clienteConsultas.invalidateQueries({ queryKey: ['servico', r.servicoId] }),
       new Promise((resolver) => setTimeout(resolver, 5_000)),
     ]);
-    await remover(r.idLocal, recebida.id);
+    await remover(r.idLocal, recebidaId);
     return true;
   } catch (erro) {
     const status = erro instanceof ErroApi ? erro.status : SEM_CONEXAO;
     if (status === 401) return false; // a sessão encerra e leva ao login; a foto fica na fila
+    // vídeo que a API não achou no bucket (envio interrompido): manda o arquivo de novo, sem erro
+    if (erro instanceof ErroApi && erro.codigo === CODIGO_VIDEO_NAO_RECEBIDO) {
+      const atual = registros.get(r.idLocal) ?? r;
+      await gravar({ ...atual, videoNoBucket: false, tentativas: atual.tentativas + 1, proximaTentativa: Date.now() + 5_000 });
+      return true;
+    }
     if (status === STATUS_APP_DESATUALIZADO) {
       // app antigo demais: a foto fica, sem erro, e tenta de novo depois (a versão nova é quem a
       // envia; a faixa do topo pede para atualizar). As outras também esperariam: para aqui.
       appDesatualizado = true;
-      await gravar({ ...r, proximaTentativa: Date.now() + 60_000 });
+      await gravar({ ...(registros.get(r.idLocal) ?? r), proximaTentativa: Date.now() + 60_000 });
       return false;
     }
     // recusa de verdade: a API recebeu o pedido e disse não (o motivo vai para a tela)
@@ -409,26 +543,35 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
       semConexao = !estourou && status === SEM_CONEXAO && navigator.onLine === false;
       conexaoLenta = estourou;
       aguardandoServidor = !estourou && !semConexao;
-      const tentativas = r.tentativas + 1;
+      const atual = registros.get(r.idLocal) ?? r;
+      const tentativas = atual.tentativas + 1;
       const espera = ESPERAS[Math.min(tentativas, ESPERAS.length) - 1];
-      await gravar({ ...r, tentativas, proximaTentativa: Date.now() + espera, ...(estourou ? { adiadaEm: Date.now() } : {}) });
+      await gravar({ ...atual, tentativas, proximaTentativa: Date.now() + espera, ...(estourou ? { adiadaEm: Date.now() } : {}) });
       // estourou o tempo: esta foi para o fim da fila e a próxima tenta agora; nos outros casos
       // (sem sinal, servidor fora) não adianta tentar as próximas
       return estourou;
     }
     // recusa da API (ex.: serviço cancelado, item fora do checklist): não adianta repetir
-    await gravar({ ...r, erro: erro instanceof ErroApi ? erro.message : 'Não foi possível enviar a foto.' });
+    await gravar({ ...(registros.get(r.idLocal) ?? r), erro: erro instanceof ErroApi ? erro.message : 'Não foi possível enviar a foto.' });
     return true;
   } finally {
-    enviandoId = null;
+    if (r.video) {
+      enviandoVideoId = null;
+      progressoDoEnvio = undefined;
+    } else {
+      enviandoId = null;
+    }
     notificar();
   }
 }
 
 function agendarProximaTentativa() {
   clearTimeout(temporizador);
-  const esperando = [...registros.values()].filter((r) => r.usuarioId === usuarioAtual && r.foto && !r.erro);
+  const esperando = [...registros.values()].filter((r) => r.usuarioId === usuarioAtual && (r.foto || r.video) && !r.erro);
   if (esperando.length === 0 || !usuarioAtual) return;
   const proxima = Math.min(...esperando.map((r) => r.proximaTentativa));
-  temporizador = setTimeout(() => void enviarProximas(), Math.max(1_000, proxima - Date.now()));
+  temporizador = setTimeout(() => {
+    void enviarProximas();
+    void enviarProximosVideos();
+  }, Math.max(1_000, proxima - Date.now()));
 }

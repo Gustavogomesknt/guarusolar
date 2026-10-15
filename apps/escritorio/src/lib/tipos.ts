@@ -239,6 +239,17 @@ export type FotoEmValidacao = {
 };
 
 /** Serviço aberto na validação (GET /api/validacao/:id). Fotos já na ordem do checklist. */
+/** Vídeo do serviço na validação: capa e link de leitura saem por /api/videos/:id, com login. */
+export type VideoEmValidacao = {
+  id: string;
+  duracaoSegundos: number | null;
+  tamanhoBytes: number;
+  gravadoEm: string | null;
+  criadoEm: string;
+  temCapa: boolean;
+  enviadoPor: { nome: string };
+};
+
 export type ServicoEmValidacao = {
   id: string;
   tipo: TipoServico;
@@ -260,6 +271,8 @@ export type ServicoEmValidacao = {
     orcamento: { id: string; codigo: string };
   };
   fotos: FotoEmValidacao[];
+  /** vídeos opcionais; ausente em resposta da versão anterior da API */
+  videos?: VideoEmValidacao[];
   materiais: { id: string; quantidade: string; observacao: string | null; produto: { nome: string; unidade: Unidade } }[];
 };
 

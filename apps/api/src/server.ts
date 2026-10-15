@@ -9,7 +9,7 @@ import { rotasProdutos } from './rotas/produtos';
 import { rotasOrcamentos } from './rotas/orcamentos';
 import { rotasOrcamentoPdf } from './rotas/orcamentoPdf';
 import { rotasAgenda, rotasTecnico, rotasValidacao } from './rotas/operacao';
-import { rotasArmazenamento, rotasFotos } from './rotas/fotos';
+import { rotasArmazenamento, rotasFotos, rotasVideos } from './rotas/fotos';
 import { rotasProjetos } from './rotas/projetos';
 import { rotasUsuarios } from './rotas/usuarios';
 import { appTecnicoLiberado, conferirArmazenamentoAoIniciar, destinoAtual } from './lib/armazenamento';
@@ -83,6 +83,7 @@ app.use('/api/validacao', rotasValidacao);
 app.use('/api/tecnico', rotasTecnico);
 app.use('/api/fotos', rotasFotos);
 app.use('/api/armazenamento', rotasArmazenamento);
+app.use('/api/videos', rotasVideos);
 app.use('/api/projetos', rotasProjetos);
 app.use('/api/usuarios', rotasUsuarios);
 

@@ -13,6 +13,7 @@ import { Cabecalho } from '@/components/Cabecalho';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { criarSomDeAviso } from '@guarusolar/web/somDeAviso';
 import { BlocoFoto, FotosExtras, type EstadoBloco } from '@/components/BlocoFoto';
+import { SecaoVideos } from '@/components/SecaoVideos';
 import { useFotos } from '@/fotos/useFotos';
 import type { Posicao } from '@/fotos/metadados';
 import { useLocalizacao, type EstadoLocalizacao } from '@/fotos/useLocalizacao';
@@ -300,7 +301,9 @@ export function Servico() {
   // o que vale para enviar é o que o servidor já tem (não o estado da foto nova na tela)
   const prontas = obrigatorios.filter((b) => b.item.enviada).length;
   const faltam = obrigatorios.length - prontas;
-  const emAndamento = fotos.locais.filter((f) => f.estado !== 'erro').length;
+  // vídeo na fila também segura o envio (ele precisa subir antes de o serviço ir ao gestor);
+  // falta de vídeo, não: é opcional
+  const emAndamento = [...fotos.locais, ...fotos.videosLocais].filter((f) => f.estado !== 'erro').length;
   // o que este tipo de serviço exige (compartilhado/roteiroDoServico.ts); a API confere de novo
   const roteiro = ROTEIRO_DO_SERVICO[s.tipo];
   const precisaTestar = roteiro.exigeTesteDoSistema;
@@ -310,7 +313,12 @@ export function Servico() {
   const bloqueado = faltam > 0 || faltaObservacao || faltaTeste || emAndamento > 0 || concluir.isPending;
 
   let rotuloBotao = 'Enviar para validação';
-  const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
+  const nFotos = fotos.locais.filter((f) => f.estado !== 'erro').length;
+  const nVideos = fotos.videosLocais.filter((f) => f.estado !== 'erro').length;
+  const fotosEscritas = [
+    nFotos ? (nFotos === 1 ? '1 foto' : `${nFotos} fotos`) : '',
+    nVideos ? (nVideos === 1 ? '1 vídeo' : `${nVideos} vídeos`) : '',
+  ].filter(Boolean).join(' e ');
   const parado = fotos.semConexao || fotos.aguardandoServidor || fotos.appDesatualizado;
   if (emAndamento > 0) {
     rotuloBotao = fotos.appDesatualizado
@@ -456,6 +464,15 @@ export function Servico() {
           locais={extrasLocais}
           onCamera={() => escolherFoto(null, 'camera')}
           onGaleria={() => escolherFoto(null, 'galeria')}
+          onTentarDeNovo={fotos.tentarDeNovo}
+          onDescartar={fotos.descartar}
+        />
+
+        <SecaoVideos
+          enviados={s.videos ?? []}
+          locais={fotos.videosLocais}
+          bloqueado={Boolean(s.fotosBloqueadas) || (s.status === 'AGENDADO' && Boolean(s.aguardandoOutro))}
+          onGravado={fotos.adicionarVideo}
           onTentarDeNovo={fotos.tentarDeNovo}
           onDescartar={fotos.descartar}
         />

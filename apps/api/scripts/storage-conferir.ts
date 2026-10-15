@@ -82,6 +82,11 @@ async function relatorio() {
   console.log(`  Fotos             ${inteiro(r.fotos.arquivos)}, ${mb(r.fotos.bytes)} MB; tamanho médio ${kb(r.fotos.mediaBytes)} KB`);
   console.log(`  Miniaturas        ${inteiro(r.miniaturas.arquivos)}, ${mb(r.miniaturas.bytes)} MB`);
   console.log(`  Fotos refeitas    ${inteiro(r.substituidas.arquivos)}, ${mb(r.substituidas.bytes)} MB (versões anteriores, guardadas)`);
+  if (r.videos) {
+    const fotosTotal = r.fotos.bytes + r.miniaturas.bytes + r.substituidas.bytes;
+    console.log(`  Vídeos (e capas)  ${inteiro(r.videos.arquivos)}, ${mb(r.videos.bytes)} MB`);
+    console.log(`  -> total de FOTOS ${mb(fotosTotal)} MB · total de VÍDEOS ${mb(r.videos.bytes)} MB (o aviso de ${FRACAO_DE_AVISO * 100}% vale para a soma)`);
+  }
   console.log(`  Livre até o teto  ${mb(Math.max(0, r.limiteBytes - r.usadoBytes))} MB; a API avisa em ${FRACAO_DE_AVISO * 100}% e recusa fotos novas em ${FRACAO_DE_RECUSA * 100}%`);
 
   console.log('\n  Crescimento por mês (o que entrou em cada mês):');

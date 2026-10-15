@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { adicionarNaFila, descartar, ouvirFila, retratoDaFila, tentarDeNovo, type EstadoNaFila } from './fila';
+import { adicionarNaFila, adicionarVideoNaFila, descartar, ouvirFila, retratoDaFila, tentarDeNovo, type EstadoNaFila, type FotoNaFila } from './fila';
 import type { Posicao } from './metadados';
 
 export type EstadoFotoLocal = EstadoNaFila;
@@ -26,9 +26,18 @@ export const useFila = () => useSyncExternalStore(ouvirFila, retratoDaFila);
  */
 export function useFotos(servicoId: string) {
   const fila = useFila();
+  // fotos e vídeos dividem a fila, mas cada um tem a sua parte na tela
   const locais = useMemo<FotoLocal[]>(
-    () => fila.fotos.filter((f) => f.servicoId === servicoId),
+    () => fila.fotos.filter((f) => f.servicoId === servicoId && f.midia === 'foto'),
     [fila.fotos, servicoId],
+  );
+  const videosLocais = useMemo<FotoNaFila[]>(
+    () => fila.fotos.filter((f) => f.servicoId === servicoId && f.midia === 'video'),
+    [fila.fotos, servicoId],
+  );
+  const adicionarVideo = useCallback(
+    (arquivo: Blob, duracaoSegundos: number, capa: Blob | null) => adicionarVideoNaFila({ servicoId, arquivo, duracaoSegundos, capa }),
+    [servicoId],
   );
 
   const adicionar = useCallback(
@@ -39,6 +48,8 @@ export function useFotos(servicoId: string) {
 
   return {
     locais,
+    videosLocais,
+    adicionarVideo,
     miniaturas: fila.miniaturas,
     semConexao: fila.semConexao,
     aguardandoServidor: fila.aguardandoServidor,

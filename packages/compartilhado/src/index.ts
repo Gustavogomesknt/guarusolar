@@ -11,3 +11,4 @@ export * from './margemDoOrcamento.js';
 export * from './textosDaProposta.js';
 export * from './roteiroDoServico.js';
 export * from './versaoDoAppDeCampo.js';
+export * from './videoDoServico.js';

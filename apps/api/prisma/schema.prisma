@@ -79,6 +79,7 @@ model Usuario {
   /// serviços em que este técnico está escalado: é o que ele vê no app (regra 6)
   escalas            EscalaServico[]
   fotosEnviadas      FotoServico[]
+  videosEnviados     VideoServico[]
   eventosProjeto     EventoProjeto[]
 
   @@index([papel, ativo])
@@ -482,6 +483,7 @@ model Agendamento {
   editadoEm DateTime @updatedAt
 
   fotos     FotoServico[]
+  videos    VideoServico[]
   materiais MaterialUtilizado[]
   eventos   EventoProjeto[]
   /// quem vai de fato neste serviço
@@ -495,6 +497,31 @@ model Agendamento {
 // ---------------------------------------------------------------------------
 // Validação por fotos
 // ---------------------------------------------------------------------------
+
+/// Vídeo do serviço (opcional, até MAXIMO_DE_VIDEOS_POR_SERVICO; compartilhado/videoDoServico.ts).
+/// Separado do roteiro de fotos. O arquivo vai do celular DIRETO para o bucket S3 por link
+/// assinado de escrita e nunca passa pela API; o registro só nasce depois de a API conferir que
+/// o arquivo chegou. Sai para o gestor por link assinado de leitura, com login (GET /api/videos).
+model VideoServico {
+  id              String      @id @default(uuid())
+  agendamentoId   String
+  agendamento     Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  /// "s3:<caminho no bucket>"; nunca uma URL
+  arquivoChave    String
+  tipo            String // video/webm, video/mp4...
+  tamanhoBytes    Int
+  duracaoSegundos Int?
+  /// imagem de capa (JPEG pequeno, gerado no celular); null se o aparelho não conseguiu
+  capaChave       String?
+  gravadoEm       DateTime?
+  enviadoPorId    String
+  enviadoPor      Usuario     @relation(fields: [enviadoPorId], references: [id])
+  /// gerado no celular; o reenvio da fila não duplica
+  idLocal         String      @unique
+  criadoEm        DateTime    @default(now())
+
+  @@index([agendamentoId])
+}
 
 // Lista configurável de fotos exigidas por tipo de serviço
 model ChecklistFoto {

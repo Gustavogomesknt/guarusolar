@@ -63,7 +63,8 @@ function erroDoBanco(erro: unknown): { status: number; mensagem: string } | null
 }
 
 export class ErroHttp extends Error {
-  constructor(public status: number, message: string) {
+  /** `codigo`: para o app distinguir casos com o mesmo status (ex.: VIDEO_NAO_RECEBIDO) */
+  constructor(public status: number, message: string, public codigo?: string) {
     super(message);
   }
 }
@@ -93,7 +94,7 @@ export function tratadorDeErros(
     });
   }
   if (erro instanceof ErroHttp) {
-    return res.status(erro.status).json({ erro: erro.message });
+    return res.status(erro.status).json({ erro: erro.message, ...(erro.codigo ? { codigo: erro.codigo } : {}) });
   }
   // corpo que não é JSON válido ou grande demais (express.json): erro de quem enviou, não 500
   const tipo = (erro as { type?: string }).type;

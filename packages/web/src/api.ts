@@ -19,6 +19,8 @@ export class ErroApi extends Error {
     public status: number,
     message: string,
     public detalhes: DetalheErro[] = [],
+    /** código da API para casos com o mesmo status (ex.: VIDEO_NAO_RECEBIDO) */
+    public codigo?: string,
   ) {
     super(message);
     this.name = 'ErroApi';
@@ -308,13 +310,13 @@ async function executar<T>(metodo: string, caminho: string, opcoes: Opcoes = {})
   const dados = await lerCorpo(resposta);
   if (resposta.ok) return dados as T;
 
-  const corpoErro = (dados ?? {}) as { erro?: unknown; detalhes?: unknown };
+  const corpoErro = (dados ?? {}) as { erro?: unknown; detalhes?: unknown; codigo?: unknown };
   const mensagem = typeof corpoErro.erro === 'string' ? corpoErro.erro : mensagemPadrao(resposta.status);
   const detalhes = Array.isArray(corpoErro.detalhes) ? (corpoErro.detalhes as DetalheErro[]) : [];
 
   if (resposta.status === 401 && !semRedirecionarEm401) aoSessaoExpirar?.(mensagem);
   if (resposta.status === STATUS_APP_DESATUALIZADO) aoAppDesatualizado?.();
-  throw new ErroApi(resposta.status, mensagem, detalhes);
+  throw new ErroApi(resposta.status, mensagem, detalhes, typeof corpoErro.codigo === 'string' ? corpoErro.codigo : undefined);
 }
 
 /**

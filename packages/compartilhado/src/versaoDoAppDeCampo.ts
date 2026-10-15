@@ -19,7 +19,7 @@
  * definitivo da foto. Por isso a mínima começa em 0; só suba depois de os celulares terem
  * aberto o app ao menos uma vez com esta versão (ela se atualiza sozinha quando está parada).
  */
-export const VERSAO_DO_APP_DE_CAMPO = 1;
+export const VERSAO_DO_APP_DE_CAMPO = 2; // 2: vídeo nos serviços (rotas novas)
 export const VERSAO_MINIMA_DO_APP_DE_CAMPO = 0;
 
 /** Cabeçalho com a versão do app de campo, em todo pedido dele à API. */

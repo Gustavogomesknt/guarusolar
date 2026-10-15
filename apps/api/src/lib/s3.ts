@@ -30,8 +30,10 @@ import { ArmazenamentoCheio, FRACAO_DE_AVISO, FRACAO_DE_RECUSA, type RelatorioDo
  * - quem fala com o bucket é só esta API, com as chaves, que ficam só no servidor;
  * - nenhum link do bucket sai da API: as fotos continuam saindo só por GET /api/fotos/:id, com
  *   login e a conferência de papel e de escala. Cada pedido da API ao bucket é assinado e vale
- *   poucos minutos. `linkAssinadoDoS3` (link com expiração) existe e é conferido pelo
- *   s3:conferir, mas NENHUMA rota o usa: entregar link assinado ao navegador é mudança de fluxo.
+ *   poucos minutos. EXCEÇÃO, só para VÍDEO (arquivo grande demais para passar pela API): a API
+ *   entrega ao celular um link de ESCRITA (`linkDeEnvioDoS3`, 10 min) e ao gestor, depois de
+ *   conferir o login, um de LEITURA (`linkAssinadoDoS3`, 5 min). Nenhum link público.
+ *   O envio direto exige CORS no bucket (PUT a partir do endereço do app): ver SOCORRO.md.
  *
  * Chave no banco: "s3:<caminho no bucket>", com os MESMOS caminhos do Supabase Storage (a
  * migração troca só o prefixo "sb:" por "s3:"). "r2:<caminho>" é lida do mesmo jeito (apelido).
@@ -39,6 +41,7 @@ import { ArmazenamentoCheio, FRACAO_DE_AVISO, FRACAO_DE_RECUSA, type RelatorioDo
  *   PRJ-2026-0015/<id do serviço>/01-20260929T170207123.jpg   item 1 do checklist
  *   PRJ-2026-0015/<id do serviço>/extra-….jpg                 foto extra
  *   PRJ-2026-0015/<id do serviço>/substituidas/…              fotos refeitas (nada é apagado)
+ *   PRJ-2026-0015/<id do serviço>/videos/<idLocal>.webm       vídeos (e a capa, …-capa.jpg)
  *   miniaturas/PRJ-2026-0015/<id do serviço>/….jpg            miniaturas (480 px), geradas uma vez
  *
  * Espaço: o teto vem de S3_STORAGE_LIMITE_MB. O bucket não tem tabela no nosso banco: o uso é
@@ -311,8 +314,15 @@ export async function usoDoS3(forcar = false): Promise<UsoDoStorage | null> {
   return montarUso(usoEmCache.usadoBytes, usoEmCache.arquivos);
 }
 
+/** Soma ao uso em memória um arquivo que chegou ao bucket sem passar pela API (vídeo). */
+export function somarAoUsoDoS3(bytes: number) {
+  if (!usoEmCache) return;
+  usoEmCache.usadoBytes += bytes;
+  usoEmCache.arquivos += 1;
+}
+
 /** Recusa o arquivo novo se ele não couber abaixo dos 95% do limite. */
-async function conferirEspaco(bytesNovos: number) {
+export async function conferirEspaco(bytesNovos: number) {
   const uso = await usoDoS3();
   if (!uso) return;
   if (uso.usadoBytes + bytesNovos > uso.limiteBytes * FRACAO_DE_RECUSA) {
@@ -341,8 +351,14 @@ const mesDe = (data: Date) => data.toLocaleDateString('sv-SE', { timeZone: 'Amer
 /** O mesmo relatório do Supabase Storage, montado com a listagem do bucket (só leitura). */
 export async function relatorioDoS3(): Promise<RelatorioDoStorage> {
   const objetos = await listarDoS3();
-  const tipoDe = (c: string) => (c.startsWith('miniaturas/') ? 'miniaturas' : c.includes('/substituidas/') ? 'substituidas' : 'fotos');
-  const grupos = { fotos: { arquivos: 0, bytes: 0 }, miniaturas: { arquivos: 0, bytes: 0 }, substituidas: { arquivos: 0, bytes: 0 } };
+  const tipoDe = (c: string) =>
+    c.includes('/videos/') ? 'videos' : c.startsWith('miniaturas/') ? 'miniaturas' : c.includes('/substituidas/') ? 'substituidas' : 'fotos';
+  const grupos = {
+    fotos: { arquivos: 0, bytes: 0 },
+    miniaturas: { arquivos: 0, bytes: 0 },
+    substituidas: { arquivos: 0, bytes: 0 },
+    videos: { arquivos: 0, bytes: 0 },
+  };
   const meses = new Map<string, { mes: string; arquivos: number; bytes: number }>();
   const mesCorrente = mesDe(new Date());
   const fotosDoMes = { arquivos: 0, bytes: 0 };
@@ -365,7 +381,7 @@ export async function relatorioDoS3(): Promise<RelatorioDoStorage> {
     if (!primeiro || quando < primeiro) primeiro = quando;
     if (Date.now() - quando.getTime() <= 90 * 864e5) recentes += o.bytes;
   }
-  const usadoBytes = grupos.fotos.bytes + grupos.miniaturas.bytes + grupos.substituidas.bytes;
+  const usadoBytes = grupos.fotos.bytes + grupos.miniaturas.bytes + grupos.substituidas.bytes + grupos.videos.bytes;
   const limiteBytes = limiteDoS3Bytes();
   const diasMedidos = primeiro ? Math.min(90, Math.max(1, (Date.now() - primeiro.getTime()) / 864e5)) : 0;
   const ritmoMensalBytes = diasMedidos > 0 && recentes > 0 ? (recentes / diasMedidos) * 30.44 : null;
@@ -378,6 +394,7 @@ export async function relatorioDoS3(): Promise<RelatorioDoStorage> {
     fotos: { ...grupos.fotos, mediaBytes: grupos.fotos.arquivos ? grupos.fotos.bytes / grupos.fotos.arquivos : 0 },
     miniaturas: grupos.miniaturas,
     substituidas: grupos.substituidas,
+    videos: grupos.videos,
     porMes: [...meses.values()].sort((a, b) => (a.mes < b.mes ? -1 : 1)),
     fotosDoMes,
     ritmoMensalBytes,
@@ -445,7 +462,7 @@ export async function apagarDoS3(caminhos: string[]) {
  * de poucos segundos, um relógio atrasado faz o link chegar já vencido. Use minutos, não segundos.
  * `agora` só existe para o s3:conferir montar um link sabidamente vencido.
  */
-export function linkAssinadoDoS3(caminho: string, segundos = 300, agora = new Date()): string {
+export function linkAssinadoDoS3(caminho: string, segundos = 300, agora = new Date(), metodo: 'GET' | 'PUT' = 'GET'): string {
   const destino = endpoint();
   const { amz, dia } = instante(agora);
   const escopo = `${dia}/${regiao()}/${SERVICO}/aws4_request`;
@@ -456,9 +473,17 @@ export function linkAssinadoDoS3(caminho: string, segundos = 300, agora = new Da
     ['X-Amz-Expires', String(Math.min(Math.max(1, Math.round(segundos)), 7 * 24 * 3600))],
     ['X-Amz-SignedHeaders', 'host'],
   ];
-  const a = assinar({ metodo: 'GET', caminho: caminhoNaUrl(caminho), consulta, cabecalhos: { host: destino.host }, hashDoCorpo: 'UNSIGNED-PAYLOAD', amz, dia });
+  const a = assinar({ metodo, caminho: caminhoNaUrl(caminho), consulta, cabecalhos: { host: destino.host }, hashDoCorpo: 'UNSIGNED-PAYLOAD', amz, dia });
   return `${destino.origin}${caminhoNaUrl(caminho)}?${a.consulta}&X-Amz-Signature=${a.assinatura}`;
 }
+
+/**
+ * Link assinado de ESCRITA (PUT) num caminho: o celular envia o vídeo direto ao bucket, sem
+ * passar pela API. Só o host entra na assinatura: o Content-Type vai livre no pedido do celular
+ * e fica gravado no objeto. Vale `segundos` (padrão 10 min) para COMEÇAR o envio; a fila pede um
+ * link novo a cada tentativa. Exige CORS no bucket liberando PUT a partir do endereço do app.
+ */
+export const linkDeEnvioDoS3 = (caminho: string, segundos = 600) => linkAssinadoDoS3(caminho, segundos, new Date(), 'PUT');
 
 /**
  * Para o s3:conferir: o objeto abre pela API S3 SEM assinatura? Tem de ser não. (true = abriu.)

@@ -60,6 +60,16 @@ export type ItemChecklist = {
 };
 
 /** Serviço aberto (GET /api/tecnico/servicos/:id). */
+/** Vídeo já recebido pela API (a capa sai por GET /api/videos/:id/capa, com login). */
+export type VideoEnviado = {
+  id: string;
+  idLocal: string;
+  duracaoSegundos: number | null;
+  tamanhoBytes: number;
+  gravadoEm: string | null;
+  temCapa: boolean;
+};
+
 export type ServicoDetalhe = Omit<ServicoNaAgenda, 'projeto'> & {
   observacoesTecnico: string | null;
   sistemaTestado: boolean;
@@ -67,6 +77,8 @@ export type ServicoDetalhe = Omit<ServicoNaAgenda, 'projeto'> & {
   projeto: { codigo: string; cliente: ClienteDoServico };
   /** todas as fotos, inclusive extras (chave nula) e as marcadas para refazer */
   fotos: FotoEnviada[];
+  /** vídeos opcionais já recebidos; ausente em resposta da versão anterior da API */
+  videos?: VideoEnviado[];
   checklist: ItemChecklist[];
   /** outro serviço do mesmo projeto está em execução ou em validação: este ainda não pode começar */
   aguardandoOutro?: string | null;

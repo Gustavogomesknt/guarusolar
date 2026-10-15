@@ -411,6 +411,19 @@ O `.env` da API fica em `apps/api/.env`.
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
+   **Vídeo do serviço** (15/10/2026; opcional, separado do roteiro de fotos, até
+   `MAXIMO_DE_VIDEOS_POR_SERVICO` = 2, números em `compartilhado/videoDoServico.ts`): gravado DENTRO
+   do app com MediaRecorder (720p, ~1,5 Mbps, até 60 s; `components/GravadorDeVideo.tsx`), nunca
+   pela câmera do sistema (100 MB+ por minuto). O arquivo NUNCA passa pela API (512 MB na Render):
+   `POST /api/tecnico/servicos/:id/videos/envio` devolve um link assinado de ESCRITA (10 min), o
+   celular envia direto ao bucket e `POST …/videos` (com a capa, JPEG pequeno) confere no bucket e
+   só então cria o `VideoServico` (`lib/videos.ts`). Mesma fila das fotos (fotos passam na frente;
+   tempo máximo pelo tamanho; depois de chegar ao bucket só repete a confirmação). O gestor assiste
+   por link de LEITURA de 5 min, gerado só depois de conferir o login (`GET /api/videos/:id/link`);
+   a capa sai pela API como as fotos. Só o destino "s3" recebe vídeo, e o bucket precisa de CORS
+   liberando PUT do endereço do app (SOCORRO.md, item 9; `s3:conferir` testa). O relatório de
+   espaço separa fotos e vídeos; o aviso de 70% vale para a soma. Vídeo NÃO bloqueia o envio para
+   validação por falta; um vídeo ainda na fila, sim (pode ser descartado).
    **Cache das fotos: um ano, privado, SEM `Vary`, de propósito** (decisão do Gustavo, 13/10/2026).
    A rota responde `Cache-Control: private, max-age=31536000, immutable` e ETag derivado do id
    (304 antes de buscar o arquivo). As telas buscam a foto por `fetch` com o cabeçalho

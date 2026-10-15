@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FotoAmpliada } from './FotoAmpliada';
+import { VideosDoServico } from './VideosDoServico';
 import { CHAVE_FILA } from './fila';
 import { BotoesMarcacao, marcacaoInicial, rotuloDaFoto, type Marcacao } from './marcacao';
 
@@ -235,6 +236,8 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
           ))}
         </ul>
       )}
+
+      <VideosDoServico videos={dados.videos ?? []} />
 
       {dados.observacoesTecnico && (
         <div className="flex flex-col gap-1.5 rounded-xl border px-4 py-3.5">

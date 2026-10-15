@@ -218,6 +218,7 @@ async function main() {
           'Histórico de status': (await tx.historicoStatus.deleteMany()).count,
           'Materiais utilizados': (await tx.materialUtilizado.deleteMany()).count,
           Fotos: (await tx.fotoServico.deleteMany()).count,
+          Vídeos: (await tx.videoServico.deleteMany()).count,
           'Histórico dos projetos': (await tx.eventoProjeto.deleteMany()).count,
           Escalas: (await tx.escalaServico.deleteMany()).count,
           Agendamentos: (await tx.agendamento.deleteMany()).count,

@@ -173,6 +173,8 @@ export type RelatorioDoStorage = {
   miniaturas: Grupo;
   /** fotos refeitas: a versão anterior fica guardada (nada é apagado) */
   substituidas: Grupo;
+  /** vídeos dos serviços e as capas deles (só no bucket S3; o Supabase não recebe vídeo) */
+  videos?: Grupo;
   /** o que entrou em cada mês (pela data de criação do arquivo), do mais antigo ao mais novo */
   porMes: { mes: string; arquivos: number; bytes: number }[];
   /** ritmo atual: o que entrou nos últimos 90 dias (ou desde o primeiro arquivo), por mês */

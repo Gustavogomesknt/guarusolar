@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
 import { tecnicoPodeVer } from '../lib/acesso';
 import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA } from '../lib/supabaseStorage';
+import { linkParaAssistir, VideoSemArmazenamento } from '../lib/videos';
 import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura, usoDoDestinoAtual } from '../lib/armazenamento';
 
 /*
@@ -121,5 +122,61 @@ rotasArmazenamento.get(
       // quantas fotos ainda cabem antes de a API recusar (estimativa)
       fotosRestantes: Math.max(0, Math.floor((uso.limiteBytes * FRACAO_DE_RECUSA - uso.usadoBytes) / BYTES_POR_FOTO)),
     });
+  }),
+);
+
+/**
+ * Vídeos dos serviços: a mesma conferência das fotos (login; gestor vê todos; técnico só os de
+ * serviço em que está escalado, senão 404; comercial não). O arquivo NÃO passa pela API: depois
+ * de conferir, ela entrega um link assinado de LEITURA que vale 5 minutos. A capa (JPEG pequeno)
+ * sai como as fotos, pela API, com o mesmo cache privado.
+ */
+export const rotasVideos = Router();
+rotasVideos.use(autenticar, autorizar('GESTOR', 'TECNICO'));
+
+async function videoQuePodeVer(req: Request) {
+  const usuario = req.usuario!;
+  const video = await prisma.videoServico.findUnique({
+    where: { id: req.params.id },
+    select: { arquivoChave: true, capaChave: true, agendamento: { select: { escala: { where: { usuarioId: usuario.id }, select: { usuarioId: true } } } } },
+  });
+  if (!video || (usuario.papel === 'TECNICO' && !tecnicoPodeVer(usuario, video.agendamento))) {
+    throw new ErroHttp(404, 'Vídeo não encontrado');
+  }
+  return video;
+}
+
+rotasVideos.get(
+  '/:id/capa',
+  rota(async (req, res) => {
+    const video = await videoQuePodeVer(req);
+    if (!video.capaChave) throw new ErroHttp(404, 'Este vídeo não tem capa');
+    const cabecalhos = { 'Cache-Control': CACHE_DA_FOTO, ETag: `"${req.params.id}-capa"` };
+    if (navegadorJaTem(req.get('If-None-Match'), cabecalhos.ETag)) return void res.status(304).set(cabecalhos).end();
+    let capa;
+    try {
+      capa = await lerArquivo(video.capaChave);
+    } catch (erro) {
+      if (erro instanceof ArquivoNaoEncontrado) throw new ErroHttp(404, 'A capa deste vídeo não foi encontrada');
+      if (erro instanceof ArmazenamentoIndisponivel) throw new ErroHttp(503, 'Os arquivos estão indisponíveis no momento. Tente de novo em instantes.');
+      throw erro;
+    }
+    res.status(200).type('image/jpeg').set({ ...cabecalhos, 'X-Content-Type-Options': 'nosniff' }).send(capa.dados);
+  }),
+);
+
+/** Link assinado de leitura, 5 minutos, só para quem pode ver o serviço. Nunca em cache. */
+rotasVideos.get(
+  '/:id/link',
+  rota(async (req, res) => {
+    const video = await videoQuePodeVer(req);
+    let url: string;
+    try {
+      url = linkParaAssistir(video.arquivoChave, 300);
+    } catch (erro) {
+      if (erro instanceof VideoSemArmazenamento) throw new ErroHttp(409, erro.message);
+      throw erro;
+    }
+    res.set('Cache-Control', 'no-store').json({ url, expiraEmSegundos: 300 });
   }),
 );
