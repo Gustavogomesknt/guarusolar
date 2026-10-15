@@ -260,7 +260,14 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                disponível" + "Atualizar agora". A API recusa app antigo demais
                                com 426 APP_DESATUALIZADO: faixa "Seu aplicativo está
                                desatualizado" e a foto ESPERA na fila (não vira erro).
-                               Versões: compartilhado/versaoDoAppDeCampo.ts (como subir lá)
+                               Versões: compartilhado/versaoDoAppDeCampo.ts (como subir lá).
+                               **Só suba a versão MÍNIMA depois de conferir a coluna "App de
+                               campo" da tela de Usuários (ADMIN) e ver que TODOS os técnicos
+                               ativos já estão na versão desejada.** Quem aparece como "versão
+                               antiga" nunca mandou o cabeçalho (app anterior a ele) e seria
+                               barrado com erro definitivo da foto. A API grava a versão vista
+                               (Usuario.versaoAppCampo/versaoAppCampoEm) no máximo uma vez por
+                               hora por técnico (lib/versaoDoApp.ts, chamada no autenticar)
   vite.config.ts               service worker (vite-plugin-pwa): guarda o app, não a API. Só
                                funciona no build: teste com `npm run preview:tecnico` (5175).
                                Também o manifest (nome, cores, ícones, abre em /agenda)

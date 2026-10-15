@@ -26,6 +26,9 @@ const camposPublicos = {
   ativo: true,
   senhaTemporaria: true,
   criadoEm: true,
+  // versão do app de campo vista por último (coluna "App de campo", só para técnicos)
+  versaoAppCampo: true,
+  versaoAppCampoEm: true,
 } satisfies Prisma.UsuarioSelect;
 
 /** Linha no log da hospedagem (quem fez o quê), como os eventos de login. Nunca a senha. */

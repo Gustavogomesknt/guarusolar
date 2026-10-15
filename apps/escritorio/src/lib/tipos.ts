@@ -389,6 +389,10 @@ export type UsuarioNaLista = {
   /** ainda não trocou a senha temporária */
   senhaTemporaria: boolean;
   criadoEm: string;
+  /** versão do app de campo vista por último e quando; null = nunca mandou (versão antiga).
+   *  Ausentes em resposta da versão anterior da API */
+  versaoAppCampo?: number | null;
+  versaoAppCampoEm?: string | null;
 };
 
 export type ListaDeUsuarios = { usuarios: UsuarioNaLista[]; equipes: { id: string; nome: string }[] };

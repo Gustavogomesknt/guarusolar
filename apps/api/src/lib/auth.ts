@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import type { Papel } from '@prisma/client';
 import { ErroHttp } from './erros';
 import { prisma } from './prisma';
+import { registrarVersaoVista } from './versaoDoApp';
 
 const SEGREDO: string = (() => {
   const segredo = process.env.JWT_SECRET;
@@ -93,6 +94,8 @@ export function autenticar(req: Request, _res: Response, next: NextFunction) {
     .then((valida) => {
       if (!valida) return next(new ErroHttp(401, 'Sua sessão terminou. Entre de novo.'));
       req.usuario = token;
+      // versão do app de campo em uso (no máximo uma escrita por hora por usuário)
+      registrarVersaoVista(req, token.id);
       next();
     })
     .catch(next);

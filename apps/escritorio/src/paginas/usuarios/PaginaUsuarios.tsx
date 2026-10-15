@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, Copy, KeyRound, Loader2, Pencil, Plus, TriangleAlert } from 'lucide-react';
-import { PAPEIS, type Papel } from '@guarusolar/compartilhado';
+import { formatarDataHora, PAPEIS, tempoDesde, VERSAO_DO_APP_DE_CAMPO, type Papel } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import type { ListaDeUsuarios, UsuarioComSenha, UsuarioNaLista } from '@/lib/tipos';
@@ -16,7 +16,7 @@ import { Selo } from '@/components/Selo';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // ações com largura fixa: todas as linhas alinham, mesmo sem o botão Desativar (a do próprio ADMIN)
-const COLUNAS = 'grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_120px_110px_150px_310px]';
+const COLUNAS = 'grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_120px_110px_130px_150px_310px]';
 const CHAVE = ['usuarios'];
 const CLASSE_SELECT =
   'h-11 w-full rounded-[10px] border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
@@ -71,12 +71,15 @@ export function PaginaUsuarios() {
       </header>
 
       <section aria-label="Usuários" className="relative min-w-0 overflow-x-auto rounded-[14px] border bg-card">
-        <div role="table" aria-label="Lista de usuários" className="min-w-[1000px]">
+        <div role="table" aria-label="Lista de usuários" className="min-w-[1130px]">
           <div role="row" className={`grid ${COLUNAS} gap-4 border-b px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
             <span role="columnheader">Nome</span>
             <span role="columnheader">E-mail</span>
             <span role="columnheader">Papel</span>
             <span role="columnheader">Equipe</span>
+            <span role="columnheader" title="Versão do app de campo vista no último acesso (só técnicos). Confira antes de subir a versão mínima.">
+              App de campo
+            </span>
             <span role="columnheader">Situação</span>
             <span role="columnheader" className="text-right">
               Ações
@@ -110,6 +113,9 @@ export function PaginaUsuarios() {
                     </span>
                     <span role="cell" className="truncate text-sm">
                       {u.papel === 'TECNICO' ? nomeDaEquipe(u.equipeId) : '—'}
+                    </span>
+                    <span role="cell" className={cn('min-w-0', !u.ativo && 'opacity-60')}>
+                      {u.papel === 'TECNICO' ? <VersaoDoApp versao={u.versaoAppCampo ?? null} em={u.versaoAppCampoEm ?? null} /> : <span className="text-sm text-muted-foreground">—</span>}
                     </span>
                     <span role="cell" className="flex flex-wrap gap-1.5">
                       {u.ativo ? <Selo className="border-[#9FD3B4] bg-[#DCF0E3] text-[#17653E]">Ativo</Selo> : <Selo>Desativado</Selo>}
@@ -393,5 +399,30 @@ function DialogSenha({ resposta, onFechar }: { resposta: UsuarioComSenha | null;
         </DialogContent>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * Versão do app de campo que o técnico usou por último (cabeçalho X-App-Campo, gravado pela API
+ * no máximo uma vez por hora). Só suba a versão mínima (compartilhado/versaoDoAppDeCampo.ts)
+ * quando todos os técnicos ATIVOS estiverem na versão desejada.
+ */
+function VersaoDoApp({ versao, em }: { versao: number | null; em: string | null }) {
+  if (versao === null) {
+    return (
+      <span className="text-xs text-destaque-texto" title="Nunca mandou a versão: app anterior a ela, ou nunca usou o app">
+        versão antiga
+      </span>
+    );
+  }
+  const atrasada = versao < VERSAO_DO_APP_DE_CAMPO;
+  return (
+    <span className="flex flex-col text-xs leading-tight" title={em ? `Visto em ${formatarDataHora(em)}` : undefined}>
+      <span className={cn('font-mono', atrasada ? 'text-destaque-texto' : 'text-foreground/80')}>
+        v{versao}
+        {atrasada && ' · desatualizado'}
+      </span>
+      {em && <span className="text-muted-foreground">{tempoDesde(em)}</span>}
+    </span>
   );
 }
