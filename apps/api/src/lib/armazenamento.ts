@@ -336,6 +336,14 @@ async function lerDoDisco(chave: string): Promise<Buffer> {
 
 const PASTA_SUBSTITUIDAS_NO_BUCKET = 'substituidas';
 
+/**
+ * Primeira pasta das fotos e vídeos de um serviço: o código do projeto (PRJ-2026-0015/<serviço>/…)
+ * ou, na visita técnica AVULSA (sem projeto), VISITAS/<serviço>/…. O id do serviço já separa
+ * uma visita da outra; o zerar-para-entrega apaga esta pasta junto com as dos projetos.
+ */
+export const PASTA_DAS_VISITAS_AVULSAS = 'VISITAS';
+export const pastaDoServico = (projeto: { codigo: string } | null) => projeto?.codigo ?? PASTA_DAS_VISITAS_AVULSAS;
+
 /** PRJ-2026-0015/<serviço>/01-20260929T170207123.jpg; o mesmo instante dá o mesmo nome (reenvio substitui). */
 function caminhoNoBucket(destino: DestinoDaFoto, extensao: string) {
   const quando = destino.capturadaEm.toISOString().replace(/[-:.Z]/g, '');

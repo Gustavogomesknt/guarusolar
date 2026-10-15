@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowRight, Check, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, ImageOff, Loader2, MessageCircle, RotateCcw } from 'lucide-react';
+import { ArrowRight, Check, ClipboardCheck, ExternalLink, ImageOff, Loader2, MessageCircle, RotateCcw } from 'lucide-react';
 import {
   formatarData,
   formatarDataHora,
-  formatarHora,
   ROTULO_STATUS_PROJETO,
   ROTULO_TIPO_SERVICO,
   moveOProjeto,
@@ -29,6 +28,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Selo } from '@/components/Selo';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SeloProjeto } from './SeloProjeto';
+import { FotoAmpliadaConsulta, rotuloDaFoto } from '@/components/FotoAmpliadaConsulta';
+import { VisitasDoCliente } from '@/components/VisitasTecnicas';
 
 type Ficha = FichaDoProjeto;
 type Servico = Ficha['agendamentos'][number];
@@ -164,6 +165,8 @@ export function FichaProjeto() {
 
       <Servicos projeto={p} gestor={gestor} />
       <Fotos projeto={p} />
+      {/* as visitas técnicas do MESMO CLIENTE (avulsas ou deste e de outros projetos): sem vínculo rígido */}
+      <VisitasDoCliente clienteId={p.cliente.id} titulo="Visitas técnicas deste cliente" />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <DadosDoProjeto projeto={p} gestor={gestor} />
@@ -483,7 +486,6 @@ function Servicos({ projeto: p, gestor }: { projeto: Ficha; gestor: boolean }) {
 // Fotos (só o gestor vê; regra 6)
 // ---------------------------------------------------------------------------------------------
 
-const rotuloDaFoto = (f: FotoDoProjeto) => f.rotulo ?? (f.chave ? f.chave.replace(/_/g, ' ') : 'Foto extra');
 
 function Fotos({ projeto: p }: { projeto: Ficha }) {
   const total = p.agendamentos.reduce((t, s) => t + s._count.fotos, 0);
@@ -531,65 +533,8 @@ function Fotos({ projeto: p }: { projeto: Ficha }) {
           </div>
         ) : null,
       )}
-      <FotoAmpliada aberta={aberta} onIndice={(indice) => setAberta((a) => (a ? { ...a, indice } : a))} onFechar={() => setAberta(null)} />
+      <FotoAmpliadaConsulta aberta={aberta} onIndice={(indice) => setAberta((a) => (a ? { ...a, indice } : a))} onFechar={() => setAberta(null)} />
     </Cartao>
-  );
-}
-
-/** Foto ampliada só para consulta. ← e → navegam; Esc fecha (Dialog do Radix). */
-function FotoAmpliada({
-  aberta,
-  onIndice,
-  onFechar,
-}: {
-  aberta: { fotos: FotoDoProjeto[]; indice: number } | null;
-  onIndice: (indice: number) => void;
-  onFechar: () => void;
-}) {
-  const foto = aberta ? aberta.fotos[aberta.indice] : null;
-  const ir = (passo: number) => aberta && onIndice((aberta.indice + passo + aberta.fotos.length) % aberta.fotos.length);
-  return (
-    <Dialog open={foto !== null} onOpenChange={(abrir) => !abrir && onFechar()}>
-      {foto && aberta && (
-        <DialogContent
-          className="flex max-h-[94vh] flex-col gap-3 bg-card p-4 sm:max-w-[min(1100px,94vw)]"
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowRight') ir(1);
-            else if (e.key === 'ArrowLeft') ir(-1);
-            else return;
-            e.preventDefault();
-          }}
-        >
-          <div className="flex items-baseline justify-between gap-4 pr-10">
-            <DialogTitle className="font-sans text-base font-semibold tracking-normal">{rotuloDaFoto(foto)}</DialogTitle>
-            <DialogDescription className="font-mono text-xs">
-              {aberta.indice + 1} de {aberta.fotos.length}
-              {foto.capturadaEm && ` · ${formatarData(foto.capturadaEm)} ${formatarHora(foto.capturadaEm)}`}
-            </DialogDescription>
-          </div>
-          <div className="relative flex min-h-0 flex-1 items-center justify-center rounded-lg bg-[#0B2F5E]">
-            <ImagemProtegida
-              key={foto.id}
-              src={urlDaFoto(foto.id)}
-              alt={rotuloDaFoto(foto)}
-              className="max-h-[72vh] max-w-full object-contain"
-              carregando={<Loader2 className="my-24 size-8 animate-spin text-white/70" aria-hidden />}
-              emErro={<ImageOff className="my-24 size-8 text-white/70" aria-hidden />}
-            />
-            {aberta.fotos.length > 1 && (
-              <>
-                <Button variant="outline" size="icon" className="absolute left-3 rounded-full bg-card" onClick={() => ir(-1)} aria-label="Foto anterior">
-                  <ChevronLeft aria-hidden />
-                </Button>
-                <Button variant="outline" size="icon" className="absolute right-3 rounded-full bg-card" onClick={() => ir(1)} aria-label="Próxima foto">
-                  <ChevronRight aria-hidden />
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      )}
-    </Dialog>
   );
 }
 

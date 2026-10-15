@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ErroApi } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
-import type { AgendamentoNaAgenda, EquipeNaAgenda } from '@/lib/tipos';
+import { clienteDoServico, type AgendamentoNaAgenda, type EquipeNaAgenda } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,7 +79,7 @@ export function DialogServico({
     mutationFn: (corpo: Record<string, unknown>) => api.patch(`/api/agenda/${servico!.id}`, corpo),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: (_r, corpo) => {
-      const cliente = servico!.projeto.cliente.nome;
+      const cliente = clienteDoServico(servico!).nome;
       toast.success(
         corpo.status === 'CANCELADO'
           ? `Serviço de ${cliente} cancelado.`
@@ -99,7 +99,10 @@ export function DialogServico({
   const inicio = diaDaApi(servico.dataInicio);
   const fim = diaDaApi(servico.dataFim);
   const equipe = equipes.find((e) => e.id === servico.equipeId);
-  const cidade = [servico.projeto.cliente.cidade, servico.projeto.cliente.uf].filter(Boolean).join('/');
+  const cliente = clienteDoServico(servico);
+  const cidade = [cliente.cidade, cliente.uf].filter(Boolean).join('/');
+  // visita técnica avulsa (pré-venda): sem projeto nem orçamento; a etapa não muda
+  const avulsa = servico.projeto === null;
   const emAberto = EM_ABERTO.includes(servico.status);
   const equipeNova = equipes.find((e) => e.id === equipeId);
 
@@ -110,16 +113,27 @@ export function DialogServico({
           <span className={cn('self-start rounded-full border px-2.5 py-0.5 text-xs font-semibold', tipo.fundo, tipo.borda, tipo.texto)}>
             {tipo.rotulo}
           </span>
-          <DialogTitle>{servico.projeto.cliente.nome}</DialogTitle>
+          <DialogTitle>{cliente.nome}</DialogTitle>
           <DialogDescription>
             {cidade && `${cidade} · `}
-            <Link to={`/projetos/${servico.projetoId}`} className="text-primary underline-offset-2 hover:underline">
-              {servico.projeto.codigo}
-            </Link>{' '}
-            ·{' '}
-            <Link to={`/orcamentos/${servico.projeto.orcamento.id}`} className="text-primary underline-offset-2 hover:underline">
-              {servico.projeto.orcamento.codigo}
-            </Link>
+            {servico.projeto ? (
+              <>
+                <Link to={`/projetos/${servico.projetoId}`} className="text-primary underline-offset-2 hover:underline">
+                  {servico.projeto.codigo}
+                </Link>{' '}
+                ·{' '}
+                <Link to={`/orcamentos/${servico.projeto.orcamento.id}`} className="text-primary underline-offset-2 hover:underline">
+                  {servico.projeto.orcamento.codigo}
+                </Link>
+              </>
+            ) : (
+              <>
+                Visita avulsa, sem projeto ·{' '}
+                <Link to={`/clientes/${servico.cliente?.id}`} className="text-primary underline-offset-2 hover:underline">
+                  ficha do cliente
+                </Link>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -189,13 +203,19 @@ export function DialogServico({
               id="rm-tipo"
               rotulo="Etapa"
               obrigatorio
-              ajuda={servico.status === 'AGENDADO' ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar] : 'A etapa só pode mudar antes de o técnico começar.'}
+              ajuda={
+                avulsa
+                  ? 'Visita avulsa: sem projeto, só pode ser visita técnica.'
+                  : servico.status === 'AGENDADO'
+                    ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar]
+                    : 'A etapa só pode mudar antes de o técnico começar.'
+              }
             >
               <select
                 id="rm-tipo"
                 required
                 value={tipoEscolhido}
-                disabled={servico.status !== 'AGENDADO'}
+                disabled={servico.status !== 'AGENDADO' || avulsa}
                 onChange={(e) => setTipoEscolhido(e.target.value as TipoServico)}
                 className={CLASSE_SELECT}
               >
@@ -257,11 +277,13 @@ export function DialogServico({
                 Cancelar serviço
               </Button>
               {/* um projeto pode ter vários serviços agendados: o projeto entra na faixa de cima */}
-              <Button asChild variant="outline" className="h-11 rounded-[10px] bg-card">
-                <Link to={`/agenda?projeto=${servico.projetoId}`} onClick={onFechar}>
-                  Agendar outro serviço
-                </Link>
-              </Button>
+              {!avulsa && (
+                <Button asChild variant="outline" className="h-11 rounded-[10px] bg-card">
+                  <Link to={`/agenda?projeto=${servico.projetoId}`} onClick={onFechar}>
+                    Agendar outro serviço
+                  </Link>
+                </Button>
+              )}
               <Button className="h-11 rounded-[10px] font-semibold" onClick={() => setModo('remarcar')}>
                 Remarcar
               </Button>

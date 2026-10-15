@@ -33,7 +33,7 @@ async function main() {
   const { createInterface } = await import('node:readline/promises');
   const { PrismaClient } = await import('@prisma/client');
   const { bancoDeProducao } = await import('../src/lib/ambienteDoBanco');
-  const { apagarArquivo, destinoDaChave } = await import('../src/lib/armazenamento');
+  const { apagarArquivo, destinoDaChave, PASTA_DAS_VISITAS_AVULSAS } = await import('../src/lib/armazenamento');
   const { apagarDoSupabase, bucketDasFotos, conferirBucketPrivado, variaveisDoSupabaseFaltando } = await import('../src/lib/supabaseStorage');
   const { variaveisFaltando: variaveisDoSharepointFaltando } = await import('../src/lib/sharepoint');
   const { apagarDoS3, conferirBucketDoS3, listarDoS3, variaveisDoS3Faltando } = await import('../src/lib/s3');
@@ -108,7 +108,8 @@ async function main() {
     ]);
     // ---- os arquivos das fotos: em qual armazenamento estão, e se esta janela alcança cada um
     const chavesDasFotos = (await prisma.fotoServico.findMany({ select: { arquivoChave: true } })).map((f) => f.arquivoChave);
-    const codigosDosProjetos = (await prisma.projeto.findMany({ select: { codigo: true } })).map((p) => p.codigo);
+    // pastas dos arquivos: uma por projeto, mais a das visitas técnicas avulsas (VISITAS/<serviço>)
+    const codigosDosProjetos = [...(await prisma.projeto.findMany({ select: { codigo: true } })).map((p) => p.codigo), PASTA_DAS_VISITAS_AVULSAS];
     const noSupabase = chavesDasFotos.filter((c) => destinoDaChave(c) === 'supabase');
     const noS3 = chavesDasFotos.filter((c) => destinoDaChave(c) === 's3');
     const noSharepoint = chavesDasFotos.filter((c) => destinoDaChave(c) === 'sharepoint');

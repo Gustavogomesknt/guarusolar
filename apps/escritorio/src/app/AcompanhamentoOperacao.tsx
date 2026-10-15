@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useFilaDeValidacao, useVersaoDaOperacao } from '@/paginas/validacao/fila';
 import { ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
-import type { ServicoNaFila } from '@/lib/tipos';
+import { clienteDoServico, type ServicoNaFila } from '@/lib/tipos';
 import { tocarSomDeChegada } from './somDaValidacao';
 
 /** Sem mexer no sistema por este tempo, para de perguntar (PC esquecido ligado não mantém a Render acordada). */
@@ -45,7 +45,7 @@ export function AcompanhamentoOperacao() {
   useEffect(() => {
     if (!atual) return;
     if (versaoAnterior.current && versaoAnterior.current !== atual) {
-      for (const chave of [['validacao'], ['agenda'], ['projetos']]) void consultas.invalidateQueries({ queryKey: chave });
+      for (const chave of [['validacao'], ['agenda'], ['projetos'], ['visitas']]) void consultas.invalidateQueries({ queryKey: chave });
     }
     versaoAnterior.current = atual;
   }, [atual, consultas]);
@@ -83,14 +83,14 @@ export function AcompanhamentoOperacao() {
     const abrir = (id?: string) => navegar(id ? `/validacao?servico=${id}` : '/validacao');
     if (novos.length === 1) {
       const s = novos[0];
-      toast.info(`Novo serviço para validar: ${s.projeto.cliente.nome}`, {
-        description: `${ROTULO_TIPO_SERVICO[s.tipo]} · ${s.projeto.codigo}${s.reenviado ? ' · reenviado após devolução' : ''}`,
+      toast.info(`Novo serviço para validar: ${clienteDoServico(s).nome}`, {
+        description: `${ROTULO_TIPO_SERVICO[s.tipo]} · ${s.projeto?.codigo ?? 'visita avulsa'}${s.reenviado ? ' · reenviado após devolução' : ''}`,
         action: { label: 'Abrir', onClick: () => abrir(s.id) },
         duration: 10_000,
       });
     } else {
       toast.info(`${novos.length} serviços novos para validar`, {
-        description: novos.map((s) => `${s.projeto.cliente.nome} (${ROTULO_TIPO_SERVICO[s.tipo]})`).join(', '),
+        description: novos.map((s) => `${clienteDoServico(s).nome} (${ROTULO_TIPO_SERVICO[s.tipo]})`).join(', '),
         action: { label: 'Abrir', onClick: () => abrir() },
         duration: 10_000,
       });

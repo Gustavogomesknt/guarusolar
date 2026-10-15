@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { CheckCircle2, Loader2, WifiOff } from 'lucide-react';
 import { tempoDesde } from '@guarusolar/compartilhado';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
-import type { ServicoNaFila } from '@/lib/tipos';
+import { clienteDoServico, type ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { DetalheValidacao } from './DetalheValidacao';
 import { useFilaDeValidacao, useSemConexao } from './fila';
@@ -98,7 +98,8 @@ export function PaginaValidacao() {
 
 function ItemDaFila({ servico, aberto, onAbrir }: { servico: ServicoNaFila; aberto: boolean; onAbrir: () => void }) {
   const devolvido = servico.status === 'DEVOLVIDO';
-  const cidade = [servico.projeto.cliente.cidade, servico.projeto.cliente.uf].filter(Boolean).join('/');
+  const cliente = clienteDoServico(servico);
+  const cidade = [cliente.cidade, cliente.uf].filter(Boolean).join('/');
   const fotos = servico._count.fotos === 1 ? '1 foto' : `${servico._count.fotos} fotos`;
   return (
     <button
@@ -112,14 +113,18 @@ function ItemDaFila({ servico, aberto, onAbrir }: { servico: ServicoNaFila; aber
       )}
     >
       <span className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-mono text-muted-foreground">{servico.projeto.codigo}</span>
+        {servico.projeto ? (
+          <span className="font-mono text-muted-foreground">{servico.projeto.codigo}</span>
+        ) : (
+          <span className="text-muted-foreground">Visita avulsa</span>
+        )}
         {devolvido ? (
           <SituacaoServico status={servico.status} className="py-0.5 text-[11px]" />
         ) : (
           <span className="text-muted-foreground">{servico.enviadoEm ? tempoDesde(servico.enviadoEm) : ''}</span>
         )}
       </span>
-      <span className="text-[15px] font-semibold">{servico.projeto.cliente.nome}</span>
+      <span className="text-[15px] font-semibold">{cliente.nome}</span>
       <span className="text-[13px] text-[#3A4A5E]">
         {devolvido ? 'Aguardando nova foto do técnico' : [fotos, cidade].filter(Boolean).join(' · ')}
       </span>

@@ -95,7 +95,7 @@ packages/web/               o que os dois fronts usam no navegador
 | POST | `/api/orcamentos/:id/whatsapp` | comercial | mensagem pronta + link `wa.me`; rascunho passa a ENVIADO |
 | GET | `/api/agenda?inicio&fim` | gestor | semana por equipe |
 | GET | `/api/agenda/pendentes` | gestor | lista "A agendar" |
-| POST | `/api/agenda` | gestor | agendar serviço; `tecnicos` = quem vai (ausente: os técnicos da equipe). Conflito não bloqueia: volta em `avisos` |
+| POST | `/api/agenda` | gestor | agendar serviço: `projetoId` OU, só na visita técnica avulsa (pré-venda), `clienteId` (exatamente um); `tecnicos` = quem vai (ausente: os técnicos da equipe). Conflito não bloqueia: volta em `avisos` |
 | PATCH | `/api/agenda/:id` | gestor | remarcar (equipe e datas), trocar a escala (`tecnicos`, só com o serviço em aberto) ou cancelar (`status: CANCELADO`) |
 | GET | `/api/agenda/tecnicos` | gestor | técnicos ativos com a equipe padrão de cada um (quem pode ser escalado) |
 | GET | `/api/agenda/conflitos` | gestor | onde a equipe e as pessoas escolhidas já estão no período (avisos da janela de agendar) |
@@ -106,7 +106,10 @@ packages/web/               o que os dois fronts usam no navegador
 | POST | `/api/projetos/:id/concluir` | gestor | ÚNICA forma de concluir um projeto; só com ele "Aguardando conclusão" |
 | POST | `/api/projetos/:id/reabrir` | gestor | reabre um projeto concluído (`justificativa` obrigatória); volta para "Aguardando conclusão" |
 | POST | `/api/validacao/:id/devolver` | gestor | pede fotos de novo (`motivo`, `fotosParaRefazer`); o projeto volta a em execução |
-| GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico | a foto (ou miniatura de 480 px); técnico só dos serviços em que está escalado |
+| GET | `/api/fotos/:id?tamanho=miniatura` | gestor, técnico, comercial | a foto (ou miniatura de 480 px); técnico só dos serviços em que está escalado (e das visitas técnicas do cliente de uma instalação em que está escalado); comercial só de visita técnica |
+| GET | `/api/visitas/aguardando-orcamento` | comercial, gestor | visitas técnicas avulsas validadas, sem orçamento do cliente criado depois e não dispensadas |
+| GET | `/api/visitas/do-cliente/:clienteId` | comercial, gestor | todas as visitas técnicas do cliente (avulsas e dos projetos), com fotos e observações |
+| POST | `/api/visitas/:id/dispensar` | comercial, gestor | tira a visita avulsa validada de "aguardando orçamento" (continua na ficha do cliente) |
 | GET | `/api/tecnico/agenda?de&ate` | técnico | só os serviços dele; por padrão de hoje (fuso de São Paulo) a 7 dias |
 | GET | `/api/tecnico/servicos/:id` | técnico | serviço com o checklist e as fotos já enviadas |
 | POST | `/api/tecnico/servicos/:id/fotos` | técnico | envia foto do checklist; `idLocal` evita duplicata no reenvio |

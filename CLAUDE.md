@@ -139,9 +139,11 @@ apps/api/                      API (Express + Prisma)
   src/lib/acesso.ts            regra 6 (técnico só vê os serviços em que está ESCALADO) num lugar
                                só: tecnicoPodeVer e filtroDoTecnico
   src/rotas/fotos.ts           GET /api/fotos/:id?tamanho=miniatura — ÚNICA saída das fotos:
-                               login sempre; gestor vê todas, técnico só de serviço em que está
-                               escalado (outro: 404),
-                               comercial não (403). Cache privado de um ano + ETag pelo id (304
+                               login sempre; quem vê o quê fica em podeVerArquivosDoServico
+                               (lib/acesso.ts): gestor vê todas; técnico as de serviço em que está
+                               escalado e as das visitas técnicas do mesmo cliente de uma instalação
+                               em que está escalado (outra: 404); comercial SÓ as de visita
+                               técnica (outras: 403). Cache privado de um ano + ETag pelo id (304
                                sem buscar o arquivo). Não existe pasta pública de arquivos
   src/lib/erros.ts             ErroHttp, wrapper de rota async, tratador central; erros do Prisma viram
                                mensagem para o usuário (banco fora do ar = 503, P2025 = 404, P2002 = 409)
@@ -409,7 +411,12 @@ O `.env` da API fica em `apps/api/.env`.
    PAYLOAD, não só na tela. Nunca use `cliente: true` nem `include` do projeto inteiro numa rota
    do técnico; o app de campo não tem botão de WhatsApp (o contato passa pelo escritório).
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
-   e conferência de papel e equipe a cada pedido. Nada de `express.static` para arquivos de
+   e conferência de papel e equipe a cada pedido (`podeVerArquivosDoServico`, lib/acesso.ts, vale
+   para fotos e vídeos). Duas aberturas decididas em 15/10/2026, só de VISITA TÉCNICA: o COMERCIAL
+   vê as fotos de visita técnica (avulsa ou não) para montar a proposta, e continua sem ver as de
+   instalação, vistoria, manutenção e retrabalho; o TÉCNICO escalado numa INSTALAÇÃO (não
+   cancelada) vê, só para consulta, as visitas técnicas do MESMO CLIENTE (observações e fotos, na
+   tela da instalação). Cancelar a instalação ou tirá-lo da escala tira o acesso na hora. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
    **Vídeo do serviço** (15/10/2026; opcional, separado do roteiro de fotos, até
    `MAXIMO_DE_VIDEOS_POR_SERVICO` = 2, números em `compartilhado/videoDoServico.ts`): gravado DENTRO
@@ -835,6 +842,38 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   Realtime (o navegador falaria direto com o banco, furando a regra de que só a API fala com ele)
   nem WebSocket (cai a cada publicação e sono da Render; o polling seria a reserva de qualquer jeito).
   Com mais de uma instância da API, a versão precisa ir para o banco.
+- **Visita técnica AVULSA** (15/10/2026). A visita é gratuita e pode acontecer antes OU depois do
+  orçamento; antes não existe projeto. Por isso `Agendamento` liga-se a um PROJETO **ou**, só na
+  visita técnica, direto a um CLIENTE (`clienteId`): exatamente um dos dois, conferido pela API
+  (`POST /api/agenda`) e pela restrição `Agendamento_projeto_ou_cliente` do banco (escrita à mão na
+  migration `20261015224909_visita_tecnica_avulsa`). Instalação, vistoria, manutenção e retrabalho
+  continuam exigindo projeto; a etapa da avulsa não muda. Agenda: botão "Agendar visita técnica"
+  (escolhe um cliente cadastrado); o bloco mostra "· avulsa" e não tem código de projeto. App de
+  campo: o serviço chega com `projeto: null` e o `cliente` (nome e endereço, nada de contato) no
+  TOPO; app anterior à versão 3 recebe um projeto de compatibilidade "Visita avulsa"
+  (`paraOTecnico` em operacao.ts). Fotos e vídeos vão para a pasta `VISITAS/<serviço>/`
+  (`pastaDoServico`, que o zerar-para-entrega também apaga).
+  **Armadilha resolvida de propósito:** "só um serviço do projeto anda por vez"
+  (`outroServicoAndando`) devolve null SEM CONSULTAR quando `projetoId` é nulo. No Prisma,
+  `where: { projetoId: null }` é "IS NULL" e pegaria TODAS as visitas avulsas da empresa (uma
+  visita em execução num cliente travaria a de outro). Toda consulta nova "do mesmo projeto" tem de
+  tratar o nulo antes; idem `passoDoServico`, que não faz nada sem projeto.
+  **Sem histórico novo** (decisão): a avulsa não grava `EventoProjeto` (que continua exigindo
+  projeto). O próprio agendamento é o registro: quem enviou e quando, quem validou e quando, e o
+  motivo da última devolução, que na avulsa NÃO é apagado ao reenviar nem ao validar (as telas só o
+  mostram como aviso com o serviço devolvido). Validar a avulsa não mexe em projeto nenhum.
+  **Comercial:** a avulsa validada entra em "Visitas a orçar" (`/visitas`, `GET
+  /api/visitas/aguardando-orcamento`) e sai SOZINHA quando o cliente ganha um orçamento CRIADO
+  DEPOIS da validação, ou pelo "Dispensar" (`dispensadaEm`/`dispensadaPor`). Sair da lista não
+  esconde nada: a ficha do cliente lista todas as visitas técnicas dele (avulsas e de projetos), e
+  a ficha do projeto mostra as visitas do MESMO CLIENTE. Não há vínculo entre visita e projeto:
+  basta serem do mesmo cliente (`filtroDeVisitasDoCliente`).
+- **Endereço na operação = cadastro ATUAL do cliente** (decisão consciente, 15/10/2026). Agenda,
+  validação e app de campo leem o endereço do CADASTRO do cliente (pelo projeto ou, na visita
+  avulsa, direto), nunca da cópia gravada no orçamento (que só o PDF, a ficha e a lista de
+  projetos usam). Isso pode divergir do endereço impresso numa proposta antiga: o sistema não tem
+  como distinguir correção de digitação de mudança de endereço, e quem vai ao local precisa do
+  dado atual. Não "alinhe" a operação com a cópia do orçamento sem nova decisão.
 - **Tipo de serviço (vendido) × Etapa (agendamento)** (15/10/2026). `TipoDeServico` é uma TABELA
   gerenciada pelo escritório (tela "Tipos de serviço", ADMIN e GESTOR; nome, ativo, ordem; nada é
   apagado, desativar só tira das escolhas de orçamentos novos): o que o orçamento VENDE

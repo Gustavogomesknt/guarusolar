@@ -13,6 +13,7 @@ import { rotasArmazenamento, rotasFotos, rotasVideos } from './rotas/fotos';
 import { rotasProjetos } from './rotas/projetos';
 import { rotasUsuarios } from './rotas/usuarios';
 import { rotasTiposDeServico } from './rotas/tiposDeServico';
+import { rotasVisitas } from './rotas/visitas';
 import { appTecnicoLiberado, conferirArmazenamentoAoIniciar, destinoAtual } from './lib/armazenamento';
 import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
@@ -87,6 +88,7 @@ app.use('/api/fotos', rotasFotos);
 app.use('/api/armazenamento', rotasArmazenamento);
 app.use('/api/videos', rotasVideos);
 app.use('/api/projetos', rotasProjetos);
+app.use('/api/visitas', rotasVisitas);
 app.use('/api/usuarios', rotasUsuarios);
 
 app.use('/api', (_req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));

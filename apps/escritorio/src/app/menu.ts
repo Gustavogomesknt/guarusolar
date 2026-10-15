@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   ClipboardCheck,
+  ClipboardList,
   FilePlus2,
   FileText,
   FolderKanban,
@@ -14,6 +15,7 @@ import {
 import type { ComponentType } from 'react';
 import type { Papel } from '@guarusolar/compartilhado';
 import { ContadorValidacao } from './ContadorValidacao';
+import { ContadorVisitas } from './ContadorVisitas';
 
 export type ItemMenu = {
   rotulo: string;
@@ -34,6 +36,8 @@ export const MENU: ItemMenu[] = [
   { rotulo: 'Orçamentos', caminho: '/orcamentos', icone: FileText, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Novo orçamento', caminho: '/orcamentos/novo', icone: FilePlus2, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Pipeline', caminho: '/pipeline', icone: KanbanSquare, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
+  // visitas técnicas avulsas validadas esperando a proposta (com fotos e medições)
+  { rotulo: 'Visitas a orçar', caminho: '/visitas', icone: ClipboardList, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial', contador: ContadorVisitas },
   { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Agenda', caminho: '/agenda', icone: CalendarDays, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação' },

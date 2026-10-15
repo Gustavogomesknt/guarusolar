@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
-import { tecnicoPodeVer } from '../lib/acesso';
+import { podeVerArquivosDoServico, servicoParaConferirAcesso } from '../lib/acesso';
 import { FRACAO_DE_AVISO, FRACAO_DE_RECUSA } from '../lib/supabaseStorage';
 import { linkParaAssistir, VideoSemArmazenamento } from '../lib/videos';
 import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, destinoAtual, lerArquivo, lerMiniatura, usoDoDestinoAtual } from '../lib/armazenamento';
@@ -12,10 +12,11 @@ import { appTecnicoLiberado, ArmazenamentoIndisponivel, ArquivoNaoEncontrado, de
  * Única saída das fotos dos serviços (casa e telhado do cliente, com localização): exige login
  * e confere quem pede, a cada foto. Não existe link que funcione sem sessão.
  *
+ * Quem vê o quê fica em podeVerArquivosDoServico (lib/acesso.ts), igual para fotos e vídeos:
  * - GESTOR (e ADMIN): todas, para validar.
- * - TECNICO: só as de serviços da própria equipe (mesma regra das rotas do técnico); de outra
- *   equipe responde 404, como se não existisse.
- * - COMERCIAL: não vê fotos de serviço (403).
+ * - TECNICO: as de serviço em que está escalado e as das visitas técnicas do mesmo cliente de uma
+ *   instalação em que está escalado; outra responde 404, como se não existisse.
+ * - COMERCIAL: só as de VISITA TÉCNICA (montar a proposta); as demais, 403.
  *
  * O navegador não manda o token em <img src>: as telas buscam a foto com o cabeçalho
  * Authorization e exibem o resultado (componente ImagemProtegida, em packages/web).
@@ -39,7 +40,13 @@ function navegadorJaTem(cabecalho: string | undefined, etag: string) {
   const semFraco = (e: string) => e.trim().replace(/^W\//, '');
   return cabecalho.trim() === '*' || cabecalho.split(',').some((e) => semFraco(e) === semFraco(etag));
 }
-rotasFotos.use(autenticar, autorizar('GESTOR', 'TECNICO'));
+rotasFotos.use(autenticar, autorizar('GESTOR', 'TECNICO', 'COMERCIAL'));
+
+/** Recusa de quem não pode ver: o técnico recebe 404 (não sabe que existe), o comercial 403. */
+function recusar(papel: string, oQue: 'Foto' | 'Vídeo'): never {
+  if (papel === 'COMERCIAL') throw new ErroHttp(403, `${oQue === 'Foto' ? 'As fotos' : 'Os vídeos'} deste serviço são só do gestor. O comercial vê os da visita técnica.`);
+  throw new ErroHttp(404, `${oQue} não encontrad${oQue === 'Foto' ? 'a' : 'o'}`);
+}
 
 rotasFotos.get(
   '/:id',
@@ -48,12 +55,11 @@ rotasFotos.get(
     const usuario = req.usuario!;
     const foto = await prisma.fotoServico.findUnique({
       where: { id: req.params.id },
-      // só a linha da escala de quem pede: basta para saber se está escalado no serviço da foto
-      select: { arquivoChave: true, agendamento: { select: { escala: { where: { usuarioId: usuario.id }, select: { usuarioId: true } } } } },
+      // etapa, cliente e só a linha da escala de quem pede: basta para conferir o acesso
+      select: { arquivoChave: true, agendamento: servicoParaConferirAcesso(usuario.id) },
     });
-    if (!foto || (usuario.papel === 'TECNICO' && !tecnicoPodeVer(usuario, foto.agendamento))) {
-      throw new ErroHttp(404, 'Foto não encontrada');
-    }
+    if (!foto) throw new ErroHttp(404, 'Foto não encontrada');
+    if (!(await podeVerArquivosDoServico(usuario, foto.agendamento))) recusar(usuario.papel, 'Foto');
 
     const cabecalhos = {
       // "private": só o navegador de quem pediu, nunca um cache compartilhado no caminho
@@ -126,23 +132,21 @@ rotasArmazenamento.get(
 );
 
 /**
- * Vídeos dos serviços: a mesma conferência das fotos (login; gestor vê todos; técnico só os de
- * serviço em que está escalado, senão 404; comercial não). O arquivo NÃO passa pela API: depois
+ * Vídeos dos serviços: a mesma conferência das fotos (podeVerArquivosDoServico). O arquivo NÃO passa pela API: depois
  * de conferir, ela entrega um link assinado de LEITURA que vale 5 minutos. A capa (JPEG pequeno)
  * sai como as fotos, pela API, com o mesmo cache privado.
  */
 export const rotasVideos = Router();
-rotasVideos.use(autenticar, autorizar('GESTOR', 'TECNICO'));
+rotasVideos.use(autenticar, autorizar('GESTOR', 'TECNICO', 'COMERCIAL'));
 
 async function videoQuePodeVer(req: Request) {
   const usuario = req.usuario!;
   const video = await prisma.videoServico.findUnique({
     where: { id: req.params.id },
-    select: { arquivoChave: true, capaChave: true, agendamento: { select: { escala: { where: { usuarioId: usuario.id }, select: { usuarioId: true } } } } },
+    select: { arquivoChave: true, capaChave: true, agendamento: servicoParaConferirAcesso(usuario.id) },
   });
-  if (!video || (usuario.papel === 'TECNICO' && !tecnicoPodeVer(usuario, video.agendamento))) {
-    throw new ErroHttp(404, 'Vídeo não encontrado');
-  }
+  if (!video) throw new ErroHttp(404, 'Vídeo não encontrado');
+  if (!(await podeVerArquivosDoServico(usuario, video.agendamento))) recusar(usuario.papel, 'Vídeo');
   return video;
 }
 

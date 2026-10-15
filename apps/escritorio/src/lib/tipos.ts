@@ -37,10 +37,14 @@ export type Cliente = {
   observacoes?: string | null;
 };
 
-/** Serviço na agenda (GET /api/agenda). Datas chegam como "2026-09-29T00:00:00.000Z". */
+/**
+ * Serviço na agenda (GET /api/agenda). Datas chegam como "2026-09-29T00:00:00.000Z".
+ * Ligado a um PROJETO ou, na visita técnica AVULSA (pré-venda), direto a um CLIENTE: exatamente
+ * um dos dois. Use clienteDoServico(s) para o nome e a cidade, que servem aos dois casos.
+ */
 export type AgendamentoNaAgenda = {
   id: string;
-  projetoId: string;
+  projetoId: string | null;
   equipeId: string;
   tipo: TipoServico;
   status: StatusAgendamento;
@@ -50,7 +54,9 @@ export type AgendamentoNaAgenda = {
     codigo: string;
     cliente: { nome: string; cidade: string | null; uf: string | null };
     orcamento: { id: string; codigo: string };
-  };
+  } | null;
+  /** só na visita avulsa (ausente em resposta da versão anterior da API) */
+  cliente?: { id: string; nome: string; cidade: string | null; uf: string | null } | null;
   /** quem vai de fato neste serviço (a equipe é só a composição padrão) */
   escala: { usuario: { id: string; nome: string } }[];
 };
@@ -246,7 +252,9 @@ export type ServicoNaFila = {
   motivoDevolucao: string | null;
   /** já tinha sido devolvido e voltou com fotos novas */
   reenviado: boolean;
-  projeto: { codigo: string; cliente: { nome: string; cidade: string | null; uf: string | null } };
+  projeto: { codigo: string; cliente: { nome: string; cidade: string | null; uf: string | null } } | null;
+  /** só na visita avulsa */
+  cliente?: { id: string; nome: string; cidade: string | null; uf: string | null } | null;
   _count: { fotos: number };
 };
 
@@ -289,12 +297,14 @@ export type ServicoEmValidacao = {
   /** quem foi escalado e quem enviou para validação */
   escala: { usuario: { id: string; nome: string } }[];
   enviadoPor: { nome: string; telefone: string | null } | null;
-  projetoId: string;
+  projetoId: string | null;
   projeto: {
     codigo: string;
     cliente: Cliente;
     orcamento: { id: string; codigo: string };
-  };
+  } | null;
+  /** só na visita avulsa */
+  cliente?: Cliente | null;
   fotos: FotoEmValidacao[];
   /** vídeos opcionais; ausente em resposta da versão anterior da API */
   videos?: VideoEmValidacao[];
@@ -440,3 +450,39 @@ export type ListaDeUsuarios = { usuarios: UsuarioNaLista[]; equipes: { id: strin
 
 /** Resposta de criar e de nova senha: a senha aparece SÓ aqui, uma vez. */
 export type UsuarioComSenha = { usuario: UsuarioNaLista; senhaTemporaria: string };
+
+/**
+ * O cliente de um serviço: pelo projeto ou, na visita técnica avulsa (sem projeto), direto.
+ * Sempre existe um dos dois (a API e o banco garantem).
+ */
+export function clienteDoServico<C>(s: { projeto: { cliente: C } | null; cliente?: C | null }): C {
+  return (s.projeto?.cliente ?? s.cliente)!;
+}
+
+/**
+ * Visita técnica para o comercial (GET /api/visitas/...): avulsa (pré-venda, sem projeto) ou de
+ * um projeto. Fotos na ordem do roteiro; abrem por /api/fotos/:id (o comercial vê as de visita).
+ */
+export type VisitaTecnica = {
+  id: string;
+  status: StatusAgendamento;
+  dataInicio: string;
+  dataFim: string;
+  avulsa: boolean;
+  /** validada, sem orçamento do cliente criado depois e não dispensada */
+  aguardandoOrcamento: boolean;
+  projeto: { id: string; codigo: string } | null;
+  cliente: { id: string; nome: string; cidade: string | null; uf: string | null } | null;
+  equipe: { nome: string };
+  escala: { usuario: { nome: string } }[];
+  observacoesTecnico: string | null;
+  enviadoEm: string | null;
+  enviadoPor: { nome: string } | null;
+  validadoEm: string | null;
+  validadoPor: { nome: string } | null;
+  motivoDevolucao: string | null;
+  dispensadaEm: string | null;
+  dispensadaPor: { nome: string } | null;
+  fotos: { id: string; rotulo: string | null; chave: string | null; capturadaEm: string | null }[];
+  videos: VideoEmValidacao[];
+};

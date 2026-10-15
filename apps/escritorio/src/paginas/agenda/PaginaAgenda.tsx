@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, TriangleAlert, Users,
 import { ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
-import type { AgendamentoNaAgenda, EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
+import { clienteDoServico, type AgendamentoNaAgenda, type EquipeNaAgenda, type ProjetoPendente } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DialogAgendar, type PreAgendamento } from './DialogAgendar';
@@ -170,6 +170,11 @@ export function PaginaAgenda() {
               </button>
             ))}
           </div>
+          {/* visita técnica AVULSA: pré-venda, escolhe um cliente cadastrado, sem projeto */}
+          <Button variant="outline" className="h-11 rounded-[10px] bg-card px-[18px] font-semibold" onClick={() => setAgendando({ avulsa: true })}>
+            <Plus aria-hidden />
+            Agendar visita técnica
+          </Button>
           <Button className="h-11 rounded-[10px] px-[18px] font-semibold" onClick={() => setAgendando({ projetoId: selecionado?.id })}>
             <Plus aria-hidden />
             Novo agendamento
@@ -412,7 +417,10 @@ function LinhaEquipe({
         const inicio = diaDaApi(servico.dataInicio);
         const fim = diaDaApi(servico.dataFim);
         const quando = inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`;
-        const cidade = servico.projeto.cliente.cidade;
+        const cliente = clienteDoServico(servico);
+        const cidade = cliente.cidade;
+        // visita técnica avulsa: sem projeto (nem código), com a marca no bloco
+        const avulsa = servico.projeto === null;
         const semEscala = servico.escala.length === 0;
         const trocada = !semEscala && escalaTrocada(servico.escala, equipe);
         const quemVai = semEscala ? 'sem técnico escalado' : `vão ${nomesDaEscala(servico.escala)}`;
@@ -423,7 +431,7 @@ function LinhaEquipe({
             // com um projeto selecionado a grade serve para escolher dia livre: serviços ficam só de consulta
             disabled={selecionado !== null}
             onClick={() => onAbrirServico(servico)}
-            aria-label={`${tipo.rotulo}: ${servico.projeto.cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}, ${quemVai}. Abrir detalhes`}
+            aria-label={`${tipo.rotulo}${avulsa ? ' avulsa' : ''}: ${cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}, ${quemVai}. Abrir detalhes`}
             style={{ gridColumn: `${coluna + 2} / span ${largura}`, gridRow: faixa + 1 }}
             className={cn(
               'relative z-10 flex min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] border-l-4 text-left',
@@ -438,7 +446,10 @@ function LinhaEquipe({
               // faixa compacta: tipo, sinal da situação e cliente; o resto está na janela do serviço
               <>
                 <span className="flex w-full items-center justify-between gap-1.5">
-                  <span className="truncate text-[10px] font-semibold tracking-[0.04em] uppercase">{tipo.rotulo}</span>
+                  <span className="truncate text-[10px] font-semibold tracking-[0.04em] uppercase">
+                    {tipo.rotulo}
+                    {avulsa && ' · avulsa'}
+                  </span>
                   <span className="flex shrink-0 items-center gap-1">
                     {semEscala && (
                       <span title="Sem técnico escalado">
@@ -448,14 +459,17 @@ function LinhaEquipe({
                     <SituacaoServico status={servico.status} soBolinha />
                   </span>
                 </span>
-                <span className="w-full truncate text-[13px] leading-tight font-semibold">{servico.projeto.cliente.nome}</span>
+                <span className="w-full truncate text-[13px] leading-tight font-semibold">{cliente.nome}</span>
               </>
             ) : (
               <>
-                <span className="w-full truncate text-[10px] font-semibold tracking-[0.04em] uppercase">{tipo.rotulo}</span>
-                <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{servico.projeto.cliente.nome}</span>
+                <span className="w-full truncate text-[10px] font-semibold tracking-[0.04em] uppercase">
+                  {tipo.rotulo}
+                  {avulsa && ' · avulsa'}
+                </span>
+                <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{cliente.nome}</span>
                 <span className="w-full truncate text-xs opacity-80">
-                  {[cidade, servico.projeto.orcamento.codigo].filter(Boolean).join(' · ')}
+                  {[cidade, servico.projeto ? servico.projeto.orcamento.codigo : 'Sem projeto'].filter(Boolean).join(' · ')}
                 </span>
                 {/* a escala só aparece no bloco quando foge do padrão da equipe, ou quando falta */}
                 {semEscala ? (

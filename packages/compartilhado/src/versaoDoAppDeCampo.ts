@@ -19,7 +19,9 @@
  * definitivo da foto. Por isso a mínima começa em 0; só suba depois de os celulares terem
  * aberto o app ao menos uma vez com esta versão (ela se atualiza sozinha quando está parada).
  */
-export const VERSAO_DO_APP_DE_CAMPO = 2; // 2: vídeo nos serviços (rotas novas)
+// 2: vídeo nos serviços (rotas novas). 3: visita técnica avulsa (`projeto` null e `cliente` no topo;
+// a API manda às versões < 3 um projeto "Visita avulsa" para não quebrar a agenda delas)
+export const VERSAO_DO_APP_DE_CAMPO = 3;
 export const VERSAO_MINIMA_DO_APP_DE_CAMPO = 0;
 
 /** Cabeçalho com a versão do app de campo, em todo pedido dele à API. */

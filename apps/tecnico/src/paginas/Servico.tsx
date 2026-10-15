@@ -6,7 +6,8 @@ import { diaDaApi, diaDeHoje, diaMes, nomeLongo, ROTEIRO_DO_SERVICO, somarDias }
 import { toast } from 'sonner';
 import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
-import type { ServicoDetalhe } from '@/lib/tipos';
+import { clienteDoServico, identificacaoDoServico, type ServicoDetalhe } from '@/lib/tipos';
+import { VisitasDoCliente } from '@/components/VisitasDoCliente';
 import { enderecoEscrito } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
@@ -222,14 +223,16 @@ export function Servico() {
   }
 
   const s = servico.data;
-  const { cliente } = s.projeto;
+  const cliente = clienteDoServico(s);
+  // código do projeto, ou "Visita avulsa" (pré-venda, sem projeto)
+  const identificacao = <span className={s.projeto ? 'font-mono' : undefined}>{identificacaoDoServico(s)}</span>;
   const tipo = TIPOS_SERVICO_AGENDA[s.tipo];
   const endereco = enderecoEscrito(cliente);
 
   if (s.status === 'APROVADO') {
     return (
       <div className="flex min-h-svh flex-col bg-background">
-        <Cabecalho titulo={cliente.nome} subtitulo={<span className="font-mono">{s.projeto.codigo}</span>} voltarPara="/agenda" />
+        <Cabecalho titulo={cliente.nome} subtitulo={identificacao} voltarPara="/agenda" />
         <main className="flex flex-1 flex-col items-center gap-4 px-7 py-12 text-center">
           <span className="flex size-[72px] items-center justify-center rounded-full bg-[#DCF0E3] text-[#17653E]">
             <Check className="size-9" strokeWidth={2.5} aria-hidden />
@@ -253,7 +256,7 @@ export function Servico() {
     const obrigatorias = s.checklist.filter((i) => i.obrigatoria).length;
     return (
       <div className="flex min-h-svh flex-col bg-background">
-        <Cabecalho titulo={cliente.nome} subtitulo={<span className="font-mono">{s.projeto.codigo}</span>} voltarPara="/agenda" />
+        <Cabecalho titulo={cliente.nome} subtitulo={identificacao} voltarPara="/agenda" />
         <main className="flex flex-1 flex-col items-center gap-4 px-7 py-12 text-center">
           <span className="flex size-[72px] items-center justify-center rounded-full bg-[#EDF1F6] text-primary">
             <Clock className="size-9" strokeWidth={2.25} aria-hidden />
@@ -341,7 +344,7 @@ export function Servico() {
 
   return (
     <div className="min-h-svh bg-background">
-      <Cabecalho titulo="Concluir serviço" subtitulo={<span className="font-mono">{s.projeto.codigo}</span>} voltarPara="/agenda" />
+      <Cabecalho titulo="Concluir serviço" subtitulo={identificacao} voltarPara="/agenda" />
 
       <input
         ref={camera}
@@ -415,6 +418,9 @@ export function Servico() {
         )}
 
         <AvisoLocalizacao estado={localizacao.estado} onPermitir={localizacao.pedir} />
+
+        {/* na instalação: o que o colega registrou nas visitas técnicas deste cliente (só leitura) */}
+        {s.tipo === 'INSTALACAO' && <VisitasDoCliente visitas={s.visitasDoCliente ?? []} />}
 
         {obrigatorios.length > 0 && (
           <section aria-label="Progresso das fotos" className="flex flex-col gap-2.5 rounded-2xl border bg-card p-4">

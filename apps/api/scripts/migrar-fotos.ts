@@ -39,7 +39,7 @@
  */
 import 'dotenv/config';
 import path from 'node:path';
-import { apagarArquivo, configuracaoIncompleta, copiarParaOBucketAtual, destinoAtual, destinoDaChave, lerArquivo, salvarFoto } from '../src/lib/armazenamento';
+import { apagarArquivo, configuracaoIncompleta, copiarParaOBucketAtual, destinoAtual, destinoDaChave, lerArquivo, pastaDoServico, salvarFoto } from '../src/lib/armazenamento';
 import { enviarAoS3, tamanhoNoS3 } from '../src/lib/s3';
 import { apagarDoSupabase, baixarDoSupabase, bucketDasFotos, variaveisDoSupabaseFaltando } from '../src/lib/supabaseStorage';
 import { bancoDeProducao } from '../src/lib/ambienteDoBanco';
@@ -99,7 +99,12 @@ async function main() {
       capturadaEm: true,
       criadoEm: true,
       agendamento: {
-        select: { id: true, dataInicio: true, tipo: true, projeto: { select: { codigo: true, cliente: { select: { nome: true, cidade: true } } } } },
+        select: {
+          id: true, dataInicio: true, tipo: true,
+          projeto: { select: { codigo: true, cliente: { select: { nome: true, cidade: true } } } },
+          // visita técnica avulsa: sem projeto, o cliente vem direto
+          cliente: { select: { nome: true, cidade: true } },
+        },
       },
     },
   });
@@ -136,7 +141,7 @@ async function main() {
   let falhas = 0;
   let naoApagadas = 0;
   for (const [i, foto] of aMigrar.entries()) {
-    const onde = `${i + 1}/${aMigrar.length} ${foto.agendamento.projeto.codigo} ${foto.arquivoNome}`;
+    const onde = `${i + 1}/${aMigrar.length} ${pastaDoServico(foto.agendamento.projeto)} ${foto.arquivoNome}`;
     try {
       const original = await lerArquivo(foto.arquivoChave);
       const doChecklist = foto.chave ? checklist.find((c) => c.tipoServico === foto.agendamento.tipo && c.chave === foto.chave) : null;
@@ -144,8 +149,8 @@ async function main() {
       const nova =
         (await copiarParaOBucketAtual(foto.arquivoChave, original.dados, original.tipo)) ??
         (await salvarFoto(original.dados, {
-          cliente: foto.agendamento.projeto.cliente,
-          projetoCodigo: foto.agendamento.projeto.codigo,
+          cliente: (foto.agendamento.projeto?.cliente ?? foto.agendamento.cliente)!,
+          projetoCodigo: pastaDoServico(foto.agendamento.projeto),
           servico: { id: foto.agendamento.id, dataInicio: foto.agendamento.dataInicio, tipo: foto.agendamento.tipo },
           item: doChecklist ? { ordem: doChecklist.ordem, rotulo: doChecklist.rotulo } : null,
           capturadaEm: foto.capturadaEm ?? foto.criadoEm,

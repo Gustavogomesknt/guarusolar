@@ -48,33 +48,34 @@ enum Papel {
 }
 
 model Usuario {
-  id              String   @id @default(uuid())
-  nome            String
-  email           String   @unique
-  senhaHash       String
+  id               String    @id @default(uuid())
+  nome             String
+  email            String    @unique
+  senhaHash        String
   /// senha gerada por um administrador (npm run usuario): a pessoa troca no primeiro acesso
-  senhaTemporaria Boolean  @default(false)
+  senhaTemporaria  Boolean   @default(false)
   /// muda ao desativar, trocar papel/equipe ou gerar senha nova: o login antigo (token com
   /// outra versão) deixa de valer na hora (lib/auth.ts, conferirSessao)
-  sessaoVersao    Int      @default(0)
-  papel           Papel
-  telefone        String?
-  ativo           Boolean  @default(true)
-  equipeId        String?
-  equipe          Equipe?  @relation(fields: [equipeId], references: [id])
+  sessaoVersao     Int       @default(0)
+  papel            Papel
+  telefone         String?
+  ativo            Boolean   @default(true)
+  equipeId         String?
+  equipe           Equipe?   @relation(fields: [equipeId], references: [id])
   /// última versão do app de campo vista nos pedidos (cabeçalho X-App-Campo) e quando; null =
   /// nunca mandou o cabeçalho (app anterior a ele, ou nunca usou o app). Gravada no máximo uma
   /// vez por hora por usuário (lib/versaoDoApp.ts). Base para subir a versão mínima
   versaoAppCampo   Int?
   versaoAppCampoEm DateTime?
-  criadoEm        DateTime @default(now())
-  editadoEm       DateTime @updatedAt
+  criadoEm         DateTime  @default(now())
+  editadoEm        DateTime  @updatedAt
 
   orcamentos         Orcamento[]       @relation("VendedorOrcamentos")
   historicos         HistoricoStatus[]
   servicosExecutados Agendamento[]     @relation("TecnicoResponsavel")
   servicosValidados  Agendamento[]     @relation("ValidadoPor")
   servicosEnviados   Agendamento[]     @relation("EnviadoPor")
+  visitasDispensadas Agendamento[]     @relation("VisitaDispensada")
   projetosConcluidos Projeto[]         @relation("ProjetosConcluidos")
   /// serviços em que este técnico está escalado: é o que ele vê no app (regra 6)
   escalas            EscalaServico[]
@@ -129,8 +130,10 @@ model Cliente {
   criadoEm    DateTime   @default(now())
   editadoEm   DateTime   @updatedAt
 
-  orcamentos Orcamento[]
-  projetos   Projeto[]
+  orcamentos     Orcamento[]
+  projetos       Projeto[]
+  /// visitas técnicas AVULSAS (sem projeto: pré-venda)
+  visitasAvulsas Agendamento[] @relation("VisitaAvulsa")
 
   @@index([nome])
   @@index([whatsapp])
@@ -248,34 +251,34 @@ model TipoDeServico {
 }
 
 model Orcamento {
-  id         String          @id @default(uuid())
-  codigo     String          @unique // GS-2026-0148
+  id              String          @id @default(uuid())
+  codigo          String          @unique // GS-2026-0148
   /// gerado pela tela ao criar: o mesmo "criar" repetido (queda de internet) não duplica
-  idCriacao  String?         @unique
-  clienteId  String
-  cliente    Cliente         @relation(fields: [clienteId], references: [id])
-  vendedorId String
-  vendedor   Usuario         @relation("VendedorOrcamentos", fields: [vendedorId], references: [id])
-  status     StatusOrcamento @default(RASCUNHO)
+  idCriacao       String?         @unique
+  clienteId       String
+  cliente         Cliente         @relation(fields: [clienteId], references: [id])
+  vendedorId      String
+  vendedor        Usuario         @relation("VendedorOrcamentos", fields: [vendedorId], references: [id])
+  status          StatusOrcamento @default(RASCUNHO)
   /// obrigatório na API (criar e editar); null só nos orçamentos anteriores ao campo ("Sem tipo")
   tipoDeServicoId String?
-  tipoDeServico   TipoDeServico? @relation(fields: [tipoDeServicoId], references: [id])
+  tipoDeServico   TipoDeServico?  @relation(fields: [tipoDeServicoId], references: [id])
 
   // valores calculados no servidor a cada gravação (nunca confiar no front)
   /// itens + margem (o subtotal que o cliente vê)
-  subtotal         Decimal      @default(0) @db.Decimal(12, 2)
+  subtotal             Decimal      @default(0) @db.Decimal(12, 2)
   /// margem de lucro em reais desta proposta; embutida no total, nunca aparece para o cliente
-  margem           Decimal      @default(0) @db.Decimal(12, 2)
-  descontoTipo     TipoDesconto @default(PERCENTUAL)
-  descontoValor    Decimal      @default(0) @db.Decimal(12, 2) // % ou R$, conforme descontoTipo
-  descontoAplicado Decimal      @default(0) @db.Decimal(12, 2) // sempre em R$
+  margem               Decimal      @default(0) @db.Decimal(12, 2)
+  descontoTipo         TipoDesconto @default(PERCENTUAL)
+  descontoValor        Decimal      @default(0) @db.Decimal(12, 2) // % ou R$, conforme descontoTipo
+  descontoAplicado     Decimal      @default(0) @db.Decimal(12, 2) // sempre em R$
   /// imposto em %, somado DEPOIS dos descontos (ordem em compartilhado/calculo.ts)
-  impostoPct       Decimal      @default(0) @db.Decimal(5, 2)
-  impostoAplicado  Decimal      @default(0) @db.Decimal(12, 2) // sempre em R$
+  impostoPct           Decimal      @default(0) @db.Decimal(5, 2)
+  impostoAplicado      Decimal      @default(0) @db.Decimal(12, 2) // sempre em R$
   /// false = o imposto não aparece como linha no PDF: vai embutido nos preços (como a margem)
-  mostrarImpostosNoPdf Boolean  @default(true)
+  mostrarImpostosNoPdf Boolean      @default(true)
   /// já com o imposto
-  valorTotal       Decimal      @default(0) @db.Decimal(12, 2)
+  valorTotal           Decimal      @default(0) @db.Decimal(12, 2)
 
   // condições de pagamento
   condicaoPagamento  CondicaoPagamento @default(ENTRADA_PARCELAS)
@@ -367,11 +370,11 @@ model ItemOrcamento {
   unidade          Unidade
   /// cópia do grupo do produto ao entrar no orçamento (regra 2)
   grupoNaProposta  GrupoNaProposta @default(MATERIAL)
-  quantidade       Decimal @db.Decimal(12, 3)
-  precoUnitario    Decimal @db.Decimal(12, 2)
-  precoTabela      Decimal @db.Decimal(12, 2) // preço padrão do catálogo, para medir desvio
-  subtotal         Decimal @db.Decimal(12, 2)
-  ordem            Int     @default(0)
+  quantidade       Decimal         @db.Decimal(12, 3)
+  precoUnitario    Decimal         @db.Decimal(12, 2)
+  precoTabela      Decimal         @db.Decimal(12, 2) // preço padrão do catálogo, para medir desvio
+  subtotal         Decimal         @db.Decimal(12, 2)
+  ordem            Int             @default(0)
 
   @@index([orcamentoId])
 }
@@ -407,22 +410,22 @@ enum StatusProjeto {
 }
 
 model Projeto {
-  id                       String        @id @default(uuid())
-  codigo                   String        @unique // PRJ-2026-0146
-  orcamentoId              String        @unique
-  orcamento                Orcamento     @relation(fields: [orcamentoId], references: [id])
+  id                       String         @id @default(uuid())
+  codigo                   String         @unique // PRJ-2026-0146
+  orcamentoId              String         @unique
+  orcamento                Orcamento      @relation(fields: [orcamentoId], references: [id])
   clienteId                String
-  cliente                  Cliente       @relation(fields: [clienteId], references: [id])
-  status                   StatusProjeto @default(AGUARDANDO_AGENDAMENTO)
+  cliente                  Cliente        @relation(fields: [clienteId], references: [id])
+  status                   StatusProjeto  @default(AGUARDANDO_AGENDAMENTO)
   /// copiado do orçamento na aprovação (e quando o orçamento é classificado depois)
   tipoDeServicoId          String?
   tipoDeServico            TipoDeServico? @relation(fields: [tipoDeServicoId], references: [id])
-  potenciaKwp              Decimal?      @db.Decimal(8, 2)
+  potenciaKwp              Decimal?       @db.Decimal(8, 2)
   observacoes              String?
   concluidoEm              DateTime?
   /// quem concluiu (gestor ou admin); a conclusão é sempre manual
   concluidoPorId           String?
-  concluidoPor             Usuario?      @relation("ProjetosConcluidos", fields: [concluidoPorId], references: [id])
+  concluidoPor             Usuario?       @relation("ProjetosConcluidos", fields: [concluidoPorId], references: [id])
   /// visita técnica validada: o projeto volta para "A agendar", com o aviso de agendar a instalação
   visitaTecnicaConcluidaEm DateTime?
   /// cancelado pelo gestor antes de a execução começar (o cliente desistiu)
@@ -430,9 +433,9 @@ model Projeto {
   motivoCancelamento       String?
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
-  textoBusca               String?       @default(dbgenerated())
-  criadoEm                 DateTime      @default(now())
-  editadoEm                DateTime      @updatedAt
+  textoBusca               String?        @default(dbgenerated())
+  criadoEm                 DateTime       @default(now())
+  editadoEm                DateTime       @updatedAt
 
   agendamentos Agendamento[]
   eventos      EventoProjeto[]
@@ -482,10 +485,16 @@ model EscalaServico {
   @@index([usuarioId])
 }
 
+/// Serviço agendado. Liga-se a UM projeto OU, só na visita técnica AVULSA (pré-venda, antes de
+/// haver orçamento aprovado), a um cliente: exatamente um dos dois, conferido pela API e pela
+/// restrição "Agendamento_projeto_ou_cliente" do banco (escrita à mão na migration).
 model Agendamento {
   id        String            @id @default(uuid())
-  projetoId String
-  projeto   Projeto           @relation(fields: [projetoId], references: [id])
+  projetoId String?
+  projeto   Projeto?          @relation(fields: [projetoId], references: [id], onDelete: Restrict)
+  /// só na visita avulsa; o endereço vem do cadastro do cliente
+  clienteId String?
+  cliente   Cliente?          @relation("VisitaAvulsa", fields: [clienteId], references: [id], onDelete: Restrict)
   equipeId  String
   equipe    Equipe            @relation(fields: [equipeId], references: [id])
   tipo      TipoServico       @default(INSTALACAO)
@@ -507,6 +516,11 @@ model Agendamento {
   validadoEm         DateTime?
   motivoDevolucao    String?
 
+  /// visita avulsa validada que o comercial tirou de "aguardando orçamento" (continua na ficha do cliente)
+  dispensadaEm    DateTime?
+  dispensadaPorId String?
+  dispensadaPor   Usuario?  @relation("VisitaDispensada", fields: [dispensadaPorId], references: [id])
+
   criadoEm  DateTime @default(now())
   editadoEm DateTime @updatedAt
 
@@ -520,6 +534,7 @@ model Agendamento {
   @@index([equipeId, dataInicio])
   @@index([status])
   @@index([tecnicoResponsavelId, dataInicio])
+  @@index([clienteId])
 }
 
 // ---------------------------------------------------------------------------

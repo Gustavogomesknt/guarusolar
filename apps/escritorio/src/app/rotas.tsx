@@ -21,6 +21,7 @@ const PaginaCatalogo = lazyComRecarga(() => import('@/paginas/catalogo/PaginaCat
 const PaginaAgenda = lazyComRecarga(() => import('@/paginas/agenda/PaginaAgenda').then((m) => ({ default: m.PaginaAgenda })));
 const ListaProjetos = lazyComRecarga(() => import('@/paginas/projetos/ListaProjetos').then((m) => ({ default: m.ListaProjetos })));
 const FichaProjeto = lazyComRecarga(() => import('@/paginas/projetos/FichaProjeto').then((m) => ({ default: m.FichaProjeto })));
+const PaginaVisitas = lazyComRecarga(() => import('@/paginas/visitas/PaginaVisitas').then((m) => ({ default: m.PaginaVisitas })));
 const PaginaTiposDeServico = lazyComRecarga(() => import('@/paginas/tiposDeServico/PaginaTiposDeServico').then((m) => ({ default: m.PaginaTiposDeServico })));
 const PaginaUsuarios = lazyComRecarga(() => import('@/paginas/usuarios/PaginaUsuarios').then((m) => ({ default: m.PaginaUsuarios })));
 const PaginaValidacao = lazyComRecarga(() =>
@@ -59,6 +60,7 @@ export const roteador = createBrowserRouter(
             {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
             <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
             <Route path="pipeline" element={<Pipeline />} />
+            <Route path="visitas" element={<PaginaVisitas />} />
             <Route path="clientes" element={<ListaClientes />} />
             <Route path="clientes/:id" element={<FichaCliente />} />
             <Route path="catalogo" element={<PaginaCatalogo />} />

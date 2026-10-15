@@ -109,11 +109,18 @@ export async function situacaoDevida(tx: Prisma.TransactionClient, projetoId: st
 
 const ANDANDO: StatusAgendamento[] = [...SERVICO_ANDANDO];
 
-/** O outro serviço do projeto que está com o técnico ou em validação (só pode haver um). */
-export const outroServicoAndando = (tx: Prisma.TransactionClient, servico: { id: string; projetoId: string }) =>
-  tx.agendamento.findFirst({
+/**
+ * O outro serviço do projeto que está com o técnico ou em validação (só pode haver um).
+ * Visita AVULSA (sem projeto) não tem "outro serviço do projeto": volta null DE PROPÓSITO, antes
+ * de consultar. Sem isso, `projetoId: null` no where do Prisma vira "projetoId IS NULL" e pegaria
+ * todas as visitas avulsas da empresa: uma visita andando num cliente travaria a de outro cliente.
+ */
+export async function outroServicoAndando(tx: Prisma.TransactionClient, servico: { id: string; projetoId: string | null }) {
+  if (servico.projetoId === null) return null;
+  return tx.agendamento.findFirst({
     where: { projetoId: servico.projetoId, id: { not: servico.id }, status: { in: ANDANDO } },
     select: { tipo: true, status: true, dataInicio: true, dataFim: true },
   });
+}
 
 export const nomeDaSituacao = (s: StatusProjeto) => ROTULO_STATUS_PROJETO[s];

@@ -6,7 +6,7 @@ import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
-import type { ServicoNaAgenda } from '@/lib/tipos';
+import { clienteDoServico, identificacaoDoServico, type ServicoNaAgenda } from '@/lib/tipos';
 import { enderecoEscrito, linkDoMapa } from '@/lib/contato';
 import { cn } from '@/lib/utils';
 import { Cabecalho } from '@/components/Cabecalho';
@@ -185,7 +185,7 @@ export function Agenda() {
 }
 
 function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaAgenda; dia: Dia; atrasado?: boolean }) {
-  const { cliente } = servico.projeto;
+  const cliente = clienteDoServico(servico);
   const { usuario } = useSessao();
   const colegas = (servico.escala ?? []).filter((e) => e.usuario.id !== usuario?.id).map((e) => e.usuario.nome.trim().split(/\s+/)[0]);
   const tipo = TIPOS_SERVICO_AGENDA[servico.tipo];
@@ -240,7 +240,8 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
             Gestor: {servico.motivoDevolucao}
           </span>
         )}
-        <span className="font-mono text-xs text-muted-foreground">{servico.projeto.codigo}</span>
+        {/* visita avulsa: sem projeto, sem código PRJ */}
+        <span className={cn('text-xs text-muted-foreground', servico.projeto && 'font-mono')}>{identificacaoDoServico(servico)}</span>
       </Link>
 
       {/* só o caminho: o contato do cliente não chega ao app de campo (fala-se pelo escritório) */}

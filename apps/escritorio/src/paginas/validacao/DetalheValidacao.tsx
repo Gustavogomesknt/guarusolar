@@ -8,7 +8,7 @@ import { api, ErroApi, urlDaFoto } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
-import type { FotoEmValidacao, ServicoEmValidacao, ServicoNaFila } from '@/lib/tipos';
+import { clienteDoServico, type FotoEmValidacao, type ServicoEmValidacao, type ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +30,10 @@ const DEPOIS_DE_VALIDAR: Record<(typeof ROTEIRO_DO_SERVICO)[keyof typeof ROTEIRO
   AGUARDANDO_CONCLUSAO: 'Sem outro serviço pendente, o projeto fica "Aguardando conclusão": quando a obra terminar, conclua na ficha do projeto.',
   NAO_MEXE: 'A situação do projeto não muda.',
 };
+/** Visita técnica avulsa: não há projeto para mexer; ela vai para o comercial. */
+const DEPOIS_DA_AVULSA = 'Não há projeto: a visita aparece para o comercial em "Visitas aguardando orçamento".';
+const depoisDeValidar = (s: Pick<ServicoEmValidacao, 'tipo' | 'projeto'>) =>
+  s.projeto === null ? DEPOIS_DA_AVULSA : DEPOIS_DE_VALIDAR[ROTEIRO_DO_SERVICO[s.tipo].aoValidar];
 
 const linkDoMapa = (f: FotoEmValidacao) =>
   f.latitude && f.longitude ? `https://www.google.com/maps/search/?api=1&query=${f.latitude},${f.longitude}` : null;
@@ -86,7 +90,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
     meta: { erroTratadoNoFormulario: true },
     onSuccess: () => {
       setConfirmarAprovacao(false);
-      resolvido(`${dados ? ROTULO_TIPO_SERVICO[dados.tipo] : 'Serviço'} de ${dados?.projeto.cliente.nome} validada. ${dados ? DEPOIS_DE_VALIDAR[ROTEIRO_DO_SERVICO[dados.tipo].aoValidar] : ''}`, 'APROVADO');
+      resolvido(`${dados ? ROTULO_TIPO_SERVICO[dados.tipo] : 'Serviço'} de ${dados ? clienteDoServico(dados).nome : ''} validada. ${dados ? depoisDeValidar(dados) : ''}`, 'APROVADO');
     },
     onError: (e) => {
       setConfirmarAprovacao(false);
@@ -120,7 +124,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
   }
 
   const tipo = TIPOS_SERVICO_AGENDA[dados.tipo];
-  const cliente = dados.projeto.cliente;
+  const cliente = clienteDoServico(dados);
   const cidade = [cliente.cidade, cliente.uf].filter(Boolean).join('/');
   const devolvido = dados.status === 'DEVOLVIDO';
   const roteiro = ROTEIRO_DO_SERVICO[dados.tipo];
@@ -158,7 +162,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-[13px] text-muted-foreground">
-            <span className="font-mono">{dados.projeto.codigo}</span> · {tipo.rotulo}
+            {dados.projeto ? <span className="font-mono">{dados.projeto.codigo}</span> : 'Visita avulsa, sem projeto'} · {tipo.rotulo}
             {cidade && ` · ${cidade}`}
           </p>
           <h2 id="titulo-servico" className="text-[28px] leading-tight font-bold">
@@ -194,14 +198,23 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">Projeto e orçamento</dt>
+          <dt className="text-muted-foreground">{dados.projeto ? 'Projeto e orçamento' : 'Cliente'}</dt>
           <dd className="flex flex-wrap gap-x-2">
-            <Link to={`/projetos/${dados.projetoId}`} className="font-mono font-medium text-primary hover:underline">
-              {dados.projeto.codigo}
-            </Link>
-            <Link to={`/orcamentos/${dados.projeto.orcamento.id}`} className="font-mono font-medium text-primary hover:underline">
-              {dados.projeto.orcamento.codigo}
-            </Link>
+            {dados.projeto ? (
+              <>
+                <Link to={`/projetos/${dados.projetoId}`} className="font-mono font-medium text-primary hover:underline">
+                  {dados.projeto.codigo}
+                </Link>
+                <Link to={`/orcamentos/${dados.projeto.orcamento.id}`} className="font-mono font-medium text-primary hover:underline">
+                  {dados.projeto.orcamento.codigo}
+                </Link>
+              </>
+            ) : (
+              // visita avulsa (pré-venda): sem projeto; a ficha do cliente guarda as visitas
+              <Link to={`/clientes/${cliente.id}`} className="font-medium text-primary hover:underline">
+                Ficha do cliente
+              </Link>
+            )}
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
@@ -321,8 +334,8 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
           <DialogHeader>
             <DialogTitle>Validar as fotos da {tipo.rotulo.toLowerCase()}?</DialogTitle>
             <DialogDescription>
-              {cliente.nome} · projeto <span className="font-mono">{dados.projeto.codigo}</span>. O serviço fica{' '}
-              <strong>Validado</strong> e sai da fila. {DEPOIS_DE_VALIDAR[roteiro.aoValidar]}
+              {cliente.nome} · {dados.projeto ? <>projeto <span className="font-mono">{dados.projeto.codigo}</span></> : 'visita avulsa'}. O serviço fica{' '}
+              <strong>Validado</strong> e sai da fila. {depoisDeValidar(dados)}
               {marcadasNoBanco > 0 &&
                 ` ${marcadasNoBanco === 1 ? 'A foto que estava marcada' : `As ${marcadasNoBanco} fotos que estavam marcadas`} para refazer ${marcadasNoBanco === 1 ? 'será aceita' : 'serão aceitas'} como estão.`}
             </DialogDescription>
