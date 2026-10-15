@@ -5,7 +5,7 @@ import { AVISO_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
 import { motivoParaNaoAtualizarSozinho, useAppDesatualizado } from '@/lib/atualizacao';
 import { cn } from '@/lib/utils';
 
-/** Até quanto tempo depois de abrir o app a versão nova ainda conta como "ao abrir". */
+/** Até quanto tempo depois de abrir o app (ou voltar para ele) a versão nova ainda conta como "ao abrir". */
 const JANELA_DA_ABERTURA = 30_000;
 
 /**
@@ -27,6 +27,8 @@ const JANELA_DA_ABERTURA = 30_000;
  */
 export function AvisoAtualizacao() {
   const registro = useRef<ServiceWorkerRegistration | null>(null);
+  // quando o app foi aberto ou voltou para a tela (performance.now(): 0 = carregou agora)
+  const aberturaEm = useRef(0);
   const {
     needRefresh: [temVersaoNova],
     updateServiceWorker,
@@ -42,28 +44,31 @@ export function AvisoAtualizacao() {
   const [procurando, setProcurando] = useState(false);
   const atualizar = useCallback(() => void updateServiceWorker(true), [updateServiceWorker]);
 
-  // voltou para o app: confere se saiu versão nova
+  // voltou para o app: conta como abertura e confere se saiu versão nova
   useEffect(() => {
     const aoVoltar = () => {
-      if (document.visibilityState === 'visible') void registro.current?.update().catch(() => undefined);
+      if (document.visibilityState !== 'visible') return;
+      aberturaEm.current = performance.now();
+      void registro.current?.update().catch(() => undefined);
     };
     document.addEventListener('visibilitychange', aoVoltar);
     return () => document.removeEventListener('visibilitychange', aoVoltar);
   }, []);
 
-  // versão nova pronta: sem nada em andamento, entra sozinha ao abrir o app ou ao voltar para ele
-  // (no meio do uso, não: recarregar a tela sob o dedo do técnico só atrapalha)
+  // versão nova pronta: sem nada em andamento, entra sozinha se o app acabou de ser aberto (ou de
+  // voltar para a tela). No meio do uso, não: recarregar a tela sob o dedo do técnico atrapalha;
+  // fica a faixa, e a próxima volta ao app tenta de novo.
   useEffect(() => {
     if (!temVersaoNova) return;
-    const tentar = (aoAbrir: boolean) => {
+    const tentar = () => {
       if (document.visibilityState !== 'visible') return;
-      if (aoAbrir && performance.now() > JANELA_DA_ABERTURA) return;
+      if (performance.now() - aberturaEm.current > JANELA_DA_ABERTURA) return;
       if (motivoParaNaoAtualizarSozinho() === null) atualizar();
     };
-    tentar(true);
-    const aoVoltar = () => tentar(false);
-    document.addEventListener('visibilitychange', aoVoltar);
-    return () => document.removeEventListener('visibilitychange', aoVoltar);
+    tentar();
+    // o listener de cima (registrado antes) já marcou a abertura quando este roda
+    document.addEventListener('visibilitychange', tentar);
+    return () => document.removeEventListener('visibilitychange', tentar);
   }, [temVersaoNova, atualizar]);
 
   // a API recusou esta versão: procura a nova na hora (o botão a aplica)
