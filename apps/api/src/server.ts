@@ -17,6 +17,7 @@ import { cabecalhosDeSeguranca, servirAppsWeb } from './lib/appsWeb';
 import { prisma } from './lib/prisma';
 import { sincronizarRoteiroDeFotos } from './lib/roteiroDeFotos';
 import { bancoDeProducao } from './lib/ambienteDoBanco';
+import { conferirVersaoDoApp } from './lib/versaoDoApp';
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
 
@@ -69,6 +70,8 @@ app.get('/saude', async (req, res) => {
   }
 });
 
+// app de campo antigo demais (service worker com a versão guardada): 426 antes de qualquer rota
+app.use('/api', conferirVersaoDoApp);
 app.use('/api/auth', rotasAuth);
 app.use('/api/clientes', rotasClientes);
 app.use('/api/produtos', rotasProdutos);

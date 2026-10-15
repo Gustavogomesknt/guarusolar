@@ -253,8 +253,14 @@ apps/tecnico/                  app do técnico (PWA no navegador do celular; mes
                                nunca junto com a câmera), envio.ts, useFotos.ts (a tela lê a fila)
   src/lib/consultas.ts         React Query persistido no localStorage (só agenda e serviços):
                                o app abre sem sinal com o que já foi carregado
-  src/components/AvisoAtualizacao  versão nova do app só entra quando o técnico toca em
-                               "Atualizar" (faixa no topo; embaixo cobriria o botão principal)
+  src/components/AvisoAtualizacao  versão nova do app (service worker em modo "prompt"):
+                               entra SOZINHA ao abrir o app se não há nada em andamento
+                               (lib/atualizacao.ts: fotos no aparelho, tela de serviço, rascunho,
+                               serviço em execução ou devolvido); senão, faixa "Nova versão
+                               disponível" + "Atualizar agora". A API recusa app antigo demais
+                               com 426 APP_DESATUALIZADO: faixa "Seu aplicativo está
+                               desatualizado" e a foto ESPERA na fila (não vira erro).
+                               Versões: compartilhado/versaoDoAppDeCampo.ts (como subir lá)
   vite.config.ts               service worker (vite-plugin-pwa): guarda o app, não a API. Só
                                funciona no build: teste com `npm run preview:tecnico` (5175).
                                Também o manifest (nome, cores, ícones, abre em /agenda)

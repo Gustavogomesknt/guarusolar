@@ -43,6 +43,7 @@ export function useFotos(servicoId: string) {
     semConexao: fila.semConexao,
     aguardandoServidor: fila.aguardandoServidor,
     conexaoLenta: fila.conexaoLenta,
+    appDesatualizado: fila.appDesatualizado,
     adicionar,
     tentarDeNovo,
     descartar,

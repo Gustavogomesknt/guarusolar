@@ -4,9 +4,13 @@
  * - transforma qualquer falha em ErroApi, com mensagem pronta para mostrar ao usuário
  *   (a API já responde { erro, detalhes? } com textos para o usuário final);
  * - em 401, avisa a sessão para sair e voltar ao login;
+ * - no app de campo, manda a versão do app (X-App-Campo) e, em 426 (app antigo demais para a
+ *   API), avisa quem se registrou em quandoAppDesatualizado;
  * - espera o servidor acordar antes do primeiro pedido e distingue "servidor acordando" de
  *   "aparelho sem internet" (veja "Conexão com o servidor", mais abaixo).
  */
+
+import { CABECALHO_VERSAO_DO_APP, STATUS_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
 
 export type DetalheErro = { campo: string; mensagem: string };
 
@@ -34,10 +38,13 @@ export const urlDaApi = (caminho: string) => `${BASE_URL}${caminho}`;
 let CHAVE_TOKEN = 'guarusolar.token';
 /** "celular" no app do técnico: entra na mensagem de quem ficou sem internet. */
 let APARELHO = 'computador';
+/** Versão do app de campo (compartilhado/versaoDoAppDeCampo.ts); o escritório não manda. */
+let VERSAO_DO_APP: number | null = null;
 
-export function configurarApi(opcoes: { chaveToken: string; aparelho?: 'computador' | 'celular' }) {
+export function configurarApi(opcoes: { chaveToken: string; aparelho?: 'computador' | 'celular'; versaoDoApp?: number }) {
   CHAVE_TOKEN = opcoes.chaveToken;
   APARELHO = opcoes.aparelho ?? 'computador';
+  VERSAO_DO_APP = opcoes.versaoDoApp ?? null;
 }
 
 // O armazenamento do navegador pode estar bloqueado; nesse caso a sessão dura só a aba aberta.
@@ -93,6 +100,16 @@ export const usuarioSalvo = {
 };
 
 let aoSessaoExpirar: ((mensagem: string) => void) | null = null;
+
+let aoAppDesatualizado: (() => void) | null = null;
+
+/** O app de campo registra aqui o que fazer quando a API recusar a versão dele (426). */
+export function quandoAppDesatualizado(acao: () => void) {
+  aoAppDesatualizado = acao;
+  return () => {
+    if (aoAppDesatualizado === acao) aoAppDesatualizado = null;
+  };
+}
 
 /** A sessão registra aqui o que fazer quando a API responder 401. */
 export function quandoSessaoExpirar(acao: (mensagem: string) => void) {
@@ -260,6 +277,7 @@ async function executar<T>(metodo: string, caminho: string, opcoes: Opcoes = {})
   if (corpo !== undefined && !formulario) cabecalhos['Content-Type'] = 'application/json';
   const token = tokenSalvo.ler();
   if (token) cabecalhos.Authorization = `Bearer ${token}`;
+  if (VERSAO_DO_APP !== null) cabecalhos[CABECALHO_VERSAO_DO_APP] = String(VERSAO_DO_APP);
 
   let resposta: Response;
   try {
@@ -295,6 +313,7 @@ async function executar<T>(metodo: string, caminho: string, opcoes: Opcoes = {})
   const detalhes = Array.isArray(corpoErro.detalhes) ? (corpoErro.detalhes as DetalheErro[]) : [];
 
   if (resposta.status === 401 && !semRedirecionarEm401) aoSessaoExpirar?.(mensagem);
+  if (resposta.status === STATUS_APP_DESATUALIZADO) aoAppDesatualizado?.();
   throw new ErroApi(resposta.status, mensagem, detalhes);
 }
 

@@ -276,7 +276,9 @@ function AvisoDaFila() {
       {naFila > 0 && (
         <p className="flex items-start gap-2">
           <Clock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-          {fila.semConexao
+          {fila.appDesatualizado
+            ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular. Atualize o app (botão no topo) para enviar.`
+            : fila.semConexao
             ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando sinal para enviar.`
             : fila.aguardandoServidor
               ? `${quantas(naFila)} guardada${naFila === 1 ? '' : 's'} no celular, aguardando o servidor. O envio recomeça sozinho.`

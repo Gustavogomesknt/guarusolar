@@ -311,9 +311,11 @@ export function Servico() {
 
   let rotuloBotao = 'Enviar para validação';
   const fotosEscritas = emAndamento === 1 ? '1 foto' : `${emAndamento} fotos`;
-  const parado = fotos.semConexao || fotos.aguardandoServidor;
+  const parado = fotos.semConexao || fotos.aguardandoServidor || fotos.appDesatualizado;
   if (emAndamento > 0) {
-    rotuloBotao = fotos.semConexao
+    rotuloBotao = fotos.appDesatualizado
+      ? `App desatualizado: ${fotosEscritas} na fila`
+      : fotos.semConexao
       ? `Sem sinal: ${fotosEscritas} na fila`
       : fotos.aguardandoServidor
         ? `Aguardando o servidor: ${fotosEscritas} na fila`
@@ -522,7 +524,7 @@ export function Servico() {
         </button>
         <p className="text-center text-xs text-muted-foreground">
           {emAndamento > 0 && (parado || fotos.conexaoLenta)
-            ? `As fotos estão guardadas no celular e sobem sozinhas quando ${fotos.semConexao ? 'o sinal voltar' : fotos.aguardandoServidor ? 'o servidor responder' : 'a conexão melhorar'}.`
+            ? `As fotos estão guardadas no celular e sobem sozinhas quando ${fotos.appDesatualizado ? 'o app for atualizado (botão no topo)' : fotos.semConexao ? 'o sinal voltar' : fotos.aguardandoServidor ? 'o servidor responder' : 'a conexão melhorar'}.`
             : 'O gestor recebe as fotos para validar antes de concluir o serviço.'}
         </p>
       </footer>

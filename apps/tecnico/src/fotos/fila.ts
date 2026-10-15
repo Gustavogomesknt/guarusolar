@@ -1,4 +1,5 @@
 import { createStore, del, set, values } from 'idb-keyval';
+import { STATUS_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
 import { acordarServidor, conexaoAtual, ErroApi, ouvirConexao, SEM_CONEXAO } from '@guarusolar/web/api';
 import { clienteConsultas } from '@/lib/consultas';
 import { enviarFoto } from './envio';
@@ -19,7 +20,10 @@ import { reduzirFoto } from './reduzir';
  *    da fila quando a API confirma que recebeu, ou quando o técnico a descarta.
  *    Erro definitivo, com o motivo na tela, só para RECUSA de verdade da API (4xx: 400, 403,
  *    404, 409, 413, 422…). 401 não é erro da foto: a sessão encerra, o login diz o motivo e a
- *    fila continua quando o técnico entra de novo.
+ *    fila continua quando o técnico entra de novo. 426 também não: é o APP que está antigo
+ *    demais para a API (versaoDoAppDeCampo.ts); a foto fica, a faixa do topo pede para
+ *    atualizar, e a versão nova envia a mesma foto (a fila mora no IndexedDB, fora do
+ *    service worker, e sobrevive à atualização).
  *    Cada envio tem no máximo 120 s: em sinal fraco o navegador não dá erro, o pedido fica
  *    pendurado e a fila pararia atrás dele. Estourou, a foto vai para o FIM da fila (tenta de
  *    novo depois, sem erro) e a próxima tenta: uma foto pendurada nunca bloqueia as outras.
@@ -84,6 +88,8 @@ export type RetratoDaFila = {
   aguardandoServidor: boolean;
   /** o último envio estourou o tempo (sinal fraco): a foto voltou para a fila e tenta de novo */
   conexaoLenta: boolean;
+  /** a API recusou a versão deste app (426): as fotos esperam a atualização */
+  appDesatualizado: boolean;
 };
 
 // ---------------------------------------------------------------------------------------
@@ -101,10 +107,11 @@ let enviandoId: string | null = null;
 let semConexao = false;
 let aguardandoServidor = false;
 let conexaoLenta = false;
+let appDesatualizado = false;
 let temporizador: ReturnType<typeof setTimeout> | undefined;
 
 const ouvintes = new Set<() => void>();
-let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false, aguardandoServidor: false, conexaoLenta: false };
+let retrato: RetratoDaFila = { carregada: false, fotos: [], miniaturas: {}, semConexao: false, aguardandoServidor: false, conexaoLenta: false, appDesatualizado: false };
 
 const ordenados = () => [...registros.values()].sort((a, b) => a.criadoEm - b.criadoEm);
 
@@ -130,8 +137,16 @@ function notificar() {
       preparada: Boolean(r.foto),
       erro: r.erro,
     }));
-  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor, conexaoLenta };
+  retrato = { carregada, fotos, miniaturas: Object.fromEntries(miniaturas), semConexao, aguardandoServidor, conexaoLenta, appDesatualizado };
   ouvintes.forEach((ouvir) => ouvir());
+}
+
+/**
+ * Há alguma foto no aparelho (de qualquer usuário, preparando, na fila ou com erro)? null enquanto
+ * a fila ainda não foi lida do IndexedDB: quem decide atualizar o app sozinho trata como "sim".
+ */
+export function filaTemAlgo(): boolean | null {
+  return carregada ? registros.size > 0 : null;
 }
 
 export function ouvirFila(ouvir: () => void) {
@@ -364,6 +379,7 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
     semConexao = false;
     aguardandoServidor = false;
     conexaoLenta = false;
+    appDesatualizado = false;
     // um envio que deu certo prova que a conexão voltou: as fotos que esperavam a próxima
     // tentativa (algumas com espera de minutos) vão em seguida, sem esperar o tempo delas
     for (const x of registros.values()) x.proximaTentativa = 0;
@@ -378,6 +394,13 @@ async function enviarUma(r: Registro, foto: NonNullable<Registro['foto']>): Prom
   } catch (erro) {
     const status = erro instanceof ErroApi ? erro.status : SEM_CONEXAO;
     if (status === 401) return false; // a sessão encerra e leva ao login; a foto fica na fila
+    if (status === STATUS_APP_DESATUALIZADO) {
+      // app antigo demais: a foto fica, sem erro, e tenta de novo depois (a versão nova é quem a
+      // envia; a faixa do topo pede para atualizar). As outras também esperariam: para aqui.
+      appDesatualizado = true;
+      await gravar({ ...r, proximaTentativa: Date.now() + 60_000 });
+      return false;
+    }
     // recusa de verdade: a API recebeu o pedido e disse não (o motivo vai para a tela)
     const recusa = status >= 400 && status < 500 && status !== 408 && status !== 429;
     if (!recusa) {

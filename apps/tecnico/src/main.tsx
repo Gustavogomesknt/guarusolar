@@ -11,13 +11,15 @@ import '@fontsource/ibm-plex-sans/600.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import './estilos/app.css';
 
+import { VERSAO_DO_APP_DE_CAMPO } from '@guarusolar/compartilhado';
 import { configurarApi } from '@guarusolar/web/api';
 import { Toaster } from 'sonner';
 import { clienteConsultas, OPCOES_DE_PERSISTENCIA } from '@/lib/consultas';
 import { iniciarFila } from '@/fotos/fila';
 import { roteador } from '@/app/rotas';
 
-configurarApi({ chaveToken: 'guarusolar.tecnico.token', aparelho: 'celular' });
+// a versão vai em todo pedido: a API recusa (426) app antigo demais (versaoDoAppDeCampo.ts)
+configurarApi({ chaveToken: 'guarusolar.tecnico.token', aparelho: 'celular', versaoDoApp: VERSAO_DO_APP_DE_CAMPO });
 void iniciarFila();
 
 createRoot(document.getElementById('raiz')!).render(

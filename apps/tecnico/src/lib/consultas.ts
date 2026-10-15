@@ -3,6 +3,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 import type { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import type { ComponentProps } from 'react';
 import { toast } from 'sonner';
+import { STATUS_APP_DESATUALIZADO } from '@guarusolar/compartilhado';
 import { ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 
 declare module '@tanstack/react-query' {
@@ -24,7 +25,8 @@ declare module '@tanstack/react-query' {
  */
 function avisarErro(erro: unknown) {
   if (erro instanceof ErroApi) {
-    if (erro.status !== 401 && erro.status !== SEM_CONEXAO) toast.error(erro.message);
+    // 426 (app desatualizado) também não: a faixa do topo já pede para atualizar
+    if (erro.status !== 401 && erro.status !== SEM_CONEXAO && erro.status !== STATUS_APP_DESATUALIZADO) toast.error(erro.message);
     return;
   }
   toast.error('Algo deu errado. Tente novamente.');
