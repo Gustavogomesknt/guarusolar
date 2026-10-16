@@ -878,12 +878,21 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   gerenciada pelo escritório (tela "Tipos de serviço", ADMIN e GESTOR; nome, ativo, ordem; nada é
   apagado, desativar só tira das escolhas de orçamentos novos): o que o orçamento VENDE
   (instalação fotovoltaica, carregador veicular, manutenção...). Obrigatório para criar orçamento
-  (a API recusa sem), copiado para o projeto na aprovação, filtro e coluna nas listas de
-  orçamentos, pipeline e projetos, e quebra "Por tipo de serviço, no mês" no painel (mesmos
-  critérios de data dos cartões; a taxa de aprovação continua GERAL). Orçamentos e projetos
-  anteriores ao campo ficam com `tipoDeServicoId` nulo ("Sem tipo"; filtro `tipo=sem`) e se
-  classificam pela lista (`PATCH /api/orcamentos/:id/tipo`, em qualquer status; o projeto vai
-  junto). Aprovar um antigo sem tipo continua permitido. NÃO entra no PDF (o título é o
+  (a API recusa sem), copiado para o projeto na aprovação, e quebra "Por tipo de serviço, no
+  mês" no painel (mesmos critérios de data dos cartões; a taxa de aprovação continua GERAL).
+  **Nas listas é só FILTRO, nunca coluna** (pedido do cliente, 15/10/2026: poluía a tela): lista
+  de orçamentos, pipeline e projetos NÃO mostram o tipo; o `FiltroDeTipo` começa fechado (botão
+  "Filtrar por tipo", nada ligado) e se combina com os chips de situação. O tipo aparece só dentro
+  do orçamento e na ficha do projeto; o painel continua com o quadro por tipo. Orçamentos e
+  projetos anteriores ao campo ficam com `tipoDeServicoId` nulo (filtro "Sem tipo", `tipo=sem`;
+  na tela, um traço discreto, sem destaque) e se classificam no orçamento aprovado e na ficha do
+  projeto (`PATCH /api/orcamentos/:id/tipo`, em qualquer status; o projeto vai junto). Aprovar um
+  antigo sem tipo continua permitido.
+  **Orçamento novo já vem com o ÚLTIMO tipo que a pessoa escolheu** (`Usuario.ultimoTipoDeServicoId`,
+  no servidor, por usuário; `GET /api/orcamentos/preferencias`): grava ao CRIAR e ao TROCAR o tipo
+  num orçamento (salvar sem mexer no tipo não conta; classificar antigo também não). Tipo
+  desativado depois não volta como preferência. Sem preferência, o campo começa vazio e
+  obrigatório. O preenchimento não conta como alteração (`resetField`, sem "Ainda não salvo"). NÃO entra no PDF (o título é o
   `descricaoServico`). Já o enum `TipoServico` do agendamento (instalação, visita técnica,
   vistoria...) aparece na tela como **"Etapa"**; o nome do enum e os dados não mudaram. Não
   chame a etapa de "tipo de serviço" em texto que o usuário vê.

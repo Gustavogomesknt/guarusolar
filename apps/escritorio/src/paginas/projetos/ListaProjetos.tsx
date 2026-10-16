@@ -20,11 +20,11 @@ import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { SeloProjeto } from './SeloProjeto';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
-import { FiltroDeTipo, SEM_TIPO, type FiltroTipo } from '@/lib/tiposDeServico';
+import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 
 type Filtro = 'EM_ANDAMENTO' | StatusProjeto;
 const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO', 'EM_EXECUCAO', 'AGUARDANDO_VALIDACAO', 'AGUARDANDO_CONCLUSAO', 'CONCLUIDO'];
-const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_150px_130px_150px_minmax(0,1.2fr)]';
+const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_150px_130px_150px_minmax(0,1.2fr)]';
 
 const dia = (iso: string) => iso.slice(0, 10);
 
@@ -117,10 +117,9 @@ export function ListaProjetos() {
       </div>
 
       <section aria-label="Projetos" className="relative min-w-0 overflow-x-auto rounded-[14px] border bg-card">
-        <div role="table" aria-label="Lista de projetos" aria-busy={lista.isFetching} className="min-w-[1000px]">
+        <div role="table" aria-label="Lista de projetos" aria-busy={lista.isFetching} className="min-w-[880px]">
           <div role="row" className={`grid ${COLUNAS} gap-4 border-b px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
             <span role="columnheader">Projeto</span>
-            <span role="columnheader">Tipo de serviço</span>
             <span role="columnheader">Cidade</span>
             <span role="columnheader" className="text-right">
               Valor
@@ -159,9 +158,6 @@ export function ListaProjetos() {
                       {p.codigo}
                     </Link>
                     <span className="truncate text-sm font-semibold">{p.clienteNome}</span>
-                  </span>
-                  <span role="cell" className={cn('min-w-0 text-[13px]', !p.tipoDeServico && 'text-destaque-texto')}>
-                    <span className="line-clamp-2">{p.tipoDeServico?.nome ?? SEM_TIPO}</span>
                   </span>
                   <span role="cell" className="truncate text-sm">
                     {[p.clienteCidade, p.clienteUf].filter(Boolean).join('/') || '—'}

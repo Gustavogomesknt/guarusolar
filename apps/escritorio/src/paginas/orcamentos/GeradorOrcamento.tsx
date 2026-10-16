@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { CartaoCliente } from './CartaoCliente';
 import { CartaoTipoDeServico } from './CartaoTipoDeServico';
+import { ClassificarTipo, usePreferenciaDeTipo } from '@/lib/tiposDeServico';
 import { CartaoItens } from './CartaoItens';
 import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
 import {
@@ -68,6 +69,15 @@ export function GeradorOrcamento({
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const somenteLeitura = salvo?.status === 'APROVADO';
+
+  // Orçamento novo já vem com o último tipo que esta pessoa escolheu (preferência no servidor),
+  // sem contar como alteração. Se ela já mexeu no campo, ou nunca escolheu, nada muda.
+  const preferencia = usePreferenciaDeTipo(!inicial);
+  const ultimoTipo = preferencia.data?.tipoDeServicoId;
+  useEffect(() => {
+    if (!ultimoTipo || salvo || formulario.getFieldState('tipoDeServicoId').isDirty || getValues('tipoDeServicoId')) return;
+    formulario.resetField('tipoDeServicoId', { defaultValue: ultimoTipo });
+  }, [ultimoTipo, salvo, formulario, getValues]);
 
   // Recalcula a cada digitação. É só a prévia: a API recalcula com a mesma função ao salvar.
   const valores = useWatch({ control }) as FormularioOrcamento;
@@ -254,6 +264,17 @@ export function GeradorOrcamento({
               )}
               . Ele fica disponível só para consulta: itens, valores e condições não podem mais ser alterados.
             </span>
+          </p>
+        )}
+        {somenteLeitura && salvo && !valores.tipoDeServicoId && (
+          // aprovado anterior ao campo: não se edita, mas o tipo se classifica (o projeto vai junto)
+          <p className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+            Tipo de serviço: —
+            <ClassificarTipo
+              orcamentoId={salvo.id}
+              codigo={salvo.codigo}
+              onClassificado={(t) => formulario.resetField('tipoDeServicoId', { defaultValue: t.id })}
+            />
           </p>
         )}
 

@@ -22,7 +22,7 @@ import { AlternadorVisao } from './AlternadorVisao';
 import { textoDoErro } from '@/lib/consultas';
 import { deMesAnterior, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
-import { FiltroDeTipo, SEM_TIPO, type FiltroTipo } from '@/lib/tiposDeServico';
+import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 
 /*
  * Pipeline (Kanban) de orçamentos: uma coluna por status, com a mesma listagem da API
@@ -283,9 +283,6 @@ function Cartao({ orcamento: o, pedir, pendente }: { orcamento: OrcamentoNaLista
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="truncate text-sm font-semibold">{o.cliente.nome}</p>
         {cidade && <p className="truncate text-xs text-muted-foreground">{cidade}</p>}
-        <p className={cn('truncate text-xs', o.tipoDeServico ? 'text-foreground/80' : 'text-destaque-texto')}>
-          {o.tipoDeServico?.nome ?? SEM_TIPO}
-        </p>
       </div>
       <ValorDaProposta
         valorTotal={o.valorTotal}

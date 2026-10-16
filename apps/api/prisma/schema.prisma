@@ -48,27 +48,31 @@ enum Papel {
 }
 
 model Usuario {
-  id               String    @id @default(uuid())
-  nome             String
-  email            String    @unique
-  senhaHash        String
+  id                    String         @id @default(uuid())
+  nome                  String
+  email                 String         @unique
+  senhaHash             String
   /// senha gerada por um administrador (npm run usuario): a pessoa troca no primeiro acesso
-  senhaTemporaria  Boolean   @default(false)
+  senhaTemporaria       Boolean        @default(false)
   /// muda ao desativar, trocar papel/equipe ou gerar senha nova: o login antigo (token com
   /// outra versão) deixa de valer na hora (lib/auth.ts, conferirSessao)
-  sessaoVersao     Int       @default(0)
-  papel            Papel
-  telefone         String?
-  ativo            Boolean   @default(true)
-  equipeId         String?
-  equipe           Equipe?   @relation(fields: [equipeId], references: [id])
+  sessaoVersao          Int            @default(0)
+  papel                 Papel
+  telefone              String?
+  ativo                 Boolean        @default(true)
+  equipeId              String?
+  equipe                Equipe?        @relation(fields: [equipeId], references: [id])
   /// última versão do app de campo vista nos pedidos (cabeçalho X-App-Campo) e quando; null =
   /// nunca mandou o cabeçalho (app anterior a ele, ou nunca usou o app). Gravada no máximo uma
   /// vez por hora por usuário (lib/versaoDoApp.ts). Base para subir a versão mínima
-  versaoAppCampo   Int?
-  versaoAppCampoEm DateTime?
-  criadoEm         DateTime  @default(now())
-  editadoEm        DateTime  @updatedAt
+  versaoAppCampo        Int?
+  versaoAppCampoEm      DateTime?
+  /// último tipo de serviço que a pessoa escolheu ao salvar um orçamento (preferência guardada
+  /// no servidor): o orçamento novo já abre com ele. null = ainda não escolheu nenhum
+  ultimoTipoDeServicoId String?
+  ultimoTipoDeServico   TipoDeServico? @relation("UltimoTipoDoUsuario", fields: [ultimoTipoDeServicoId], references: [id], onDelete: SetNull)
+  criadoEm              DateTime       @default(now())
+  editadoEm             DateTime       @updatedAt
 
   orcamentos         Orcamento[]       @relation("VendedorOrcamentos")
   historicos         HistoricoStatus[]
@@ -244,8 +248,10 @@ model TipoDeServico {
   criadoEm  DateTime @default(now())
   editadoEm DateTime @updatedAt
 
-  orcamentos Orcamento[]
-  projetos   Projeto[]
+  orcamentos            Orcamento[]
+  projetos              Projeto[]
+  /// quem o escolheu por último (preferência do orçamento novo)
+  usuariosQueEscolheram Usuario[]   @relation("UltimoTipoDoUsuario")
 
   @@index([ativo, ordem])
 }

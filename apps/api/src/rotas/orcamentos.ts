@@ -328,6 +328,23 @@ rotasOrcamentos.get(
   }),
 );
 
+// --------------------------------------------------------------------------
+// Preferência de quem está logado: o orçamento novo já vem com o último tipo de serviço que a
+// pessoa escolheu (guardado no servidor, por usuário). Tipo desativado depois não volta: o
+// campo começa vazio, como para quem nunca escolheu.
+// --------------------------------------------------------------------------
+rotasOrcamentos.get(
+  '/preferencias',
+  rota(async (req, res) => {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.usuario!.id },
+      select: { ultimoTipoDeServico: { select: { id: true, ativo: true } } },
+    });
+    const ultimo = usuario?.ultimoTipoDeServico;
+    res.json({ tipoDeServicoId: ultimo?.ativo ? ultimo.id : null });
+  }),
+);
+
 rotasOrcamentos.get(
   '/:id',
   rota(async (req, res) => {
@@ -359,7 +376,7 @@ rotasOrcamentos.post(
     if (dados.idCriacao) {
       const jaCriado = await prisma.orcamento.findUnique({ where: { idCriacao: dados.idCriacao }, select: { id: true } });
       if (jaCriado) {
-        const { orcamento, totais } = await atualizarOrcamento(jaCriado.id, dados);
+        const { orcamento, totais } = await atualizarOrcamento(jaCriado.id, dados, req.usuario!.id);
         return res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
       }
     }
@@ -384,8 +401,9 @@ rotasOrcamentos.post(
     });
 
     // o código sai dentro da mesma transação: se a criação falhar, o número não é perdido
-    const orcamento = await prisma.$transaction(async (tx) =>
-      tx.orcamento.create({
+    const orcamento = await prisma.$transaction(async (tx) => {
+      await guardarUltimoTipo(tx, req.usuario!.id, dados.tipoDeServicoId!);
+      return tx.orcamento.create({
         data: {
           codigo: await gerarCodigoOrcamento(tx),
           idCriacao: dados.idCriacao,
@@ -417,15 +435,20 @@ rotasOrcamentos.post(
           itens: { create: itens.map(({ _calculo, ...item }) => item) },
         },
         include: { itens: true, cliente: true },
-      }),
-    );
+      });
+    });
 
     res.status(201).json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
   }),
 );
 
+/** O tipo escolhido vira a preferência de quem salvou (o próximo orçamento novo já vem com ele). */
+function guardarUltimoTipo(tx: Prisma.TransactionClient, usuarioId: string, tipoDeServicoId: string) {
+  return tx.usuario.update({ where: { id: usuarioId }, data: { ultimoTipoDeServicoId: tipoDeServicoId }, select: { id: true } });
+}
+
 /** Grava a edição de um orçamento (PUT e o "criar" repetido com o mesmo idCriacao). */
-async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSchema>) {
+async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSchema>, usuarioId: string) {
   const atual = await prisma.orcamento.findUnique({
     where: { id: id },
     include: { itens: { orderBy: { ordem: 'asc' } } },
@@ -465,6 +488,10 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   // troca os itens em bloco: se algo falhar, nada é gravado
   const orcamento = await prisma.$transaction(async (tx) => {
     await tx.itemOrcamento.deleteMany({ where: { orcamentoId: id } });
+    // só quando a pessoa TROCOU o tipo: salvar sem mexer nele não é uma escolha
+    if (dados.tipoDeServicoId && dados.tipoDeServicoId !== atual.tipoDeServicoId) {
+      await guardarUltimoTipo(tx, usuarioId, dados.tipoDeServicoId);
+    }
     return tx.orcamento.update({
       where: { id: id },
       data: {
@@ -503,7 +530,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
 rotasOrcamentos.put(
   '/:id',
   rota(async (req, res) => {
-    const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body));
+    const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body), req.usuario!.id);
     res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
   }),
 );

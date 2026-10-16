@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SeloProjeto } from './SeloProjeto';
 import { FotoAmpliadaConsulta, rotuloDaFoto } from '@/components/FotoAmpliadaConsulta';
 import { VisitasDoCliente } from '@/components/VisitasTecnicas';
+import { ClassificarTipo } from '@/lib/tiposDeServico';
 
 type Ficha = FichaDoProjeto;
 type Servico = Ficha['agendamentos'][number];
@@ -413,8 +414,15 @@ function CartaoOrcamento({ projeto: p }: { projeto: Ficha }) {
           <span>{o.resumoPagamento ?? '—'}</span>
         </Dado>
         <Dado rotulo="Tipo de serviço">
-          {/* copiado do orçamento na aprovação; os anteriores ao campo se classificam na lista de orçamentos */}
-          <span className={p.tipoDeServico ? undefined : 'text-destaque-texto'}>{p.tipoDeServico?.nome ?? 'Sem tipo'}</span>
+          {/* copiado do orçamento na aprovação; o anterior ao campo mostra um traço e se classifica aqui */}
+          {p.tipoDeServico ? (
+            <span>{p.tipoDeServico.nome}</span>
+          ) : (
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground" aria-label="Sem tipo">—</span>
+              <ClassificarTipo orcamentoId={o.id} codigo={o.codigo} />
+            </span>
+          )}
         </Dado>
         <Dado rotulo="Itens">
           <span>

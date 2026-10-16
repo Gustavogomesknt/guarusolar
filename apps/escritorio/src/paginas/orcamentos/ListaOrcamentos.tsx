@@ -21,11 +21,11 @@ import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus'
 import { AlternadorVisao } from './AlternadorVisao';
 import { opcoesDePeriodo, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
-import { ClassificarTipo, FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
+import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
-const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_minmax(0,0.8fr)_100px_100px_136px_170px_96px]';
+const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_100px_100px_136px_170px_96px]';
 
 export function ListaOrcamentos() {
   const [status, setStatus] = useState<FiltroStatus>('TODOS');
@@ -289,7 +289,7 @@ function Tabela({
 
   return (
     <section aria-label="Lista de orçamentos" className="relative overflow-x-auto rounded-[14px] border bg-card">
-      <div role="table" aria-label="Orçamentos" className="min-w-[1120px]">
+      <div role="table" aria-label="Orçamentos" className="min-w-[960px]">
         <div role="rowgroup">
           <div
             role="row"
@@ -297,7 +297,6 @@ function Tabela({
           >
             <span role="columnheader">Código</span>
             <span role="columnheader">Cliente</span>
-            <span role="columnheader">Tipo de serviço</span>
             <span role="columnheader">Criado em</span>
             <span role="columnheader">Validade</span>
             <span role="columnheader" className="text-right">
@@ -414,9 +413,6 @@ function Linha({
         <span className="truncate text-xs text-muted-foreground">
           {[o.cliente.cidade, o.cliente.uf].filter(Boolean).join(' · ') || 'Cidade não informada'}
         </span>
-      </span>
-      <span role="cell" className="min-w-0 text-[13px]">
-        {o.tipoDeServico ? <span className="line-clamp-2">{o.tipoDeServico.nome}</span> : <ClassificarTipo orcamentoId={o.id} codigo={o.codigo} />}
       </span>
       <span role="cell" className="text-sm">
         {formatarData(o.criadoEm)}

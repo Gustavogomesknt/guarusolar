@@ -89,6 +89,7 @@ packages/web/               o que os dois fronts usam no navegador
 | POST/PUT | `/api/orcamentos` | comercial | criar/editar (totais no servidor) |
 | PATCH | `/api/orcamentos/:id/status` | comercial | mudança em 1 clique |
 | PATCH | `/api/orcamentos/:id/tipo` | comercial | classifica o tipo de serviço (qualquer status; o projeto acompanha) |
+| GET | `/api/orcamentos/preferencias` | comercial, gestor | `tipoDeServicoId`: o último tipo que quem está logado escolheu (null se nunca escolheu ou se foi desativado) |
 | GET | `/api/tipos-de-servico?incluirInativos=` | comercial, gestor | tipos de serviço vendidos, na ordem |
 | POST/PUT | `/api/tipos-de-servico` | gestor | cadastrar, renomear, ativar/desativar |
 | POST | `/api/tipos-de-servico/:id/mover` | gestor | subir/descer na ordem |
