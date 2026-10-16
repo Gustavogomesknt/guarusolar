@@ -878,12 +878,14 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   gerenciada pelo escritório (tela "Tipos de serviço", ADMIN e GESTOR; nome, ativo, ordem; nada é
   apagado, desativar só tira das escolhas de orçamentos novos): o que o orçamento VENDE
   (instalação fotovoltaica, carregador veicular, manutenção...). Obrigatório para criar orçamento
-  (a API recusa sem), copiado para o projeto na aprovação, e quebra "Por tipo de serviço, no
-  mês" no painel (mesmos critérios de data dos cartões; a taxa de aprovação continua GERAL).
-  **Nas listas é só FILTRO, nunca coluna** (pedido do cliente, 15/10/2026: poluía a tela): lista
-  de orçamentos, pipeline e projetos NÃO mostram o tipo; o `FiltroDeTipo` começa fechado (botão
-  "Filtrar por tipo", nada ligado) e se combina com os chips de situação. O tipo aparece só dentro
-  do orçamento e na ficha do projeto; o painel continua com o quadro por tipo. Orçamentos e
+  (a API recusa sem) e copiado para o projeto na aprovação.
+  **Nas telas é só FILTRO, nunca coluna nem quadro fixo** (pedidos do cliente, 15/10/2026: poluía
+  a tela): lista de orçamentos, pipeline e projetos NÃO mostram o tipo, e o painel NÃO tem quadro
+  por tipo (o "Por tipo de serviço, no mês" foi retirado, também da API `/resumo`). O
+  `FiltroDeTipo` começa fechado (botão "Filtrar por tipo", nada ligado) e se combina com os chips
+  de situação; o rodapé da lista de orçamentos mostra a quantidade E o TOTAL EM VALOR do que está
+  filtrado (`valorTotal`, o mesmo dos indicadores): "Aprovado" + um tipo + o período responde
+  quanto aquele tipo representou. O tipo aparece só dentro do orçamento e na ficha do projeto. Orçamentos e
   projetos anteriores ao campo ficam com `tipoDeServicoId` nulo (filtro "Sem tipo", `tipo=sem`;
   na tela, um traço discreto, sem destaque) e se classificam no orçamento aprovado e na ficha do
   projeto (`PATCH /api/orcamentos/:id/tipo`, em qualquer status; o projeto vai junto). Aprovar um

@@ -185,52 +185,7 @@ function Indicadores() {
         Aprovados neste mês, confirmados para instalação
       </Cartao>
     </section>
-    {r?.porTipo && r.porTipo.length > 0 && <PorTipo linhas={r.porTipo} />}
     </div>
-  );
-}
-
-/**
- * Quantidade e valor por tipo de serviço, com os mesmos critérios de data dos cartões: orçados
- * pela criação no mês, aprovados pela aprovação no mês. A taxa de aprovação continua geral.
- */
-function PorTipo({ linhas }: { linhas: NonNullable<ResumoOrcamentos['porTipo']> }) {
-  const celula = (q: number, v: number) =>
-    q === 0 ? (
-      <span className="text-muted-foreground">—</span>
-    ) : (
-      <>
-        <span className="font-mono">{q}</span>
-        <span className="text-muted-foreground"> · {formatarBRL(v)}</span>
-      </>
-    );
-  return (
-    <section aria-labelledby="titulo-por-tipo" className="rounded-[14px] border bg-card px-[22px] py-4">
-      <h2 id="titulo-por-tipo" className="pb-2 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
-        Por tipo de serviço, no mês
-      </h2>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-            <th scope="col" className="py-1.5 font-semibold">Tipo</th>
-            <th scope="col" className="py-1.5 font-semibold">Orçados</th>
-            <th scope="col" className="py-1.5 font-semibold">Aprovados</th>
-          </tr>
-        </thead>
-        <tbody>
-          {linhas.map((l) => (
-            <tr key={l.tipoDeServicoId ?? 'sem'} className="border-t">
-              <th scope="row" className={cn('py-1.5 text-left font-medium', l.tipoDeServicoId === null && 'text-destaque-texto')}>
-                {l.nome}
-                {!l.ativo && <span className="font-normal text-muted-foreground"> (desativado)</span>}
-              </th>
-              <td className="py-1.5">{celula(l.orcados.quantidade, l.orcados.valor)}</td>
-              <td className="py-1.5">{celula(l.aprovados.quantidade, l.aprovados.valor)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
   );
 }
 
@@ -360,6 +315,12 @@ function Tabela({
           <span>
             Mostrando {orcamentos.length} de {totalSemFiltroDeStatus ?? orcamentos.length}{' '}
             {(totalSemFiltroDeStatus ?? orcamentos.length) === 1 ? 'orçamento' : 'orçamentos'}
+            {/* soma do que está na tabela (com todos os filtros): situação + tipo responde "quanto
+                a manutenção representou". Mesmo valor dos indicadores: o que a Guarusolar recebe */}
+            {' · '}
+            <span className="whitespace-nowrap">
+              total <span className="font-mono font-semibold text-foreground">{formatarBRL(orcamentos.reduce((soma, o) => soma + Number(o.valorTotal), 0))}</span>
+            </span>
           </span>
           <span>Clique no status para mudar em 1 clique</span>
         </div>

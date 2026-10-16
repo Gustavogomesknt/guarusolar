@@ -141,14 +141,6 @@ export type ResumoOrcamentos = {
   quantidadeEmAberto: number;
   valorEmAberto: number;
   valorAprovadoMes: number;
-  /** por tipo de serviço, com os mesmos critérios de data dos cartões (mês da empresa) */
-  porTipo?: {
-    tipoDeServicoId: string | null;
-    nome: string;
-    ativo: boolean;
-    orcados: { quantidade: number; valor: number };
-    aprovados: { quantidade: number; valor: number };
-  }[];
 };
 
 /** Orçamento completo (GET /api/orcamentos/:id), usado para abrir no gerador. */

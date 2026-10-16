@@ -272,7 +272,7 @@ rotasOrcamentos.get(
   rota(async (_req, res) => {
     const doMes = { gte: inicioDoMes(0), lt: inicioDoMes(1) };
 
-    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto, criadosPorTipo, aprovadosPorTipo, tipos] = await Promise.all([
+    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto] = await Promise.all([
       prisma.orcamento.aggregate({ where: { criadoEm: doMes }, _sum: { valorTotal: true }, _count: true }),
       prisma.orcamento.groupBy({ by: ['status'], where: { criadoEm: doMes }, _count: true }),
       prisma.orcamento.aggregate({
@@ -284,27 +284,9 @@ rotasOrcamentos.get(
         _sum: { valorTotal: true },
         _count: true,
       }),
-      // por tipo de serviço, com os MESMOS critérios de data dos cartões: orçado pela criação,
-      // aprovado pela aprovação no mês
-      prisma.orcamento.groupBy({ by: ['tipoDeServicoId'], where: { criadoEm: doMes }, _count: true, _sum: { valorTotal: true } }),
-      prisma.orcamento.groupBy({ by: ['tipoDeServicoId'], where: { status: 'APROVADO', aprovadoEm: doMes }, _count: true, _sum: { valorTotal: true } }),
-      prisma.tipoDeServico.findMany({ orderBy: [{ ordem: 'asc' }, { nome: 'asc' }], select: { id: true, nome: true, ativo: true } }),
     ]);
-
-    // uma linha por tipo ativo (mesmo sem movimento) e por desativado que teve movimento;
-    // "Sem tipo" (orçamentos anteriores ao campo) por último, só se houver
-    const linha = (id: string | null) => {
-      const c = criadosPorTipo.find((g) => g.tipoDeServicoId === id);
-      const a = aprovadosPorTipo.find((g) => g.tipoDeServicoId === id);
-      return {
-        orcados: { quantidade: c?._count ?? 0, valor: Number(c?._sum.valorTotal ?? 0) },
-        aprovados: { quantidade: a?._count ?? 0, valor: Number(a?._sum.valorTotal ?? 0) },
-      };
-    };
-    const porTipo = [
-      ...tipos.map((t) => ({ tipoDeServicoId: t.id as string | null, nome: t.nome, ativo: t.ativo, ...linha(t.id) })),
-      { tipoDeServicoId: null, nome: 'Sem tipo', ativo: true, ...linha(null) },
-    ].filter((t) => (t.ativo && t.tipoDeServicoId !== null) || t.orcados.quantidade > 0 || t.aprovados.quantidade > 0);
+    // por tipo de serviço não há quadro (decisão do cliente, 15/10/2026): a lista filtrada por
+    // situação + tipo mostra a quantidade e o total em valor
 
     // taxa de aprovação: turma dos criados no mês
     const quantos = (s: StatusOrcamento) => criadosPorStatus.find((p) => p.status === s)?._count ?? 0;
@@ -323,7 +305,6 @@ rotasOrcamentos.get(
       quantidadeEmAberto: emAberto._count,
       valorEmAberto: Number(emAberto._sum.valorTotal ?? 0),
       valorAprovadoMes: Number(aprovadosNoMes._sum.valorTotal ?? 0),
-      porTipo,
     });
   }),
 );
