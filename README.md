@@ -474,6 +474,39 @@ ao endereço antigo, então mantenha o túnel aberto durante todo o teste.
 **Sessão do técnico dura 7 dias** (`JWT_EXPIRES_IN_TECNICO`), para a fila de fotos não parar
 no meio do serviço; os demais papéis seguem com 12 horas (`JWT_EXPIRES_IN`).
 
+## Vídeos de tutorial
+
+`npm run videos:tutorial` grava seis clipes curtos para a equipe em `scripts/video-tutorial/saida/`
+(MP4 H.264, sem áudio, abaixo de 10 MB cada, para WhatsApp e página web):
+
+1. Cadastrar cliente e montar um orçamento
+2. Gerar a proposta e enviar pelo WhatsApp
+3. Aprovar um orçamento e agendar a equipe
+4. Agendar uma visita técnica sem orçamento
+5. Validar as fotos que o técnico enviou
+6. O técnico no campo (formato celular, 1080x1920)
+
+**Só no ambiente LOCAL.** O script recusa qualquer endereço que não seja `localhost` e recusa
+banco marcado como produção. Antes: a API local no ar, com o banco de desenvolvimento e o
+seed (`npm run db:seed`), servindo os apps (`SERVIR_APPS=sim`, padrão `http://localhost:3333`;
+com os servidores do Vite, use `VIDEO_URL`, `VIDEO_URL_CAMPO` e `VIDEO_URL_API`). Precisa do
+Google Chrome instalado (`VIDEO_CHROME` aponta outro caminho). O primeiro uso instala o
+Playwright e o ffmpeg só nessa pasta (fora dos workspaces: não entram no build nem na imagem).
+
+- **Legendas:** `scripts/video-tutorial/legendas.mjs`, um array por clipe. Trocar o texto é só
+  editar; para pôr ou tirar uma legenda, mexa também no passo em `clipes.mjs` (o script avisa
+  se a quantidade não bater).
+- **Dados:** todos fictícios (`dados.mjs`): nomes comuns, endereços de Guarulhos, itens do
+  catálogo de exemplo e as equipes com a composição real (A: Willian e Washington; B: Gilmar e
+  Vitor; C: André). O preparo é feito pela API antes de gravar: cria esses técnicos no banco
+  local (com senha gerada na hora, só na memória) e **desativa o técnico de teste do seed**
+  (`tecnico.a@`), para a Equipe A aparecer só com os dois. As fotos são cenas desenhadas.
+- **Nada sai para a internet:** o ViaCEP é respondido pelo próprio script e o WhatsApp é
+  interceptado (a mensagem aparece numa prévia; nada é enviado).
+- **Gravar de novo:** os clientes dos vídeos ficariam repetidos nas telas, então o script
+  recusa um banco que já os tem. Limpe o banco local (`npm run db:limpar` e `npm run db:seed`)
+  ou use `-- --forcar`. Só alguns clipes: `npm run videos:tutorial -- --so 2,5`.
+
 ## Limpar os dados de teste
 
 `npm run db:limpar` apaga, **sem possibilidade de recuperar**, clientes, orçamentos (com itens

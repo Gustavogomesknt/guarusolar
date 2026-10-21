@@ -325,6 +325,10 @@ packages/web/                  código de NAVEGADOR usado pelos dois fronts (só
                                a RotaProtegida leva quem tem senha temporária direto para ela
   src/ImagemProtegida.tsx      <img> de foto de serviço: busca com o token no cabeçalho (o navegador
                                não manda token em <img src>) e exibe; use com urlDaFoto(id)
+scripts/video-tutorial/        npm run videos:tutorial: 6 clipes de tutorial (Playwright + ffmpeg, pacote
+                               PRÓPRIO, fora dos workspaces). Só localhost e banco não-produção.
+                               App num iframe de um "palco" (cursor e legenda por cima; o palco tira o
+                               X-Frame-Options só nesse navegador). Legendas em legendas.mjs (README)
 Dockerfile, render.yaml        produção na Render, plano gratuito (README, "Publicar em produção");
                                a Render compila a imagem. Publicação só pelo Actions (autoDeploy off)
 .github/workflows/             verificação (build a cada push), publicar (manual: migrations, deploy

@@ -9,3 +9,5 @@ uploads
 !.env.example
 # npm run pdf:exemplo
 proposta-exemplo*.pdf
+# npm run videos:tutorial (os MP4 gerados)
+scripts/video-tutorial/saida/
