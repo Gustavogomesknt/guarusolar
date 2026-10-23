@@ -155,6 +155,16 @@ apps/api/                      API (Express + Prisma)
                                com o pdfkit (nunca estimar). Fontes em WOFF (WOFF2 e IBM Plex Mono
                                quebram o subset do pdfkit; Bricolage só existe variável: títulos
                                em Plex negrito). Conferir com `npm run pdf:exemplo` e olhar o PDF
+  src/lib/pdf-proposta-nova.ts MODELO NOVO da proposta (3 páginas, formato do cliente), EM CONSTRUÇÃO:
+                               só sai com PROPOSTA_MODELO=nova (produção não tem a variável: segue
+                               o atual) e no pdf:exemplo (subpasta nova/). Usa cores e peças de
+                               pdf-orcamento.ts. Páginas 1 e 3 = arte de fundo (assets/proposta/,
+                               LEIA-ME; sem arquivo, cinza com o nome esperado) e texto por cima
+                               (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
+                               escopo em cartões por seção (seção sem item some; Infraestrutura
+                               sempre), foto no pé com a altura que sobra, bloco fixo "contempla".
+                               Itens demais para a foto mínima: seções empilhadas em tabela que
+                               quebra de página (cartão de altura fixa não passa de uma folha)
   src/conteudo/proposta.ts     EDITÁVEL: dados da empresa, textos fixos da página 1 e a página
                                institucional inteira. Orçamento: descricaoServico (título).
                                Itens = lista de ESCOPO (só o nome; sem quantidade nem preço:

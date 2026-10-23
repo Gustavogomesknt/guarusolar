@@ -89,3 +89,46 @@ export const INSTITUCIONAL = {
   },
 };
 
+
+// ---------------------------------------------------------------------------------------------
+// MODELO NOVO (três páginas A4, formato enviado pelo cliente), em construção:
+// lib/pdf-proposta-nova.ts. Só sai com PROPOSTA_MODELO=nova ou no `npm run pdf:exemplo`.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Arquivos de arte, caminho a partir de apps/api/ (pasta assets/proposta/, ver o LEIA-ME de lá).
+ * Arquivo que ainda não existe: o PDF desenha um retângulo cinza no lugar, com o nome esperado.
+ */
+export const ARTES_DA_PROPOSTA_NOVA = {
+  /** fundos de página inteira (A4 em retrato, 2480 x 3508 px = 300 dpi) */
+  fundoPagina1: 'assets/proposta/pagina-1.jpg',
+  fundoPagina3: 'assets/proposta/pagina-3.jpg',
+  /** foto no pé de cada cartão do escopo (preenche a área e é cortada nas sobras) */
+  fotoDocumentacao: 'assets/proposta/foto-documentacao.jpg',
+  fotoBombeiros: 'assets/proposta/foto-bombeiros.jpg',
+  fotoInfraestrutura: 'assets/proposta/foto-infraestrutura.jpg',
+};
+
+/** Página 2 do modelo novo: textos fixos. */
+export const PAGINA_2_NOVA = {
+  /** rótulo acima do nome de quem montou o orçamento */
+  rotuloConsultor: 'CONSULTORA',
+  titulo: { azul: 'ESCOPO', laranja: 'DO SERVIÇO' },
+  /** títulos dos cartões em linhas; `laranja` = linhas (ou trecho final) em laranja */
+  cartoes: {
+    DOCUMENTACAO: { linhas: ['DOCUMENTAÇÃO', 'DE ENGENHARIA'], laranja: 'DE ENGENHARIA' },
+    BOMBEIROS: { linhas: ['ADEQUAÇÃO', 'CORPO DE BOMBEIROS', '• IT 41'], laranja: '' },
+    MATERIAL: { linhas: ['INFRAESTRUTURA', 'DA INSTALAÇÃO'], laranja: 'INSTALAÇÃO' },
+  },
+  contempla: {
+    faixa: { azul: 'ESCOPO DO SERVIÇO', laranja: 'CONTEMPLA' },
+    /** fixo, igual em toda proposta; duas linhas cada */
+    etapas: <{ icone: 'prancheta' | 'caixa' | 'ferramenta' | 'teste' | 'suporte'; linhas: [string, string] }[]>[
+      { icone: 'prancheta', linhas: ['Levantamento', 'técnico'] },
+      { icone: 'caixa', linhas: ['Fornecimento', 'de materiais'] },
+      { icone: 'ferramenta', linhas: ['Execução da', 'infraestrutura'] },
+      { icone: 'teste', linhas: ['Instalação, testes', 'e comissionamento'] },
+      { icone: 'suporte', linhas: ['Entrega técnica', 'com suporte'] },
+    ],
+  },
+};

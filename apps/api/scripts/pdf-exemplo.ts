@@ -4,8 +4,12 @@
  *
  *   proposta-exemplo.pdf            padrão: escopo em três seções (Documentação, Bombeiros,
  *                                   Infraestrutura), um item fora do PDF; entrada de 30% + 12x
- *   proposta-exemplo-simples.pdf    todos os itens em Infraestrutura: uma lista só, sem seções (12x)
+ *   proposta-exemplo-duas-secoes.pdf  Documentação e Infraestrutura (sem itens de bombeiros), 12x
+ *   proposta-exemplo-simples.pdf    todos os itens em Infraestrutura: uma seção só (12x)
  *   proposta-exemplo-longa.pdf      muitos itens e observação longa (quebra de página), 18x
+ *
+ * Cada caso sai nos dois modelos: o ATUAL na pasta indicada e o NOVO (três páginas, em
+ * construção: lib/pdf-proposta-nova.ts) na subpasta nova/.
  *
  * Os valores saem do mesmo cálculo que a API grava (calcularOrcamento), e as contas do cartão
  * aparecem no terminal para conferir.
@@ -21,6 +25,7 @@ import { gerarPdfOrcamento, type OrcamentoParaPdf } from '../src/lib/pdf-orcamen
 const D = (v: number) => new Prisma.Decimal(v);
 
 type Grupo = 'MATERIAL' | 'DOCUMENTACAO' | 'BOMBEIROS';
+type Secoes = 3 | 2 | 1;
 
 function item(
   ordem: number,
@@ -50,8 +55,9 @@ function item(
   };
 }
 
-function exemplo(opcoes: { secoes: boolean; longo?: boolean; parcelas: number }): OrcamentoParaPdf {
-  const g = (grupo: Grupo): Grupo => (opcoes.secoes ? grupo : 'MATERIAL');
+function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }): OrcamentoParaPdf {
+  // 2 seções: sem bombeiros (o Kit vai para Infraestrutura); 1: tudo em Infraestrutura
+  const g = (grupo: Grupo): Grupo => (opcoes.secoes === 3 || (opcoes.secoes === 2 && grupo === 'DOCUMENTACAO') ? grupo : 'MATERIAL');
   const itens = [
     item(0, 'Instalação completa', 'Mão de obra especializada', 1, 3200, 'SERVICO'),
     item(1, 'Materiais', 'Carregador não incluso', 1, 2480),
@@ -147,15 +153,19 @@ async function main() {
   const pasta = path.resolve(process.argv[2] ?? '.');
   mkdirSync(pasta, { recursive: true });
   const casos: [string, OrcamentoParaPdf][] = [
-    ['proposta-exemplo.pdf', exemplo({ secoes: true, parcelas: 12 })],
-    ['proposta-exemplo-simples.pdf', exemplo({ secoes: false, parcelas: 12 })],
-    ['proposta-exemplo-longa.pdf', exemplo({ secoes: true, longo: true, parcelas: 18 })],
+    ['proposta-exemplo.pdf', exemplo({ secoes: 3, parcelas: 12 })],
+    ['proposta-exemplo-duas-secoes.pdf', exemplo({ secoes: 2, parcelas: 12 })],
+    ['proposta-exemplo-simples.pdf', exemplo({ secoes: 1, parcelas: 12 })],
+    ['proposta-exemplo-longa.pdf', exemplo({ secoes: 3, longo: true, parcelas: 18 })],
   ];
   mostrarContas(casos[0][1]);
+  mkdirSync(path.join(pasta, 'nova'), { recursive: true });
   for (const [nome, orcamento] of casos) {
-    const destino = path.join(pasta, nome);
-    writeFileSync(destino, await gerarPdfOrcamento(orcamento));
-    console.log(destino);
+    for (const modelo of ['atual', 'nova'] as const) {
+      const destino = modelo === 'atual' ? path.join(pasta, nome) : path.join(pasta, 'nova', nome);
+      writeFileSync(destino, await gerarPdfOrcamento(orcamento, modelo));
+      console.log(destino);
+    }
   }
 }
 

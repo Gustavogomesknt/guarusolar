@@ -546,9 +546,15 @@ pasta de armazenamento não são removidos.
   e sai assim no PDF. **Prazo de execução e garantia** são preenchidos em cada orçamento: o prazo
   é obrigatório para gerar o PDF e enviar (o rascunho pode ficar sem), e a garantia já vem com o
   texto padrão de 12 meses. As sugestões de prazo e o texto padrão da garantia ficam num lugar
-  só: `packages/compartilhado/src/textosDaProposta.ts`. Depois de editar, `npm run pdf:exemplo` gera três PDFs de exemplo, sem banco
-  (padrão em três seções, uma lista só e muitos itens), para conferir. No gerador de orçamentos,
+  só: `packages/compartilhado/src/textosDaProposta.ts`. Depois de editar, `npm run pdf:exemplo` gera quatro PDFs de exemplo, sem banco
+  (padrão em três seções, duas seções, uma seção só e muitos itens), para conferir. No gerador de orçamentos,
   "Serviço" vira o título da proposta.
+- **Modelo novo da proposta (em construção):** três páginas no formato enviado pelo cliente,
+  em `apps/api/src/lib/pdf-proposta-nova.ts`. O PDF em uso continua o atual; o novo só sai com
+  `PROPOSTA_MODELO=nova` na API (para testar localmente) e no `npm run pdf:exemplo`, que grava
+  cada caso nos dois modelos (o novo na subpasta `nova/`). Artes e fotos dos cartões: pasta
+  `apps/api/assets/proposta/` (o LEIA-ME de lá tem os nomes); textos fixos em
+  `src/conteudo/proposta.ts` (`PAGINA_2_NOVA`).
 - **Itens na proposta = lista de escopo** (23/10/2026): o PDF mostra só o nome de cada item (e a
   descrição técnica, se houver), sem quantidade e sem preço unitário; o preço aparece uma vez, no
   total. As seções seguem a ordem da peça da Guarusolar: "Documentação de engenharia",

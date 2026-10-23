@@ -32,7 +32,7 @@ import { EMPRESA, INSTITUCIONAL, PAGINA_1, type IconePilar } from '../conteudo/p
  * mesma fonte (pdfkit, o motor do pdfmake), nunca estimada.
  */
 
-const COR = {
+export const COR = {
   marinho: '#0E2E60',
   laranja: '#F26B21',
   // fundo do valor total, com texto branco: 4,84:1 (o laranja da marca dá 3,04:1)
@@ -54,16 +54,16 @@ const COR = {
 };
 
 // A4 em pontos; medidas do canvas (px) x 0,75
-const PAGINA = { largura: 595.28, altura: 841.89 };
-const LATERAL = 36;
-const LARGURA = PAGINA.largura - 2 * LATERAL;
+export const PAGINA = { largura: 595.28, altura: 841.89 };
+export const LATERAL = 36;
+export const LARGURA = PAGINA.largura - 2 * LATERAL;
 const CABECALHO = 72; // faixa azul
 const FAIXA_LARANJA = 3.75;
 const RODAPE = 26; // faixa azul de baixo (na página institucional, 40: duas linhas)
 const RODAPE_COMPLETO = 40;
 
 // Ícone de sol provisório (o mesmo das telas) até o cliente enviar o logo.
-const svgIcone = (d: string, cor: string, espessura = 2) =>
+export const svgIcone = (d: string, cor: string, espessura = 2) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="${espessura}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const DESENHO: Record<IconePilar, string> = {
   sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
@@ -87,7 +87,8 @@ const FONTES = {
   },
 };
 const LOGO = EMPRESA.logo ? path.resolve(__dirname, '../..', EMPRESA.logo) : null;
-const ARQUIVOS_PERMITIDOS = new Set([...Object.values(FONTES).flatMap((f) => Object.values(f)), ...(LOGO ? [LOGO] : [])]);
+/** Arquivos locais que o PDF pode ler (fontes, logo e as artes do modelo novo, que se somam aqui). */
+export const ARQUIVOS_PERMITIDOS = new Set<string>([...Object.values(FONTES).flatMap((f) => Object.values(f)), ...(LOGO ? [LOGO] : [])]);
 
 pdfmake.setFonts(FONTES);
 // o documento não busca nada na internet e só lê as fontes e o logo acima
@@ -131,13 +132,13 @@ function condicaoPorExtenso(o: OrcamentoParaPdf): string {
 // Peças de desenho
 // ---------------------------------------------------------------------------------------------
 
-type Margem = [number, number, number, number];
+export type Margem = [number, number, number, number];
 /**
  * Peça montada aqui e encaixada em colunas e pilhas. Os tipos do pdfmake não descrevem bem
  * colunas com largura fixa espalhadas ({ width, ...caixa }); a estrutura é conferida no PDF.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Peca = any;
+export type Peca = any;
 
 // Medidor: um documento do pdfkit só em memória (nunca gravado), com as fontes do PDF.
 const medidor = new PDFDocument({ size: 'A4' });
@@ -145,7 +146,7 @@ medidor.registerFont('normal', FONTES.PlexSans.normal);
 medidor.registerFont('negrito', FONTES.PlexSans.bold);
 
 /** Altura que um texto ocupa no PDF: as linhas quebradas como o pdfmake quebra x altura da linha. */
-function alturaDoTexto(texto: string, largura: number, tamanho: number, entrelinha = 1.15, negrito = false) {
+export function alturaDoTexto(texto: string, largura: number, tamanho: number, entrelinha = 1.15, negrito = false) {
   medidor.font(negrito ? 'negrito' : 'normal').fontSize(tamanho);
   const linha = medidor.currentLineHeight(true);
   const quantas = Math.max(1, Math.round(medidor.heightOfString(texto, { width: largura, lineGap: 0 }) / linha));
@@ -162,7 +163,7 @@ const semBordas = (padding: Margem) => ({
 });
 
 /** Caixa arredondada de tamanho definido, com o conteúdo por cima. */
-function caixa(
+export function caixa(
   conteudo: Peca,
   o: { largura: number; altura: number; fundo?: string; borda?: string | null; raio?: number; padding?: Margem; margem?: Margem },
 ): Peca {
@@ -230,7 +231,7 @@ function marca(tamanho: number): Content {
  * Dados do cliente no documento: a CÓPIA gravada no orçamento (regra 2), nunca o cadastro de
  * hoje. Só orçamento criado pela versão anterior durante uma publicação não tem cópia: usa o cadastro.
  */
-function clienteDoDocumento(o: OrcamentoParaPdf) {
+export function clienteDoDocumento(o: OrcamentoParaPdf) {
   if (o.clienteNome == null) return o.cliente;
   return {
     nome: o.clienteNome,
@@ -756,7 +757,21 @@ function documento(o: OrcamentoParaPdf): TDocumentDefinitions {
   };
 }
 
+/**
+ * Qual proposta sai: "atual" (este arquivo, o PDF em uso) ou "nova" (três páginas no formato que
+ * o cliente enviou, pdf-proposta-nova.ts, em construção). Padrão: atual. A variável
+ * PROPOSTA_MODELO=nova liga o modelo novo na API inteira (só no ambiente de quem está testando);
+ * produção não tem a variável e continua no atual até o novo ficar pronto.
+ */
+export type ModeloDaProposta = 'atual' | 'nova';
+export const modeloDaProposta = (): ModeloDaProposta => (process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual');
+
 /** Gera o PDF em memória (Buffer). */
-export async function gerarPdfOrcamento(o: OrcamentoParaPdf): Promise<Buffer> {
+export async function gerarPdfOrcamento(o: OrcamentoParaPdf, modelo: ModeloDaProposta = modeloDaProposta()): Promise<Buffer> {
+  if (modelo === 'nova') {
+    // carregado só quando usado (o arquivo novo importa as peças deste: sem ciclo na carga)
+    const { documentoDaPropostaNova } = await import('./pdf-proposta-nova');
+    return pdfmake.createPdf(documentoDaPropostaNova(o)).getBuffer();
+  }
   return pdfmake.createPdf(documento(o)).getBuffer();
 }
