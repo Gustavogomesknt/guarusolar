@@ -54,9 +54,11 @@ const orcamentoSchema = z.object({
   impostoPct: z.number().min(0, 'O imposto não pode ser negativo').max(100, 'O imposto vai até 100%').optional(),
   mostrarImpostosNoPdf: z.boolean().optional(),
   condicaoPagamento: z.enum(['A_VISTA', 'ENTRADA_PARCELAS', 'FINANCIAMENTO']),
-  descontoAVistaPct: z.number().min(0).max(100).optional(),
+  // desconto à vista e parcelas valem em QUALQUER condição: são as entradas das três condições da
+  // proposta (condicoesDaProposta.ts). null = em branco (usa o padrão); ausente = mantém o gravado
+  descontoAVistaPct: z.number().min(0).max(100).nullish(),
   entradaPct: z.number().min(0).max(100).optional(),
-  parcelas: z.number().int().min(1).max(MAXIMO_PARCELAS, `Até ${MAXIMO_PARCELAS}x no cartão`).optional(),
+  parcelas: z.number().int().min(1).max(MAXIMO_PARCELAS, `Até ${MAXIMO_PARCELAS}x no cartão`).nullish(),
   pagamentoDebito: z.boolean().default(false),
   absorverTaxaCartao: z.boolean().default(false),
   bancoFinanciamento: z.string().optional(),

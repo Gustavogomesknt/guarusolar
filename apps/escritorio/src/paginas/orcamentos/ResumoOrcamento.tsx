@@ -1,4 +1,6 @@
 import { FileText, Loader2, MessageCircle, TriangleAlert } from 'lucide-react';
+import { CondicoesDaProposta } from './CondicoesDaProposta';
+import { useCapas } from './capa';
 import { AVISO_SEM_PRAZO, type PagamentoCartao } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
@@ -52,6 +54,7 @@ export function ResumoOrcamento({
   onWhatsApp: () => void;
   onPdf: () => void;
 }) {
+  const modeloNovo = useCapas().data?.ativa ?? false;
   // PDF e WhatsApp mostram o que está gravado: só com o orçamento salvo e sem alterações
   // e só com o prazo de execução preenchido (o rascunho pode ficar sem; a proposta, não)
   const podeEnviar = salvo && !alteradoDepoisDeSalvar && !semPrazo;
@@ -82,6 +85,14 @@ export function ResumoOrcamento({
           {confirmado ? 'Valores confirmados pelo sistema.' : 'Prévia. O valor final é confirmado pelo sistema ao salvar.'}
         </p>
       </section>
+
+      {/* só com o modelo novo da proposta ligado: é ele que mostra as três condições no PDF */}
+      {modeloNovo && (
+        <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
+          <legend className="sr-only">Três condições da proposta</legend>
+          <CondicoesDaProposta />
+        </fieldset>
+      )}
 
       <div className="flex flex-col gap-2.5">
         <Button

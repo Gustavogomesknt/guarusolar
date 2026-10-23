@@ -191,7 +191,8 @@ async function main() {
   for (const [nome, orcamento] of casos) {
     for (const modelo of ['atual', 'nova'] as const) {
       const destino = modelo === 'atual' ? path.join(pasta, nome) : path.join(pasta, 'nova', nome);
-      writeFileSync(destino, await gerarPdfOrcamento(orcamento, modelo));
+      // forcar: o exemplo de padrões em branco mostra o "[A DEFINIR]" (a API nunca manda isso ao cliente)
+      writeFileSync(destino, await gerarPdfOrcamento(orcamento, modelo, { forcar: true }));
       console.log(destino);
     }
   }

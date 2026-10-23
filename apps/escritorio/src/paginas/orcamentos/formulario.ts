@@ -1,4 +1,4 @@
-import { GARANTIA_PADRAO, MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
+import { CONDICOES_PADRAO_DA_PROPOSTA, GARANTIA_PADRAO, MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
@@ -87,6 +87,15 @@ export function dataDaquiA(dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
+const PADRAO_A_VISTA = CONDICOES_PADRAO_DA_PROPOSTA.descontoAVistaPct == null ? null : formatarQuantidade(CONDICOES_PADRAO_DA_PROPOSTA.descontoAVistaPct);
+const PADRAO_PARCELAS = CONDICOES_PADRAO_DA_PROPOSTA.parcelas == null ? null : String(CONDICOES_PADRAO_DA_PROPOSTA.parcelas);
+
+/** Número digitado, ou null com o campo em branco (o cálculo usa o padrão). */
+const numeroOuNulo = (valor: string) => {
+  const n = lerNumero(valor);
+  return Number.isFinite(n) ? n : null;
+};
+
 export function valoresIniciais(): FormularioOrcamento {
   return {
     cliente: null,
@@ -99,9 +108,11 @@ export function valoresIniciais(): FormularioOrcamento {
     impostoPct: '0',
     mostrarImpostosNoPdf: true,
     condicaoPagamento: 'A_VISTA',
-    descontoAVistaPct: '0',
+    // desconto à vista e parcelas começam nos padrões das três condições da proposta
+    // (compartilhado/condicoesDaProposta.ts); sem padrão, como antes
+    descontoAVistaPct: PADRAO_A_VISTA ?? '0',
     entradaPct: '30',
-    parcelas: '6',
+    parcelas: PADRAO_PARCELAS ?? '6',
     absorverTaxaCartao: false,
     validade: dataDaquiA(DIAS_DE_VALIDADE),
     observacoes: '',
@@ -148,9 +159,10 @@ export function entradaDoCalculo(f: FormularioOrcamento): EntradaCalculo {
     descontoValor: numeroOuZero(f.descontoValor),
     impostoPct: numeroOuZero(f.impostoPct),
     condicaoPagamento: f.condicaoPagamento,
-    descontoAVistaPct: numeroOuZero(f.descontoAVistaPct),
+    // em branco = null: as três condições da proposta usam o padrão
+    descontoAVistaPct: numeroOuNulo(f.descontoAVistaPct),
     entradaPct: numeroOuZero(f.entradaPct),
-    parcelas: f.parcelas === DEBITO ? 1 : Math.max(1, Math.trunc(numeroOuZero(f.parcelas))),
+    parcelas: f.parcelas === DEBITO ? 1 : f.parcelas.trim() === '' ? null : Math.max(1, Math.trunc(numeroOuZero(f.parcelas))),
     debito: f.parcelas === DEBITO,
     absorverTaxaCartao: f.absorverTaxaCartao,
   };
@@ -205,11 +217,15 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
   if (desconto) problemas.push({ campo: 'descontoValor', mensagem: desconto });
   const imposto = problemaNoImposto(f.impostoPct);
   if (imposto) problemas.push({ campo: 'impostoPct', mensagem: imposto });
-  if (f.condicaoPagamento === 'A_VISTA') {
+  // vale em qualquer condição: é também o desconto do "à vista via Pix" da proposta
+  if (f.condicaoPagamento === 'A_VISTA' || f.descontoAVistaPct.trim() !== '') {
     const pct = lerNumero(f.descontoAVistaPct || '0');
     if (!(pct >= 0 && pct <= 100)) {
       problemas.push({ campo: 'descontoAVistaPct', mensagem: 'Use um percentual entre 0 e 100' });
     }
+  }
+  if (f.condicaoPagamento === 'ENTRADA_PARCELAS' && f.parcelas.trim() === '') {
+    problemas.push({ campo: 'parcelas', mensagem: 'Escolha o número de parcelas' });
   }
   if (!f.validade) {
     problemas.push({ campo: 'validade', mensagem: 'Informe até quando o orçamento vale' });
@@ -219,7 +235,11 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
   return problemas;
 }
 
-/** Corpo do POST/PUT /api/orcamentos. Só manda os campos da condição escolhida. */
+/**
+ * Corpo do POST/PUT /api/orcamentos. Entrada, débito e taxa absorvida só da condição "Entrada +
+ * cartão"; desconto à vista e parcelas SEMPRE (são as entradas das três condições da proposta;
+ * null = em branco, a API usa o padrão).
+ */
 export function paraApi(f: FormularioOrcamento) {
   return {
     clienteId: f.cliente!.id,
@@ -232,11 +252,11 @@ export function paraApi(f: FormularioOrcamento) {
     impostoPct: numeroOuZero(f.impostoPct),
     mostrarImpostosNoPdf: f.mostrarImpostosNoPdf,
     condicaoPagamento: f.condicaoPagamento,
-    ...(f.condicaoPagamento === 'A_VISTA' ? { descontoAVistaPct: numeroOuZero(f.descontoAVistaPct) } : {}),
+    descontoAVistaPct: f.condicaoPagamento === 'A_VISTA' ? numeroOuZero(f.descontoAVistaPct) : numeroOuNulo(f.descontoAVistaPct),
+    parcelas: f.parcelas === DEBITO ? 1 : f.parcelas.trim() === '' ? null : Math.trunc(numeroOuZero(f.parcelas)),
     ...(f.condicaoPagamento === 'ENTRADA_PARCELAS'
       ? {
           entradaPct: numeroOuZero(f.entradaPct),
-          parcelas: f.parcelas === DEBITO ? 1 : Math.trunc(numeroOuZero(f.parcelas)),
           pagamentoDebito: f.parcelas === DEBITO,
           absorverTaxaCartao: f.absorverTaxaCartao,
         }
@@ -393,10 +413,25 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     impostoPct: numeroTexto(o.impostoPct, '0'),
     mostrarImpostosNoPdf: o.mostrarImpostosNoPdf ?? true,
     condicaoPagamento: o.condicaoPagamento,
-    descontoAVistaPct: numeroTexto(o.descontoAVistaPct, '0'),
+    // fora da condição escolhida, o que está na proposta gravada (propostaAVistaPct /
+    // propostaCartaoParcelas); sem ela, o padrão. Valor gravado da condição não escolhida, de antes
+    // das três condições, era resto de edição: não vale
+    descontoAVistaPct:
+      o.condicaoPagamento === 'A_VISTA'
+        ? numeroTexto(o.descontoAVistaPct, '0')
+        : numeroTexto(o.propostaAVistaPct, PADRAO_A_VISTA ?? ''),
     // os selects só têm estas opções; valores fora delas voltam ao padrão
     entradaPct: OPCOES_ENTRADA.includes(String(Number(o.entradaPct))) ? String(Number(o.entradaPct)) : '30',
-    parcelas: o.pagamentoDebito ? DEBITO : parcelaValida(String(o.parcelas)) ? String(o.parcelas) : '6',
+    parcelas:
+      o.condicaoPagamento === 'ENTRADA_PARCELAS'
+        ? o.pagamentoDebito
+          ? DEBITO
+          : parcelaValida(String(o.parcelas))
+            ? String(o.parcelas)
+            : '6'
+        : o.propostaCartaoParcelas != null && parcelaValida(String(o.propostaCartaoParcelas))
+          ? String(o.propostaCartaoParcelas)
+          : (PADRAO_PARCELAS ?? ''),
     absorverTaxaCartao: o.absorverTaxaCartao,
     // gravada ao meio-dia UTC: os 10 primeiros caracteres são a data certa
     validade: o.validade.slice(0, 10),

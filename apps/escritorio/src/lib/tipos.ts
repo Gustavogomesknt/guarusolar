@@ -165,6 +165,9 @@ export type OrcamentoCompleto = {
   parcelas: number | null;
   observacoes: string | null;
   descricaoServico: string | null;
+  /** as três condições da proposta gravadas (modelo novo); ausentes em orçamento antigo */
+  propostaAVistaPct?: string | null;
+  propostaCartaoParcelas?: number | null;
   /** não é mais usado (o PDF lista o escopo, sem preço por item); continua gravado */
   detalharPrecosNoPdf?: boolean;
   /** texto livre do PDF; null em orçamento anterior aos campos (ou rascunho sem prazo) */

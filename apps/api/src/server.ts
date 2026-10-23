@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
+import { situacaoDoModeloDaProposta } from './lib/pdf-orcamento';
 import express from 'express';
 import cors from 'cors';
 import { tratadorDeErros } from './lib/erros';
@@ -65,7 +66,10 @@ app.get('/saude', async (req, res) => {
     // `fotos`: onde as fotos novas são gravadas e se a API as está recebendo (em produção, só com
     // armazenamento persistente). Responde "por que o app de campo não aceita fotos?" sem abrir o painel.
     const fotos = { destino: destinoAtual(), recebendo: appTecnicoLiberado() };
-    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, versao, hora: new Date().toISOString() });
+    // modelo da proposta em uso; `recusado` = pediram o novo e a trava segurou (padrões em branco)
+    const { modelo, recusado } = situacaoDoModeloDaProposta();
+    const proposta = { modelo, ...(recusado ? { recusado } : {}) };
+    res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, proposta, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
     res.status(503).set('Cache-Control', 'no-store').json({ ok: false, banco: 'inacessível', versao });
@@ -101,6 +105,11 @@ app.use(tratadorDeErros);
 
 const porta = Number(process.env.PORT ?? 3333);
 app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localhost:${porta}`));
+// pediram o modelo novo da proposta com padrões em branco: fica no atual, e o motivo aparece aqui
+{
+  const { recusado } = situacaoDoModeloDaProposta();
+  if (recusado) console.error(`[proposta] ${recusado}`);
+}
 
 // O roteiro de fotos de cada tipo de serviço é editado no código (compartilhado/roteiroDoServico.ts):
 // ao subir, a tabela ChecklistFoto é acertada por ele. Sem travar a subida.

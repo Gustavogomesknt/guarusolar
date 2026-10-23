@@ -31,6 +31,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "usuario": "tsx scripts/usuario.ts",
     "pdf:exemplo": "tsx scripts/pdf-exemplo.ts",
+    "orcamentos:condicoes": "tsx scripts/condicoes-da-proposta.ts",
     "produtos:importar": "tsx scripts/importar-produtos.ts"
   },
   "prisma": {

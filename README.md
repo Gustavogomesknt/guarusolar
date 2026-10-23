@@ -555,6 +555,11 @@ pasta de armazenamento não são removidos.
   cada caso nos dois modelos (o novo na subpasta `nova/`). Artes e fotos dos cartões: pasta
   `apps/api/assets/proposta/` (o LEIA-ME de lá tem os nomes); textos fixos em
   `src/conteudo/proposta.ts` (`PAGINA_2_NOVA`).
+- **Antes de ligar o modelo novo** (`PROPOSTA_MODELO=nova` na Render): preencha os dois padrões
+  em `packages/compartilhado/src/condicoesDaProposta.ts` (sem eles a API recusa e diz qual falta,
+  em `/saude`), publique e rode, com a `DATABASE_URL` de produção na sua janela,
+  `npm run orcamentos:condicoes` (mostra quantos orçamentos tocaria) e depois
+  `npm run orcamentos:condicoes -- --executar`. Pode rodar de novo: o que já está certo não muda.
 - **Capa por tipo de serviço:** a página 1 do modelo novo é uma imagem fixa com o serviço
   impresso, em `apps/api/assets/proposta/capas/`, com o nome do tipo sem acento, em minúsculas e
   com hífens (`instalacao-de-carregador-veicular.jpg`). Para outro tipo, basta pôr o arquivo dele

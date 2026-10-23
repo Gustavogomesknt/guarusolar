@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   formatarBRL,
   formatarData,
+  faltaNosPadroes,
   formatarQuantidade,
   GARANTIA_PADRAO,
   mascararCep,
@@ -766,10 +767,44 @@ function documento(o: OrcamentoParaPdf): TDocumentDefinitions {
  * produção não tem a variável e continua no atual até o novo ficar pronto.
  */
 export type ModeloDaProposta = 'atual' | 'nova';
-export const modeloDaProposta = (): ModeloDaProposta => (process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual');
+
+/**
+ * TRAVA: com algum padrão das condições em branco (compartilhado/condicoesDaProposta.ts) o modelo
+ * novo NÃO liga, mesmo com PROPOSTA_MODELO=nova: a proposta sairia com "[A DEFINIR]". A API sobe
+ * normalmente (nunca derrubar o sistema por configuração), fica no modelo atual e diz o motivo:
+ * no log ao subir e em /saude (`proposta`).
+ */
+export function situacaoDoModeloDaProposta(): { modelo: ModeloDaProposta; pedido: ModeloDaProposta; recusado: string | null } {
+  const pedido: ModeloDaProposta = process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual';
+  const faltam = faltaNosPadroes();
+  if (pedido === 'nova' && faltam.length > 0) {
+    return {
+      modelo: 'atual',
+      pedido,
+      recusado: `O modelo novo da proposta não foi ligado: falta preencher em packages/compartilhado/src/condicoesDaProposta.ts o padrão de ${faltam.join(' e o de ')}.`,
+    };
+  }
+  return { modelo: pedido, pedido, recusado: null };
+}
+export const modeloDaProposta = (): ModeloDaProposta => situacaoDoModeloDaProposta().modelo;
+
+/** O orçamento tem as três condições gravadas? Sem elas o modelo novo mostraria "[A DEFINIR]". */
+const temAsTresCondicoes = (o: OrcamentoParaPdf) =>
+  o.propostaInvestimento != null && o.propostaAVistaValor != null && o.propostaCartaoTotal != null;
 
 /** Gera o PDF em memória (Buffer). */
-export async function gerarPdfOrcamento(o: OrcamentoParaPdf, modelo: ModeloDaProposta = modeloDaProposta()): Promise<Buffer> {
+export async function gerarPdfOrcamento(
+  o: OrcamentoParaPdf,
+  modelo: ModeloDaProposta = modeloDaProposta(),
+  opcoes: { forcar?: boolean } = {},
+): Promise<Buffer> {
+  // orçamento sem as três condições gravadas (salvo antes e ainda não acertado pelo
+  // `npm run orcamentos:condicoes`): sai no modelo atual, nunca com "[A DEFINIR]" para o cliente.
+  // Só o pdf:exemplo pede o novo sem essa conferência (forcar), para mostrar o lugar reservado
+  if (modelo === 'nova' && !temAsTresCondicoes(o) && !opcoes.forcar) {
+    console.warn(`[pdf] ${o.codigo} sem as três condições gravadas: proposta no modelo atual`);
+    modelo = 'atual';
+  }
   if (modelo === 'nova') {
     // carregado só quando usado (o arquivo novo importa as peças deste: sem ciclo na carga)
     const { documentoDaPropostaNova } = await import('./pdf-proposta-nova');

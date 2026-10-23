@@ -389,8 +389,16 @@ O `.env` da API fica em `apps/api/.env`.
    `proposta*` (investimento = sem desconto à vista nem taxa; à vista via Pix; cartão) com
    `calcularCondicoesDaProposta`: a condição escolhida usa o que o vendedor informou (o cartão
    dele com entrada, débito e taxa absorvida); a outra, os padrões de `condicoesDaProposta.ts`
-   (cartão padrão sem entrada). Padrão em branco ou orçamento salvo antes = nulo e "[A DEFINIR]"
-   no PDF. `valorTotal` continua sendo o da condição escolhida (indicadores não mudam).
+   (cartão padrão sem entrada). `valorTotal` continua sendo o da condição escolhida (indicadores
+   não mudam). Desconto à vista e parcelas são gravados em QUALQUER condição (entradas das três;
+   null = padrão), e o gerador mostra as três (`CondicoesDaProposta.tsx`, só com o modelo novo
+   ligado), com os dois campos da condição não escolhida ajustáveis ali.
+   **Nada de "[A DEFINIR]" para o cliente:** com padrão em branco, `PROPOSTA_MODELO=nova` é
+   RECUSADO (`situacaoDoModeloDaProposta`, pdf-orcamento.ts: a API fica no atual, diz o padrão que
+   falta no log e em `/saude` → `proposta.recusado`); orçamento sem as três gravadas sai no modelo
+   atual. Antes da virada: `npm run orcamentos:condicoes` (só mostra) e `-- --executar` grava as
+   três nos já salvos, copiando a condição escolhida do que está gravado (nunca recalcula o que o
+   cliente recebeu) e pulando o que não confere; roda de novo sem estragar (não mexe no editadoEm).
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
    percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
    (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista
