@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { clienteDoServico, identificacaoDoServico, type ServicoDetalhe } from '@/lib/tipos';
+import { FotosDoRoteiroAnterior } from '@/components/FotosDoRoteiroAnterior';
 import { VisitasDoCliente } from '@/components/VisitasDoCliente';
 import { enderecoEscrito } from '@/lib/contato';
 import { cn } from '@/lib/utils';
@@ -340,6 +341,12 @@ export function Servico() {
 
   const extrasEnviadas = s.fotos.filter((f) => f.chave === null);
   const extrasLocais = fotos.locais.filter((f) => f.chave === null);
+  // fotos de itens que saíram do roteiro (a chave não está mais no checklist ativo): só leitura,
+  // fora da contagem; existem para o técnico entender por que o contador voltou a zero
+  const chavesDoRoteiro = new Set(s.checklist.map((c) => c.chave));
+  const doRoteiroAnterior = (chave: string | null) => chave !== null && !chavesDoRoteiro.has(chave);
+  const fotosAnteriores = s.fotos.filter((f) => doRoteiroAnterior(f.chave));
+  const anterioresNaFila = fotos.locais.filter((f) => doRoteiroAnterior(f.chave)).length;
   const primeiraQueFalta = obrigatorios.find((b) => !b.item.enviada)?.item.chave;
 
   return (
@@ -473,6 +480,8 @@ export function Servico() {
           onTentarDeNovo={fotos.tentarDeNovo}
           onDescartar={fotos.descartar}
         />
+
+        <FotosDoRoteiroAnterior fotos={fotosAnteriores} naFila={anterioresNaFila} />
 
         <SecaoVideos
           enviados={s.videos ?? []}

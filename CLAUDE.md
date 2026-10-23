@@ -506,7 +506,10 @@ O `.env` da API fica em `apps/api/.env`.
    testar); e as observações obrigatórias: "Observações de medição" na visita técnica e
    "Observações da vistoria" na vistoria. A tabela `ChecklistFoto` é acertada pelo
    código ao subir a API (`lib/roteiroDeFotos.ts`): item que sai do roteiro é desativado, não apagado.
-   Nunca mude a `chave` de um item que já tem fotos.
+   Nunca mude a `chave` de um item que já tem fotos. Foto de item que SAIU do roteiro continua
+   gravada e aparece no escritório (validação, ficha) com o nome antigo; o envio ainda a aceita (a
+   fila do celular não trava) e ela não conta para o roteiro novo. No app do técnico ela aparece no
+   bloco "Fotos do roteiro anterior" (`FotosDoRoteiroAnterior`), só leitura e fora do contador.
    Fotos e envio para validação só com o serviço em aberto (agendado, em execução ou
    devolvido): `conferirServicoAberto` em `apps/api/src/rotas/operacao.ts`. Aprovar e devolver
    (gestor) só com o serviço aguardando validação ou devolvido: `servicoEmValidacao`. Devolver
