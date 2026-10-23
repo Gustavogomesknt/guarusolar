@@ -318,6 +318,21 @@ model Orcamento {
   valorTotalCliente    Decimal? @db.Decimal(12, 2)
   valorTaxaAbsorvida   Decimal? @db.Decimal(12, 2) // quanto a empresa deixa de receber (absorvida)
 
+  // AS TRÊS CONDIÇÕES DA PROPOSTA (modelo novo, página 3), gravadas ao salvar por
+  // calcularCondicoesDaProposta (compartilhado/condicoesDaProposta.ts): a escolhida pelo vendedor
+  // e a outra pelos padrões. Nulas = orçamento salvo antes (ou padrão ainda em branco): o PDF
+  // mostra "[A DEFINIR]". O PDF só imprime, nunca recalcula
+  propostaInvestimento       Decimal? @db.Decimal(12, 2)
+  propostaAVistaPct          Decimal? @db.Decimal(5, 2)
+  propostaAVistaValor        Decimal? @db.Decimal(12, 2)
+  propostaCartaoParcelas     Int?
+  propostaCartaoDebito       Boolean?
+  propostaCartaoEntrada      Decimal? @db.Decimal(12, 2)
+  propostaCartaoParcela      Decimal? @db.Decimal(12, 2) // da 2ª em diante
+  propostaCartaoPrimeira     Decimal? @db.Decimal(12, 2)
+  propostaCartaoTotal        Decimal? @db.Decimal(12, 2) // entrada + o cobrado no cartão
+  propostaCartaoTaxaPct      Decimal? @db.Decimal(5, 2)
+
   // chave do link público do PDF (/api/orcamentos/:id/pdf?token=...), enviado ao cliente
   // pelo WhatsApp; 64 caracteres hexadecimais aleatórios gerados pelo próprio Postgres
   tokenPdf String @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)"))

@@ -167,7 +167,9 @@ apps/api/                      API (Express + Prisma)
                                esperado). Itens: nome · descrição técnica. Acima do nome do
                                vendedor, o "Cargo na proposta" dele (Usuario.cargoNaProposta,
                                tela Usuários, padrão "Consultor"). Rodapé "Página X de N" da
-                               página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Texto por cima das artes
+                               página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Página 3: os três
+                               valores GRAVADOS (proposta*) e o contato, em posições de
+                               PAGINA_3_NOVA (conteudo/proposta.ts). Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".
@@ -306,6 +308,9 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
                                data da última atualização
   src/textosDaProposta.ts      EDITÁVEL: GARANTIA_PADRAO (texto de garantia de todo orçamento novo) e
                                SUGESTOES_DE_PRAZO (atalhos do campo "Prazo de execução")
+  src/condicoesDaProposta.ts   EDITÁVEL: CONDICOES_PADRAO_DA_PROPOSTA (desconto à vista e parcelas da
+                               condição que o vendedor NÃO escolheu; EM BRANCO até a Guarusolar
+                               confirmar) e calcularCondicoesDaProposta (as três da página 3)
   src/margemDoOrcamento.ts     EDITÁVEL: MARGEM_PADRAO (margem em reais de todo orçamento novo) e
                                distribuirMargem (preços do PDF detalhado)
   src/roteiroDoServico.ts      EDITÁVEL: por tipo de serviço, as fotos pedidas, as observações (nome e
@@ -377,6 +382,15 @@ O `.env` da API fica em `apps/api/.env`.
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
+   **Repasse da taxa:** `REPASSAR_TAXA_DO_CARTAO` (taxasCartao.ts), usado em `calcularCartao`;
+   `false` faz a empresa absorver a taxa em todo orçamento. PENDENTE de confirmação (23/10/2026):
+   a proposta modelo do cliente soma as parcelas no valor cheio.
+   **Três condições na proposta (modelo novo, 23/10/2026):** ao salvar, a API grava também
+   `proposta*` (investimento = sem desconto à vista nem taxa; à vista via Pix; cartão) com
+   `calcularCondicoesDaProposta`: a condição escolhida usa o que o vendedor informou (o cartão
+   dele com entrada, débito e taxa absorvida); a outra, os padrões de `condicoesDaProposta.ts`
+   (cartão padrão sem entrada). Padrão em branco ou orçamento salvo antes = nulo e "[A DEFINIR]"
+   no PDF. `valorTotal` continua sendo o da condição escolhida (indicadores não mudam).
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
    percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
    (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista

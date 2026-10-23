@@ -36,6 +36,15 @@ export const TAXAS_CARTAO = {
   } as Record<number, number>,
 };
 
+/**
+ * REPASSE DA TAXA AO CLIENTE: true = o cliente paga  valor ÷ (1 − taxa)  no cartão (regra de hoje).
+ * false = o cliente paga o valor da proposta e a Guarusolar absorve a taxa em TODO orçamento
+ * (como o "absorver a taxa" de negociação, que grava quanto a empresa deixa de receber).
+ * PENDENTE (23/10/2026): a proposta modelo do cliente soma as parcelas no valor cheio, sem
+ * repasse; a Guarusolar vai confirmar. A conta está em calcularCartao (calculo.ts).
+ */
+export const REPASSAR_TAXA_DO_CARTAO = true;
+
 /** Maior número de parcelas da tabela (18). */
 export const MAXIMO_PARCELAS = Math.max(...Object.keys(TAXAS_CARTAO.credito).map(Number));
 

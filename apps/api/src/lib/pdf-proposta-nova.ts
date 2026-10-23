@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
-import { mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
-import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
+import { formatarBRL, formatarQuantidade, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
+import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
@@ -603,12 +603,106 @@ function paginaDeArte(fundo: Arte, numero: 1 | 3, o: OrcamentoParaPdf): Content[
           absolutePosition: { x: 0, y: PAGINA.altura / 2 - 20 },
         } as Content,
       ];
-  return [...camada, ...sobreAArte(numero, o)];
+  return [...camada, ...sobreAArte(numero, o, fundo.arquivo !== null)];
 }
 
-/** Textos posicionados sobre as artes: a preencher quando os arquivos chegarem. */
-function sobreAArte(_numero: 1 | 3, _o: OrcamentoParaPdf): Content[] {
-  return [];
+/** Textos posicionados sobre as artes. A capa (1) é fixa: nada por cima. */
+function sobreAArte(numero: 1 | 3, o: OrcamentoParaPdf, comArte: boolean): Content[] {
+  return numero === 3 ? valoresEContato(o, comArte) : [];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Página 3: os três valores e o contato, por cima da arte (posições em conteudo/proposta.ts)
+// ---------------------------------------------------------------------------------------------
+
+const A_DEFINIR = '[A DEFINIR]';
+const n = (v: { toString(): string } | null | undefined) => (v == null ? null : Number(v));
+
+/** Os três blocos: só o que está GRAVADO (propostaInvestimento, propostaAVista..., propostaCartao...). */
+function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista' | 'cartao', { valor: string; detalhes: string[] }> {
+  const investimento = n(o.propostaInvestimento);
+  const aVista = n(o.propostaAVistaValor);
+  const pct = n(o.propostaAVistaPct) ?? 0;
+  const parcelas = o.propostaCartaoParcelas;
+  const parcela = n(o.propostaCartaoParcela);
+  const primeira = n(o.propostaCartaoPrimeira);
+  const entrada = n(o.propostaCartaoEntrada) ?? 0;
+  const total = n(o.propostaCartaoTotal);
+  const temCartao = parcelas != null && parcela != null && total != null;
+  return {
+    investimento: { valor: investimento == null ? A_DEFINIR : formatarBRL(investimento), detalhes: [] },
+    aVista: {
+      valor: aVista == null ? A_DEFINIR : formatarBRL(aVista),
+      detalhes: aVista == null ? [] : [pct > 0 ? `${formatarQuantidade(pct)}% de desconto` : 'sem desconto'],
+    },
+    cartao: !temCartao
+      ? { valor: A_DEFINIR, detalhes: [] }
+      : {
+          valor: o.propostaCartaoDebito ? `${formatarBRL(total - entrada)} no débito` : `${parcelas} × ${formatarBRL(parcela)}`,
+          detalhes: [
+            ...(!o.propostaCartaoDebito && primeira != null && primeira !== parcela ? [`1ª parcela de ${formatarBRL(primeira)}`] : []),
+            ...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []),
+            `total de ${formatarBRL(total)}`,
+          ],
+        },
+  };
+}
+
+function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
+  const P = PAGINA_3_NOVA;
+  const caixas = !comArte && P.caixasSemArte;
+  const textos = textosDosValores(o);
+  const bloco = (chave: 'investimento' | 'aVista' | 'cartao'): Content[] => {
+    const b = P.blocos[chave];
+    const t = textos[chave];
+    return [
+      ...(caixas ? [{ canvas: [{ type: 'rect', x: 0, y: 0, w: b.largura, h: b.altura, r: 10, color: COR.branco, lineColor: COR.borda, lineWidth: 0.75 }], absolutePosition: { x: b.x, y: b.y } } as Content] : []),
+      {
+        absolutePosition: { x: b.x + P.respiro, y: b.y + P.respiro },
+        // tabela de uma célula: em posição absoluta é ela que limita a largura do texto ao bloco
+        table: { widths: [b.largura - 2 * P.respiro], body: [[{ stack: [
+          { text: b.titulo, fontSize: 8, bold: true, characterSpacing: 1, color: P.cores.titulo },
+          { text: t.valor, fontSize: P.tamanhoDoValor, bold: true, color: P.cores.valor, margin: [0, 4, 0, 0] },
+          ...t.detalhes.map((d) => ({ text: d, fontSize: 8.5, color: P.cores.detalhe, margin: [0, 2, 0, 0] })),
+        ] }]] },
+        layout: semBordas([0, 0, 0, 0]),
+      } as Content,
+    ];
+  };
+
+  const c = P.contato;
+  const fone = o.vendedor.telefone?.replace(/\D/g, '') ?? '';
+  const cargo = o.vendedor.cargoNaProposta?.trim() || 'Consultor';
+  const contato: Content[] = [
+    ...(caixas ? [{ canvas: [{ type: 'rect', x: 0, y: 0, w: c.largura, h: c.altura, r: 10, color: COR.branco, lineColor: COR.borda, lineWidth: 0.75 }], absolutePosition: { x: c.x, y: c.y } } as Content] : []),
+    {
+      absolutePosition: { x: c.x + P.respiro, y: c.y + P.respiro },
+      // larguras fixas: em posição absoluta o pdfmake não limita as colunas pela caixa
+      columns: [
+        {
+          width: c.largura - 2 * P.respiro - 220 - 16,
+          stack: [
+            { text: c.titulo, fontSize: 8, bold: true, characterSpacing: 1, color: P.cores.titulo },
+            { text: o.vendedor.nome, fontSize: 12, bold: true, color: P.cores.valor, margin: [0, 4, 0, 0] },
+            { text: cargo, fontSize: 9, color: P.cores.detalhe },
+            ...(fone ? [{ text: `WhatsApp ${mascararTelefone(fone)}`, fontSize: 9.5, color: P.cores.valor, margin: [0, 3, 0, 0] }] : []),
+          ],
+        },
+        {
+          width: 220,
+          alignment: 'right',
+          stack: [
+            [EMPRESA.telefone, EMPRESA.email].filter(Boolean).join(' · '),
+            [EMPRESA.instagram, EMPRESA.site].filter(Boolean).join(' · '),
+          ]
+            .filter(Boolean)
+            .map((linha, i) => ({ text: linha, fontSize: 9, color: i === 0 ? P.cores.valor : P.cores.detalhe, margin: [0, i === 0 ? 16 : 2, 0, 0] })),
+        },
+      ],
+      columnGap: 16,
+    } as Content,
+  ];
+  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...contato];
 }
 
 /** Capa do tipo de serviço do orçamento (ou a padrão), no mesmo formato das outras artes. */

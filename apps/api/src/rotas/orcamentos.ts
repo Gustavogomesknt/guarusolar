@@ -8,6 +8,8 @@ import { operacaoMudou } from '../lib/versaoDaOperacao';
 import { autenticar, autorizar } from '../lib/auth';
 import {
   calcularOrcamento,
+  calcularCondicoesDaProposta,
+  type EntradaCalculo,
   AVISO_SEM_PRAZO,
   GARANTIA_MAXIMO_DE_CARACTERES,
   MAXIMO_PARCELAS,
@@ -77,6 +79,23 @@ const orcamentoSchema = z.object({
   // queda de internet) atualiza o orçamento já criado em vez de criar outro
   idCriacao: z.string().uuid().optional(),
 });
+
+/** As três condições da proposta (modelo novo), gravadas para o PDF só imprimir. */
+function condicoesGravadas(entrada: EntradaCalculo) {
+  const c = calcularCondicoesDaProposta(entrada);
+  return {
+    propostaInvestimento: c.investimento,
+    propostaAVistaPct: c.aVista?.descontoPct ?? null,
+    propostaAVistaValor: c.aVista?.valor ?? null,
+    propostaCartaoParcelas: c.cartao?.detalhe.parcelas ?? null,
+    propostaCartaoDebito: c.cartao?.detalhe.debito ?? null,
+    propostaCartaoEntrada: c.cartao?.entrada ?? null,
+    propostaCartaoParcela: c.cartao?.detalhe.valorParcela ?? null,
+    propostaCartaoPrimeira: c.cartao?.detalhe.valorPrimeiraParcela ?? null,
+    propostaCartaoTotal: c.cartao?.total ?? null,
+    propostaCartaoTaxaPct: c.cartao?.detalhe.taxaPct ?? null,
+  };
+}
 
 /**
  * Resultado do cálculo do pagamento que fica gravado no orçamento, para o PDF e o WhatsApp
@@ -392,7 +411,7 @@ rotasOrcamentos.post(
     await conferirTipoDeServico(dados.tipoDeServicoId);
     const cliente = await clienteDoOrcamento(dados.clienteId);
     const itens = await prepararItens(dados.itens);
-    const totais = calcularOrcamento({
+    const entradaDoCalculo: EntradaCalculo = {
       itens: itens.map((i) => i._calculo),
       margem: dados.margem ?? 0,
       descontoTipo: dados.descontoTipo,
@@ -404,7 +423,8 @@ rotasOrcamentos.post(
       parcelas: dados.parcelas,
       debito: dados.pagamentoDebito,
       absorverTaxaCartao: dados.absorverTaxaCartao,
-    });
+    };
+    const totais = calcularOrcamento(entradaDoCalculo);
 
     // o código sai dentro da mesma transação: se a criação falhar, o número não é perdido
     const orcamento = await prisma.$transaction(async (tx) => {
@@ -438,6 +458,7 @@ rotasOrcamentos.post(
           impostoAplicado: totais.impostoAplicado,
           valorTotal: totais.valorTotal,
           ...pagamentoGravado(dados.condicaoPagamento, totais),
+          ...condicoesGravadas(entradaDoCalculo),
           itens: { create: itens.map(({ _calculo, ...item }) => item) },
         },
         include: { itens: true, cliente: true },
@@ -477,7 +498,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   const copiarCliente = dados.clienteId !== atual.clienteId || dados.atualizarDadosCliente || atual.clienteNome == null;
   const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId)) : {};
   const itens = await prepararItens(dados.itens, atual.itens);
-  const totais = calcularOrcamento({
+  const entradaDoCalculo: EntradaCalculo = {
     itens: itens.map((i) => i._calculo),
     margem: dados.margem ?? Number(atual.margem),
     descontoTipo: dados.descontoTipo,
@@ -489,7 +510,8 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
     parcelas: dados.parcelas,
     debito: dados.pagamentoDebito,
     absorverTaxaCartao: dados.absorverTaxaCartao,
-  });
+  };
+  const totais = calcularOrcamento(entradaDoCalculo);
 
   // troca os itens em bloco: se algo falhar, nada é gravado
   const orcamento = await prisma.$transaction(async (tx) => {
@@ -525,6 +547,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         impostoAplicado: totais.impostoAplicado,
         valorTotal: totais.valorTotal,
         ...pagamentoGravado(dados.condicaoPagamento, totais),
+          ...condicoesGravadas(entradaDoCalculo),
         itens: { create: itens.map(({ _calculo, ...item }) => item) },
       },
       include: { itens: true, cliente: true },

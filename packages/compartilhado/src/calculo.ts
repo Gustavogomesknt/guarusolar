@@ -4,7 +4,7 @@
  * mesma função ao salvar e nunca aceita total vindo do front (regra 1 do CLAUDE.md).
  */
 import type { CondicaoPagamento, TipoDesconto } from './enums.js';
-import { taxaDoCartao } from './taxasCartao.js';
+import { REPASSAR_TAXA_DO_CARTAO, taxaDoCartao } from './taxasCartao.js';
 
 export type ItemCalculo = {
   quantidade: number;
@@ -81,7 +81,9 @@ const brl = (v: number) =>
  * Cartão com a taxa repassada: cobrado = saldo ÷ (1 − taxa). Contas em centavos inteiros.
  * Cobrado arredondado para cima: depois da taxa, a empresa recebe pelo menos o saldo.
  */
-export function calcularCartao(saldo: number, parcelas: number, debito: boolean, absorver: boolean): PagamentoCartao {
+export function calcularCartao(saldo: number, parcelas: number, debito: boolean, absorverNoOrcamento: boolean): PagamentoCartao {
+  // sem repasse (REPASSAR_TAXA_DO_CARTAO = false, taxasCartao.ts) a taxa é sempre absorvida
+  const absorver = absorverNoOrcamento || !REPASSAR_TAXA_DO_CARTAO;
   const n = debito ? 1 : parcelas;
   const taxaPct = taxaDoCartao(n, debito);
   const taxa = taxaPct / 100;

@@ -19,7 +19,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Prisma } from '@prisma/client';
-import { calcularOrcamento, formatarBRL, GARANTIA_PADRAO, MARGEM_PADRAO, SUGESTOES_DE_PRAZO } from '@guarusolar/compartilhado';
+import {
+  calcularCondicoesDaProposta,
+  calcularOrcamento,
+  CONDICOES_PADRAO_DA_PROPOSTA,
+  formatarBRL,
+  GARANTIA_PADRAO,
+  MARGEM_PADRAO,
+  SUGESTOES_DE_PRAZO,
+  type EntradaCalculo,
+} from '@guarusolar/compartilhado';
 import { gerarPdfOrcamento, type OrcamentoParaPdf } from '../src/lib/pdf-orcamento';
 
 const D = (v: number) => new Prisma.Decimal(v);
@@ -55,7 +64,11 @@ function item(
   };
 }
 
-function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }): OrcamentoParaPdf {
+// padrões SÓ destes exemplos, para a página 3 mostrar os três blocos; os de verdade estão em branco
+// (compartilhado/condicoesDaProposta.ts) e o caso de duas seções usa eles: blocos "[A DEFINIR]"
+const PADROES_DE_EXEMPLO = { descontoAVistaPct: 5, parcelas: 10 };
+
+function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; padroesReais?: boolean }): OrcamentoParaPdf {
   // 2 seções: sem bombeiros (o Kit vai para Infraestrutura); 1: tudo em Infraestrutura
   const g = (grupo: Grupo): Grupo => (opcoes.secoes === 3 || (opcoes.secoes === 2 && grupo === 'DOCUMENTACAO') ? grupo : 'MATERIAL');
   const itens = [
@@ -73,7 +86,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
       : []),
   ];
   // o mesmo cálculo que a API faz ao salvar
-  const t = calcularOrcamento({
+  const entrada: EntradaCalculo = {
     itens: itens.map((i) => ({ quantidade: Number(i.quantidade), precoUnitario: Number(i.precoUnitario) })),
     margem: MARGEM_PADRAO,
     descontoTipo: 'PERCENTUAL',
@@ -81,8 +94,11 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
     condicaoPagamento: 'ENTRADA_PARCELAS',
     entradaPct: 30,
     parcelas: opcoes.parcelas,
-  });
+  };
+  const t = calcularOrcamento(entrada);
   const c = t.cartao!;
+  const cp = calcularCondicoesDaProposta(entrada, opcoes.padroesReais ? CONDICOES_PADRAO_DA_PROPOSTA : PADROES_DE_EXEMPLO);
+  const Dn = (v: number | null | undefined) => (v == null ? null : D(v));
   return {
     id: 'exemplo',
     codigo: 'GS-2026-0001',
@@ -109,6 +125,16 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
     valorPrimeiraParcela: D(c.valorPrimeiraParcela),
     valorTotalCliente: D(t.valorTotalCliente),
     valorTaxaAbsorvida: D(c.valorAbsorvido),
+    propostaInvestimento: D(cp.investimento),
+    propostaAVistaPct: Dn(cp.aVista?.descontoPct),
+    propostaAVistaValor: Dn(cp.aVista?.valor),
+    propostaCartaoParcelas: cp.cartao?.detalhe.parcelas ?? null,
+    propostaCartaoDebito: cp.cartao?.detalhe.debito ?? null,
+    propostaCartaoEntrada: Dn(cp.cartao?.entrada),
+    propostaCartaoParcela: Dn(cp.cartao?.detalhe.valorParcela),
+    propostaCartaoPrimeira: Dn(cp.cartao?.detalhe.valorPrimeiraParcela),
+    propostaCartaoTotal: Dn(cp.cartao?.total),
+    propostaCartaoTaxaPct: Dn(cp.cartao?.detalhe.taxaPct),
     tokenPdf: 'exemplo',
     validade: new Date('2026-10-31T12:00:00Z'),
     observacoes: opcoes.longo
@@ -156,7 +182,7 @@ async function main() {
   mkdirSync(pasta, { recursive: true });
   const casos: [string, OrcamentoParaPdf][] = [
     ['proposta-exemplo.pdf', exemplo({ secoes: 3, parcelas: 12 })],
-    ['proposta-exemplo-duas-secoes.pdf', exemplo({ secoes: 2, parcelas: 12 })],
+    ['proposta-exemplo-duas-secoes.pdf', exemplo({ secoes: 2, parcelas: 12, padroesReais: true })],
     ['proposta-exemplo-simples.pdf', exemplo({ secoes: 1, parcelas: 12 })],
     ['proposta-exemplo-longa.pdf', exemplo({ secoes: 3, longo: true, parcelas: 18 })],
   ];

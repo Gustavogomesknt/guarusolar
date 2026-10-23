@@ -136,6 +136,27 @@ export const RODAPE_DA_PROPOSTA_NOVA = {
   distanciaDaBase: 16,
 };
 
+/**
+ * Página 3 do modelo novo: os três valores e o contato, POR CIMA da arte. Posições em pontos a
+ * partir do canto de cima à esquerda da folha (A4 = 595 x 842). Quando a arte chegar, ajuste x,
+ * y, largura e altura de cada bloco para cair nos espaços dela e desligue `caixasSemArte` se a
+ * arte já desenha os quadros. Os valores vêm gravados no orçamento (condições da proposta).
+ */
+export const PAGINA_3_NOVA = {
+  /** sem a arte (retângulo cinza), desenha os quadros brancos para mostrar onde cada bloco fica */
+  caixasSemArte: true,
+  /** margem interna de cada bloco */
+  respiro: 14,
+  tamanhoDoValor: 17,
+  cores: { titulo: '#F26B21', valor: '#0E2E60', detalhe: '#5A6675' },
+  blocos: {
+    investimento: { titulo: 'VALOR DO INVESTIMENTO', x: 36, y: 470, largura: 165, altura: 112 },
+    aVista: { titulo: 'À VISTA VIA PIX', x: 215, y: 470, largura: 165, altura: 112 },
+    cartao: { titulo: 'NO CARTÃO DE CRÉDITO', x: 394, y: 470, largura: 165, altura: 112 },
+  },
+  contato: { titulo: 'FALE COM A GENTE', x: 36, y: 690, largura: 523, altura: 90 },
+};
+
 /** Página 2 do modelo novo: textos fixos. */
 export const PAGINA_2_NOVA = {
   // o rótulo acima do nome de quem montou o orçamento é o "Cargo na proposta" do usuário
