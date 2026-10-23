@@ -555,6 +555,12 @@ pasta de armazenamento não são removidos.
   cada caso nos dois modelos (o novo na subpasta `nova/`). Artes e fotos dos cartões: pasta
   `apps/api/assets/proposta/` (o LEIA-ME de lá tem os nomes); textos fixos em
   `src/conteudo/proposta.ts` (`PAGINA_2_NOVA`).
+- **Capa por tipo de serviço:** a página 1 do modelo novo é uma imagem fixa com o serviço
+  impresso, em `apps/api/assets/proposta/capas/`, com o nome do tipo sem acento, em minúsculas e
+  com hífens (`instalacao-de-carregador-veicular.jpg`). Para outro tipo, basta pôr o arquivo dele
+  na pasta (a tabela de nomes está no `LEIA-ME.md` de lá). Tipo sem capa própria sai com a de
+  carregador, e o gerador e a lista avisam o vendedor antes de gerar o PDF ou enviar pelo
+  WhatsApp; ele pode seguir assim mesmo.
 - **Itens na proposta = lista de escopo** (23/10/2026): o PDF mostra só o nome de cada item (e a
   descrição técnica, se houver), sem quantidade e sem preço unitário; o preço aparece uma vez, no
   total. As seções seguem a ordem da peça da Guarusolar: "Documentação de engenharia",

@@ -114,6 +114,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
       ? Array.from({ length: 6 }, () => 'Instalação condicionada à vistoria técnica do local e à disponibilidade de carga no padrão de entrada. ').join('')
       : 'Instalação em até 3 metros do quadro de distribuição. Vistoria técnica incluída.',
     descricaoServico: 'Instalação de carregador veicular · Residencial',
+    tipoDeServico: { nome: 'Instalação de carregador veicular' },
     detalharPrecosNoPdf: false,
     prazoExecucao: opcoes.longo
       ? '45 dias após a aprovação, conforme a homologação na concessionária e a liberação do acesso ao local da instalação'

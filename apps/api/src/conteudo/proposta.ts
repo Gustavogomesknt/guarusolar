@@ -99,9 +99,21 @@ export const INSTITUCIONAL = {
  * Arquivos de arte, caminho a partir de apps/api/ (pasta assets/proposta/, ver o LEIA-ME de lá).
  * Arquivo que ainda não existe: o PDF desenha um retângulo cinza no lugar, com o nome esperado.
  */
+/**
+ * CAPA (página 1): uma imagem por TIPO DE SERVIÇO, com o nome do tipo sem acento, em
+ * minúsculas e com hífens: capas/instalacao-de-carregador-veicular.jpg. Tipo sem capa própria
+ * usa a `padrao` e o gerador avisa o vendedor (lib/capaDaProposta.ts).
+ */
+export const CAPAS_DA_PROPOSTA = {
+  pasta: 'assets/proposta/capas',
+  /** hoje a Guarusolar só vende carregador */
+  padrao: 'instalacao-de-carregador-veicular',
+  /** a linha impressa na capa padrão, citada no aviso do gerador */
+  textoDaCapaPadrao: 'Instalação de Carregador Veicular',
+};
+
 export const ARTES_DA_PROPOSTA_NOVA = {
-  /** fundos de página inteira (A4 em retrato, 2480 x 3508 px = 300 dpi) */
-  fundoPagina1: 'assets/proposta/pagina-1.jpg',
+  /** fundo de página inteira (A4 em retrato, 2480 x 3508 px = 300 dpi); a capa está acima */
   fundoPagina3: 'assets/proposta/pagina-3.jpg',
   /** foto no pé de cada cartão do escopo (preenche a área e é cortada nas sobras) */
   fotoDocumentacao: 'assets/proposta/foto-documentacao.jpg',

@@ -53,6 +53,7 @@ rotasOrcamentoPdf.get(
             cliente: true,
             vendedor: { select: { nome: true, telefone: true } },
             itens: { orderBy: { ordem: 'asc' }, include: { produto: { select: { categoria: true } } } },
+            tipoDeServico: { select: { nome: true } },
           },
         })
       : null;

@@ -1,4 +1,4 @@
-import { FileText, Loader2, MessageCircle } from 'lucide-react';
+import { FileText, Loader2, MessageCircle, TriangleAlert } from 'lucide-react';
 import { AVISO_SEM_PRAZO, type PagamentoCartao } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ export function ResumoOrcamento({
   alteradoDepoisDeSalvar,
   semPrazo,
   enviandoWhatsApp,
+  avisoDaCapa = null,
   onWhatsApp,
   onPdf,
 }: {
@@ -46,6 +47,8 @@ export function ResumoOrcamento({
   /** o prazo de execução está em branco: a proposta não é gerada nem enviada */
   semPrazo: boolean;
   enviandoWhatsApp: boolean;
+  /** o tipo do orçamento não tem capa própria (capa.tsx): avisa aqui e confirma no clique */
+  avisoDaCapa?: string | null;
   onWhatsApp: () => void;
   onPdf: () => void;
 }) {
@@ -105,6 +108,12 @@ export function ResumoOrcamento({
         <p id="dica-acoes" className={`text-center text-[13px] ${semPrazo ? 'text-destaque-texto' : 'text-muted-foreground'}`}>
           {dicaAcoes}
         </p>
+        {avisoDaCapa && (
+          <p className="flex gap-2 rounded-[10px] border border-destaque bg-destaque-suave px-3 py-2.5 text-[13px] text-destaque-texto">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {avisoDaCapa}
+          </p>
+        )}
       </div>
     </aside>
   );

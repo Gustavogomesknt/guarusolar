@@ -5,7 +5,7 @@ Coloque aqui os arquivos com estes nomes exatos (JPG; PNG também serve, trocand
 
 | Arquivo | Onde entra | Tamanho sugerido |
 | --- | --- | --- |
-| `pagina-1.jpg` | fundo inteiro da página 1 | 2480 x 3508 px (A4 a 300 dpi) |
+| `capas/<tipo-de-servico>.jpg` | a capa (página 1), uma por tipo de serviço: ver `capas/LEIA-ME.md` | 2480 x 3508 px (A4 a 300 dpi) |
 | `pagina-3.jpg` | fundo inteiro da página 3 | 2480 x 3508 px |
 | `foto-documentacao.jpg` | pé do cartão "Documentação de engenharia" | 1200 x 900 px ou maior |
 | `foto-bombeiros.jpg` | pé do cartão "Adequação Corpo de Bombeiros · IT 41" | idem |

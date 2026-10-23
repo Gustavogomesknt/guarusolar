@@ -22,6 +22,9 @@ import {
 } from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
+import { tipoTemCapa } from '../lib/capaDaProposta';
+import { CAPAS_DA_PROPOSTA } from '../conteudo/proposta';
+import { modeloDaProposta } from '../lib/pdf-orcamento';
 
 export const rotasOrcamentos = Router();
 rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -321,6 +324,21 @@ rotasOrcamentos.get(
 // pessoa escolheu (guardado no servidor, por usuário). Tipo desativado depois não volta: o
 // campo começa vazio, como para quem nunca escolheu.
 // --------------------------------------------------------------------------
+// Capa da proposta por tipo de serviço (lib/capaDaProposta.ts): o gerador e a lista avisam antes
+// de gerar ou enviar quando o tipo do orçamento não tem capa própria. `ativa` = o PDF em uso tem
+// capa (modelo novo); no modelo atual não há capa e nada é avisado.
+rotasOrcamentos.get(
+  '/capas',
+  rota(async (_req, res) => {
+    const tipos = await prisma.tipoDeServico.findMany({ select: { id: true, nome: true }, orderBy: { ordem: 'asc' } });
+    res.json({
+      ativa: modeloDaProposta() === 'nova',
+      textoDaCapaPadrao: CAPAS_DA_PROPOSTA.textoDaCapaPadrao,
+      tipos: tipos.map((t) => ({ ...t, temCapa: tipoTemCapa(t.nome) })),
+    });
+  }),
+);
+
 rotasOrcamentos.get(
   '/preferencias',
   rota(async (req, res) => {

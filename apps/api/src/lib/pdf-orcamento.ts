@@ -100,6 +100,8 @@ export type OrcamentoParaPdf = Prisma.OrcamentoGetPayload<{
     cliente: true;
     vendedor: { select: { nome: true; telefone: true } };
     itens: { include: { produto: { select: { categoria: true } } } };
+    /** a capa do modelo novo depende do tipo vendido */
+    tipoDeServico: { select: { nome: true } };
   };
 }>;
 

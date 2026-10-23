@@ -22,6 +22,7 @@ import { CartaoTipoDeServico } from './CartaoTipoDeServico';
 import { ClassificarTipo, usePreferenciaDeTipo } from '@/lib/tiposDeServico';
 import { CartaoItens } from './CartaoItens';
 import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
+import { useConfirmacaoDaCapa } from './capa';
 import {
   caminhoDoPdf,
   campoDoFormulario,
@@ -68,6 +69,8 @@ export function GeradorOrcamento({
   const idCriacao = useRef(crypto.randomUUID());
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
+  // a capa do PDF é do tipo de serviço: tipo sem capa própria avisa antes de gerar ou enviar
+  const capa = useConfirmacaoDaCapa();
   const somenteLeitura = salvo?.status === 'APROVADO';
 
   // Orçamento novo já vem com o último tipo que esta pessoa escolheu (preferência no servidor),
@@ -297,12 +300,16 @@ export function GeradorOrcamento({
             // aprovado não pode mais ser editado: o anterior ao campo continua abrindo o PDF
             semPrazo={!somenteLeitura && !valores.prazoExecucao?.trim()}
             enviandoWhatsApp={enviandoWhatsApp}
-            onWhatsApp={aoEnviarWhatsApp}
-            onPdf={() => salvo && window.open(urlDaApi(caminhoDoPdf(salvo)), '_blank', 'noopener')}
+            avisoDaCapa={capa.aviso(valores.tipoDeServicoId)}
+            onWhatsApp={() => capa.confirmar(valores.tipoDeServicoId, 'Enviar assim mesmo', aoEnviarWhatsApp)}
+            onPdf={() =>
+              capa.confirmar(valores.tipoDeServicoId, 'Gerar assim mesmo', () => salvo && window.open(urlDaApi(caminhoDoPdf(salvo)), '_blank', 'noopener'))
+            }
           />
         </div>
       </div>
 
+      {capa.dialogo}
       <Dialog open={bloqueio.state === 'blocked'} onOpenChange={(aberto) => !aberto && bloqueio.reset?.()}>
         <DialogContent className="bg-card sm:max-w-md">
           <DialogHeader>

@@ -158,8 +158,13 @@ apps/api/                      API (Express + Prisma)
   src/lib/pdf-proposta-nova.ts MODELO NOVO da proposta (3 páginas, formato do cliente), EM CONSTRUÇÃO:
                                só sai com PROPOSTA_MODELO=nova (produção não tem a variável: segue
                                o atual) e no pdf:exemplo (subpasta nova/). Usa cores e peças de
-                               pdf-orcamento.ts. Páginas 1 e 3 = arte de fundo (assets/proposta/,
-                               LEIA-ME; sem arquivo, cinza com o nome esperado) e texto por cima
+                               pdf-orcamento.ts. Página 1 = CAPA fixa por TIPO DE SERVIÇO
+                               (lib/capaDaProposta.ts; assets/proposta/capas/<nome-do-tipo>.jpg,
+                               LEIA-ME de lá): tipo sem capa usa a padrão (carregador) e o gerador
+                               e a lista AVISAM antes de gerar/enviar (paginas/orcamentos/capa.tsx,
+                               GET /api/orcamentos/capas; só com o modelo novo ligado). Página 3 =
+                               arte de fundo (assets/proposta/; sem arquivo, cinza com o nome
+                               esperado). Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".

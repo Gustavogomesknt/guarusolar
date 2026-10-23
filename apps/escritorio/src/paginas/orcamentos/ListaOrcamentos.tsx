@@ -22,6 +22,7 @@ import { AlternadorVisao } from './AlternadorVisao';
 import { opcoesDePeriodo, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
+import { useConfirmacaoDaCapa } from './capa';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
@@ -341,6 +342,7 @@ function Linha({
   const navegar = useNavigate();
   const clienteConsultas = useQueryClient();
   const abrir = () => navegar(`/orcamentos/${o.id}`);
+  const capa = useConfirmacaoDaCapa();
 
   const whatsapp = useMutation({
     mutationFn: () => enviarPeloWhatsApp(o.id),
@@ -402,7 +404,7 @@ function Linha({
           disabled={whatsapp.isPending}
           onClick={(e) => {
             e.stopPropagation();
-            whatsapp.mutate();
+            capa.confirmar(o.tipoDeServico?.id, 'Enviar assim mesmo', () => whatsapp.mutate());
           }}
           className="flex size-10 items-center justify-center rounded-[10px] border border-[#C3D8F0] bg-[#EAF2FB] text-primary hover:bg-[#DCE9F8] disabled:opacity-60"
         >
@@ -412,6 +414,8 @@ function Linha({
             <MessageCircle className="size-[18px]" aria-hidden />
           )}
         </button>
+        {/* o diálogo é portal, mas o clique sobe pela árvore do React: não pode abrir a linha */}
+        <span onClick={(e) => e.stopPropagation()}>{capa.dialogo}</span>
       </span>
     </div>
   );

@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
 import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA } from '../conteudo/proposta';
+import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
   ARQUIVOS_PERMITIDOS,
@@ -20,7 +21,7 @@ import {
 
 /*
  * PROPOSTA NO MODELO NOVO (formato enviado pelo cliente): três páginas A4 em retrato.
- *   1. arte de fundo (assets/proposta/pagina-1.jpg) com texto por cima — EM ESPERA do arquivo
+ *   1. CAPA: imagem fixa do tipo de serviço (assets/proposta/capas/, lib/capaDaProposta.ts)
  *   2. dinâmica: cliente, escopo do serviço em cartões por seção e o bloco fixo "contempla"
  *   3. arte de fundo (assets/proposta/pagina-3.jpg) com texto por cima — EM ESPERA do arquivo
  *
@@ -47,7 +48,6 @@ function arte(relativo: string) {
 type Arte = ReturnType<typeof arte>;
 // conferido a cada PDF: colocar o arquivo na pasta vale sem reiniciar
 const artes = () => ({
-  pagina1: arte(ARTES_DA_PROPOSTA_NOVA.fundoPagina1),
   pagina3: arte(ARTES_DA_PROPOSTA_NOVA.fundoPagina3),
   fotos: {
     DOCUMENTACAO: arte(ARTES_DA_PROPOSTA_NOVA.fotoDocumentacao),
@@ -561,7 +561,7 @@ function paginaDeArte(fundo: Arte, numero: 1 | 3, o: OrcamentoParaPdf): Content[
         {
           text: [
             { text: `Página ${numero}: arte do cliente\n`, fontSize: 16, bold: true, color: RESERVADO_TEXTO },
-            { text: `aguardando o arquivo assets/proposta/${fundo.nome}`, fontSize: 10, color: RESERVADO_TEXTO },
+            { text: `aguardando o arquivo ${fundo.nome.includes('/') ? fundo.nome : `assets/proposta/${fundo.nome}`}`, fontSize: 10, color: RESERVADO_TEXTO },
           ],
           alignment: 'center',
           absolutePosition: { x: 0, y: PAGINA.altura / 2 - 20 },
@@ -573,6 +573,13 @@ function paginaDeArte(fundo: Arte, numero: 1 | 3, o: OrcamentoParaPdf): Content[
 /** Textos posicionados sobre as artes: a preencher quando os arquivos chegarem. */
 function sobreAArte(_numero: 1 | 3, _o: OrcamentoParaPdf): Content[] {
   return [];
+}
+
+/** Capa do tipo de serviço do orçamento (ou a padrão), no mesmo formato das outras artes. */
+function capa(o: OrcamentoParaPdf): Arte {
+  const c = capaDoOrcamento(o.tipoDeServico?.nome);
+  if (c.arquivo) ARQUIVOS_PERMITIDOS.add(c.arquivo);
+  return { arquivo: c.arquivo, nome: c.esperado };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -588,7 +595,7 @@ export function documentoDaPropostaNova(o: OrcamentoParaPdf): TDocumentDefinitio
     info: { title: `Proposta ${o.codigo} — ${EMPRESA.nome}`, author: EMPRESA.nome, subject: 'Proposta comercial' },
     defaultStyle: { font: 'PlexSans', fontSize: 10, color: COR.texto, lineHeight: 1.15 },
     content: [
-      ...paginaDeArte(A.pagina1, 1, o),
+      ...paginaDeArte(capa(o), 1, o),
       { text: '', pageBreak: 'after' },
       ...escopo.conteudo,
       { text: '', pageBreak: 'before' },
