@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
 import { situacaoDoModeloDaProposta } from './lib/pdf-orcamento';
+import { artesQueFaltam } from './lib/pdf-proposta-nova';
 import express from 'express';
 import cors from 'cors';
 import { tratadorDeErros } from './lib/erros';
@@ -68,7 +69,9 @@ app.get('/saude', async (req, res) => {
     const fotos = { destino: destinoAtual(), recebendo: appTecnicoLiberado() };
     // modelo da proposta em uso; `recusado` = pediram o novo e a trava segurou (padrões em branco)
     const { modelo, recusado } = situacaoDoModeloDaProposta();
-    const proposta = { modelo, ...(recusado ? { recusado } : {}) };
+    // `artesFaltando`: só os arquivos do modelo novo que faltam na pasta (aviso; o PDF sai igual)
+    const artesFaltando = artesQueFaltam();
+    const proposta = { modelo, ...(recusado ? { recusado } : {}), ...(artesFaltando.length > 0 ? { artesFaltando } : {}) };
     res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, proposta, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
@@ -109,6 +112,11 @@ app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localho
 {
   const { recusado } = situacaoDoModeloDaProposta();
   if (recusado) console.error(`[proposta] ${recusado}`);
+  // artes do modelo novo que faltam em apps/api/assets/proposta/: só avisa (nada é bloqueado)
+  const faltando = artesQueFaltam();
+  if (faltando.length > 0) {
+    console.warn(`[proposta] Faltam ${faltando.length} arte(s) do modelo novo em apps/api/assets/proposta/: ${faltando.join(', ')}. O PDF sai sem elas (cartão sem foto, logo pulada, lugar reservado da arte).`);
+  }
 }
 
 // O roteiro de fotos de cada tipo de serviço é editado no código (compartilhado/roteiroDoServico.ts):

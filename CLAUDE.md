@@ -173,7 +173,8 @@ apps/api/                      API (Express + Prisma)
                                montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
                                Fotos dos cartões: 3:4, 40 mm (FOTO_DO_CARTAO; os arquivos têm
                                ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
-                               foto. Texto por cima das artes
+                               foto. Arte faltando (artesQueFaltam): aviso no log ao subir e em
+                               /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".

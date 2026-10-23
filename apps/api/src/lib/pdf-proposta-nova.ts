@@ -46,6 +46,21 @@ function arte(relativo: string) {
   return { arquivo: absoluto, nome: path.basename(relativo) };
 }
 type Arte = ReturnType<typeof arte>;
+
+/**
+ * Artes que o modelo novo espera e NÃO estão na pasta, a partir de assets/proposta/ (capa padrão,
+ * fotos dos cartões, logos, fundo da página 3). Só AVISO: no log ao subir e em /saude; o PDF sai
+ * do mesmo jeito (cartão sem foto, logo pulada, lugar reservado da arte).
+ */
+export function artesQueFaltam(): string[] {
+  const A = ARTES_DA_PROPOSTA_NOVA;
+  const esperadas = [A.fotoDocumentacao, A.fotoBombeiros, A.fotoInfraestrutura, ...A.logosDasMontadoras, A.fundoPagina3];
+  const faltam = esperadas.filter((relativo) => !existsSync(path.resolve(RAIZ, relativo)));
+  // a capa aceita .jpg, .jpeg ou .png (capaDaProposta.ts): confere pela mesma regra do PDF
+  const capa = capaDoOrcamento(null);
+  if (!capa.arquivo) faltam.unshift(capa.esperado);
+  return faltam.map((relativo) => relativo.replace(/^assets\/proposta\//, ''));
+}
 // conferido a cada PDF: colocar o arquivo na pasta vale sem reiniciar
 const artes = () => ({
   pagina3: arte(ARTES_DA_PROPOSTA_NOVA.fundoPagina3),
