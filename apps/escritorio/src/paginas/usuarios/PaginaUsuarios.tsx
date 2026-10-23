@@ -229,6 +229,7 @@ function DialogUsuario({
   const [email, setEmail] = useState('');
   const [papel, setPapel] = useState<Papel>('COMERCIAL');
   const [equipeId, setEquipeId] = useState('');
+  const [cargo, setCargo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -237,13 +238,15 @@ function DialogUsuario({
     setEmail(existente?.email ?? '');
     setPapel(existente?.papel ?? 'COMERCIAL');
     setEquipeId(existente?.equipeId ?? equipes[0]?.id ?? '');
+    setCargo(existente?.cargoNaProposta ?? 'Consultor');
     setErro(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo]);
 
   const salvar = useMutation({
     mutationFn: (): Promise<UsuarioComSenha | UsuarioNaLista> => {
-      const corpo = { nome: nome.trim(), papel, equipeId: papel === 'TECNICO' ? equipeId : null };
+      // em branco, a API grava o padrão "Consultor"
+      const corpo = { nome: nome.trim(), papel, equipeId: papel === 'TECNICO' ? equipeId : null, cargoNaProposta: cargo.trim() };
       return novo
         ? api.post<UsuarioComSenha>('/api/usuarios', { ...corpo, email: email.trim() })
         : api.patch<UsuarioNaLista>(`/api/usuarios/${existente!.id}`, corpo);
@@ -336,6 +339,23 @@ function DialogUsuario({
             <p id="usuario-papel-ajuda" className="-mt-2 text-xs text-muted-foreground">
               Você não pode mudar o seu próprio papel.
             </p>
+          )}
+          {papel !== 'TECNICO' && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="usuario-cargo">Cargo na proposta</Label>
+              <Input
+                id="usuario-cargo"
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                maxLength={40}
+                placeholder="Consultor"
+                aria-describedby="usuario-cargo-ajuda"
+                className="h-11 rounded-[10px]"
+              />
+              <p id="usuario-cargo-ajuda" className="text-xs text-muted-foreground">
+                Sai em maiúsculas na proposta, acima do nome de quem montou o orçamento. Ex.: Consultora, Engenheiro.
+              </p>
+            </div>
           )}
           {erro && (
             <p role="alert" className="text-[13px] text-destructive">

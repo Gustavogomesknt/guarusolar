@@ -164,7 +164,10 @@ apps/api/                      API (Express + Prisma)
                                e a lista AVISAM antes de gerar/enviar (paginas/orcamentos/capa.tsx,
                                GET /api/orcamentos/capas; só com o modelo novo ligado). Página 3 =
                                arte de fundo (assets/proposta/; sem arquivo, cinza com o nome
-                               esperado). Texto por cima das artes
+                               esperado). Itens: nome · descrição técnica. Acima do nome do
+                               vendedor, o "Cargo na proposta" dele (Usuario.cargoNaProposta,
+                               tela Usuários, padrão "Consultor"). Rodapé "Página X de N" da
+                               página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".
@@ -565,6 +568,13 @@ Cores da marca: **azul, laranja e branco**.
 **Única exceção aprovada:** o laranja escuro **`#C14D10`** pode ser fundo de texto branco
 (4,84:1). Hoje é o bloco do valor total na proposta em PDF (`COR.laranjaFundo`); use esse tom,
 e não o laranja da marca, se outro lugar precisar de laranja com texto branco.
+**Exceção consciente (23/10/2026, pedido do Gustavo):** no modelo novo da proposta
+(`pdf-proposta-nova.ts`), o cabeçalho do cartão "Adequação Corpo de Bombeiros · IT 41" usa o
+laranja DA MARCA (`#F26B21`) com texto branco, abaixo do contraste mínimo. Motivo: a página 2
+fica entre as artes do cliente, que usam o laranja vivo, e um tom diferente no meio parece erro.
+Compensação: o título branco sai maior que o dos outros cartões (10 pt com três cartões, 10,5 pt
+com dois ou um; o negrito 700 já é o peso máximo da fonte). Não vale como precedente para
+outros lugares: fora desse cartão, a regra acima continua.
 
 Verde e vermelho ficam reservados para "Aprovado" e "Recusado". Tipografia do protótipo:
 Bricolage Grotesque nos títulos, IBM Plex Sans no texto, IBM Plex Mono em códigos e valores.

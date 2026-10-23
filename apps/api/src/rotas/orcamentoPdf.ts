@@ -51,7 +51,7 @@ rotasOrcamentoPdf.get(
           where: { id: req.params.id },
           include: {
             cliente: true,
-            vendedor: { select: { nome: true, telefone: true } },
+            vendedor: { select: { nome: true, telefone: true, cargoNaProposta: true } },
             itens: { orderBy: { ordem: 'asc' }, include: { produto: { select: { categoria: true } } } },
             tipoDeServico: { select: { nome: true } },
           },

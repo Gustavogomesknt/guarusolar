@@ -121,10 +121,25 @@ export const ARTES_DA_PROPOSTA_NOVA = {
   fotoInfraestrutura: 'assets/proposta/foto-infraestrutura.jpg',
 };
 
+/**
+ * Rodapé "Página X de N" das páginas 2 em diante (a capa não tem). Copie o estilo da numeração
+ * da arte da capa quando ela chegar: tamanho, cor, alinhamento, espaçamento entre letras e a
+ * distância da base da folha. `corSobreAArte` vale na última página, que é a arte da página 3.
+ */
+export const RODAPE_DA_PROPOSTA_NOVA = {
+  texto: 'Página {pagina} de {total}',
+  tamanho: 8,
+  cor: '#5A6675',
+  corSobreAArte: '#5A6675',
+  alinhamento: 'right' as 'left' | 'center' | 'right',
+  espacamento: 0.3,
+  distanciaDaBase: 16,
+};
+
 /** Página 2 do modelo novo: textos fixos. */
 export const PAGINA_2_NOVA = {
-  /** rótulo acima do nome de quem montou o orçamento */
-  rotuloConsultor: 'CONSULTORA',
+  // o rótulo acima do nome de quem montou o orçamento é o "Cargo na proposta" do usuário
+  // (tela Usuários; padrão "Consultor"), em caixa alta
   titulo: { azul: 'ESCOPO', laranja: 'DO SERVIÇO' },
   /** títulos dos cartões em linhas; `laranja` = linhas (ou trecho final) em laranja */
   cartoes: {

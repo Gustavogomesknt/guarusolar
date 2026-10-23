@@ -428,6 +428,8 @@ export type FichaDoProjeto = {
 // ---------------------------------------------------------------------------------------------
 
 export type UsuarioNaLista = {
+  /** "Cargo na proposta" (PDF); ausente em resposta da versão anterior da API */
+  cargoNaProposta?: string;
   id: string;
   nome: string;
   email: string;

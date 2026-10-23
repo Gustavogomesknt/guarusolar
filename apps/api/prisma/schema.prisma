@@ -59,6 +59,9 @@ model Usuario {
   sessaoVersao          Int            @default(0)
   papel                 Papel
   telefone              String?
+  /// "Cargo na proposta": sai em caixa alta acima do nome de quem montou o orçamento, no PDF
+  /// (modelo novo). Texto livre, editável na tela Usuários
+  cargoNaProposta       String         @default("Consultor")
   ativo                 Boolean        @default(true)
   equipeId              String?
   equipe                Equipe?        @relation(fields: [equipeId], references: [id])

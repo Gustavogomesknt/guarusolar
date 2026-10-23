@@ -61,14 +61,15 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
   const itens = [
     item(0, 'Instalação completa', 'Mão de obra especializada', 1, 3200, 'SERVICO'),
     item(1, 'Materiais', 'Carregador não incluso', 1, 2480),
-    item(2, 'Quadro de proteção', null, 1, 1650),
+    item(2, 'Cabos de cobre 10 mm²', 'isolação 1 kV', 30, 18.5, 'M'),
+    item(8, 'Quadro de proteção', 'DR 30 mA, DPS classe II e disjuntor bipolar 40 A', 1, 1650),
     item(3, 'ART elétrica / TRT / diagrama unifilar', null, 1, 980, 'UN', g('DOCUMENTACAO')),
     item(4, 'ART civil', null, 1, 760, 'UN', g('DOCUMENTACAO')),
     item(5, 'Kit IT 41', 'Sinalização e segurança', 1, 690, 'KIT', g('BOMBEIROS')),
     // entra no preço, não aparece no PDF ("aparece na proposta" desligado)
     item(6, 'Parafusos e buchas (não aparece no PDF)', null, 40, 1.5, 'UN', 'MATERIAL', false),
     ...(opcoes.longo
-      ? Array.from({ length: 14 }, (_, i) => item(7 + i, `Cabo solar 6 mm² — trecho ${i + 1}`, 'Preto e vermelho, dupla isolação', 25 + i, 9.9, 'M'))
+      ? Array.from({ length: 14 }, (_, i) => item(9 + i, `Cabo solar 6 mm² — trecho ${i + 1}`, 'Preto e vermelho, dupla isolação', 25 + i, 9.9, 'M'))
       : []),
   ];
   // o mesmo cálculo que a API faz ao salvar
@@ -145,7 +146,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number }):
       criadoEm: new Date(),
       editadoEm: new Date(),
     },
-    vendedor: { nome: 'Vendedor de Exemplo', telefone: '11900000001' },
+    vendedor: { nome: 'Vendedora de Exemplo', telefone: '11900000001', cargoNaProposta: 'Consultora' },
     itens,
   } as OrcamentoParaPdf;
 }

@@ -98,7 +98,7 @@ pdfmake.setLocalAccessPolicy((caminho) => ARQUIVOS_PERMITIDOS.has(caminho));
 export type OrcamentoParaPdf = Prisma.OrcamentoGetPayload<{
   include: {
     cliente: true;
-    vendedor: { select: { nome: true; telefone: true } };
+    vendedor: { select: { nome: true; telefone: true; cargoNaProposta: true } };
     itens: { include: { produto: { select: { categoria: true } } } };
     /** a capa do modelo novo depende do tipo vendido */
     tipoDeServico: { select: { nome: true } };

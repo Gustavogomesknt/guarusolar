@@ -3,7 +3,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
-import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA } from '../conteudo/proposta';
+import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
@@ -165,7 +165,7 @@ function cartaoDoCliente(o: OrcamentoParaPdf): { peca: Peca; altura: number } {
       {
         columns: [
           { width: 11, svg: svgIcone(ICONE.pessoa, COR.laranja, 2.4), height: 11 },
-          { width: '*', text: PAGINA_2_NOVA.rotuloConsultor, fontSize: 7.5, bold: true, characterSpacing: 1.1, color: COR.secundario, margin: [0, 1.5, 0, 0] },
+          { width: '*', text: (o.vendedor.cargoNaProposta?.trim() || 'Consultor').toUpperCase(), fontSize: 7.5, bold: true, characterSpacing: 1.1, color: COR.secundario, margin: [0, 1.5, 0, 0] },
         ],
         columnGap: 5,
       },
@@ -205,33 +205,67 @@ function tituloDoEscopo(): { peca: Peca; altura: number } {
 // largura de um texto em negrito, com o mesmo pdfkit (motor do pdfmake) que mede as alturas
 const regua = new PDFDocument({ size: 'A4' });
 regua.registerFont('negrito', require.resolve('@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-700-normal.woff'));
-function medirLargura(texto: string, tamanho: number) {
-  return regua.font('negrito').fontSize(tamanho).widthOfString(texto, { characterSpacing: 0.4 });
+function medirLargura(texto: string, tamanho: number, espacamento = 0.4) {
+  return regua.font('negrito').fontSize(tamanho).widthOfString(texto, { characterSpacing: espacamento });
 }
 
-type Cartao = { grupo: GrupoNaProposta; itens: string[] };
+/** Item do escopo: o nome e a descrição técnica, se houver ("Cabos de cobre 10 mm² · isolação 1 kV"). */
+type ItemDoEscopo = { nome: string; tecnica: string | null };
+type Cartao = { grupo: GrupoNaProposta; itens: ItemDoEscopo[] };
+
+const SEPARADOR = ' · ';
+/** O texto inteiro, como é medido; a descrição vira uma linha só (no catálogo ela pode ter quebras). */
+const textoDoItem = (i: ItemDoEscopo) => (i.tecnica ? `${i.nome}${SEPARADOR}${i.tecnica}` : i.nome);
+/** O mesmo texto para o PDF: a descrição técnica num tom mais claro que o nome (mesma fonte e tamanho). */
+const pecaDoItem = (i: ItemDoEscopo): Peca[] => [
+  { text: i.nome, color: COR.texto },
+  ...(i.tecnica ? [{ text: `${SEPARADOR}${i.tecnica}`, color: COR.secundario }] : []),
+];
 
 /** Seções com itens; Infraestrutura sempre aparece (é a seção padrão de todo item). */
 function cartoesDoOrcamento(o: OrcamentoParaPdf): Cartao[] {
   const visiveis = o.itens.filter((i) => i.apareceNaProposta).sort((a, b) => a.ordem - b.ordem);
-  return ORDEM_DOS_GRUPOS_NA_PROPOSTA.map((grupo) => ({ grupo, itens: visiveis.filter((i) => i.grupoNaProposta === grupo).map((i) => i.descricao) })).filter(
+  const doItem = (i: (typeof visiveis)[number]): ItemDoEscopo => ({
+    nome: i.descricao.trim(),
+    tecnica: i.descricaoTecnica?.replace(/\s+/g, ' ').trim() || null,
+  });
+  return ORDEM_DOS_GRUPOS_NA_PROPOSTA.map((grupo) => ({ grupo, itens: visiveis.filter((i) => i.grupoNaProposta === grupo).map(doItem) })).filter(
     (c) => c.itens.length > 0 || c.grupo === 'MATERIAL',
   );
 }
 
-const CABECALHO_CARTAO = { paddingX: 11, paddingY: 10, tamanho: 9.5, entrelinha: 1.12, icone: 20 };
+// tamanhoSobreLaranja: o título branco sobre o laranja da marca sai maior (o negrito 700 já é o
+// peso máximo da IBM Plex Sans), para compensar o contraste menor: até 10,5 pt, o maior em que
+// cada linha cabe sem quebrar na largura do cartão. Com três cartões "CORPO DE BOMBEIROS" limita:
+// as letras ficam um pouco mais juntas (0,2) para chegar a 10 pt
+
+const CABECALHO_CARTAO = { paddingX: 11, paddingY: 10, tamanho: 9.5, tamanhoSobreLaranja: 10.5, entrelinha: 1.12, icone: 20, espacamento: 0.5 };
+
+/** Tamanho e espaçamento do título: o padrão, ou o maior que cabe (até o teto) no de bombeiros. */
+function tituloDoCartao(grupo: GrupoNaProposta, larguraDoCartao: number): { tamanho: number; espacamento: number } {
+  const padrao = { tamanho: CABECALHO_CARTAO.tamanho, espacamento: CABECALHO_CARTAO.espacamento };
+  if (grupo !== 'BOMBEIROS') return padrao;
+  const larguraTexto = larguraDoCartao - 2 * CABECALHO_CARTAO.paddingX - CABECALHO_CARTAO.icone - 9 - 0.5;
+  const linhas = PAGINA_2_NOVA.cartoes[grupo].linhas;
+  for (let tamanho = CABECALHO_CARTAO.tamanhoSobreLaranja; tamanho > CABECALHO_CARTAO.tamanho; tamanho -= 0.25) {
+    for (const espacamento of [CABECALHO_CARTAO.espacamento, 0.2]) {
+      if (linhas.every((l) => medirLargura(l, tamanho, espacamento) <= larguraTexto)) return { tamanho, espacamento };
+    }
+  }
+  return padrao;
+}
 const ITENS_CARTAO = { paddingX: 11, paddingTop: 11, paddingBottom: 10, tamanho: 9, entrelinha: 1.2, marcador: 11, gap: 6, entreItens: 6 };
 
-function alturaDosItens(itens: string[], larguraColuna: number) {
+function alturaDosItens(itens: ItemDoEscopo[], larguraColuna: number) {
   const larguraTexto = larguraColuna - ITENS_CARTAO.marcador - ITENS_CARTAO.gap;
   return itens.reduce(
-    (t, item, i) => t + (i ? ITENS_CARTAO.entreItens : 0) + Math.max(ITENS_CARTAO.marcador, alturaDoTexto(item, larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha)),
+    (t, item, i) => t + (i ? ITENS_CARTAO.entreItens : 0) + Math.max(ITENS_CARTAO.marcador, alturaDoTexto(textoDoItem(item), larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha)),
     0,
   );
 }
 
 /** Itens em uma coluna (dois ou três cartões) ou duas (cartão sozinho na largura toda). */
-function colunasDosItens(itens: string[], largura: number, colunas: number) {
+function colunasDosItens(itens: ItemDoEscopo[], largura: number, colunas: number) {
   const gap = 14;
   const larguraColuna = (largura - (colunas - 1) * gap) / colunas;
   const porColuna = Math.ceil(itens.length / colunas) || 0;
@@ -242,12 +276,12 @@ function colunasDosItens(itens: string[], largura: number, colunas: number) {
     columns: grupos.map((g) => ({
       width: larguraColuna,
       stack: g.map((item, i) => {
-        const alturaTexto = alturaDoTexto(item, larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha);
+        const alturaTexto = alturaDoTexto(textoDoItem(item), larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha);
         return {
           columns: [
             // o tique acompanha a primeira linha do texto
             { width: ITENS_CARTAO.marcador, svg: TIQUE, height: ITENS_CARTAO.marcador, margin: [0, Math.max(0, (Math.min(alturaTexto, ITENS_CARTAO.tamanho * ITENS_CARTAO.entrelinha * 1.15) - ITENS_CARTAO.marcador) / 2), 0, 0] },
-            { width: '*', text: item, fontSize: ITENS_CARTAO.tamanho, lineHeight: ITENS_CARTAO.entrelinha, color: COR.texto },
+            { width: '*', text: pecaDoItem(item), fontSize: ITENS_CARTAO.tamanho, lineHeight: ITENS_CARTAO.entrelinha },
           ],
           columnGap: ITENS_CARTAO.gap,
           margin: [0, i ? ITENS_CARTAO.entreItens : 0, 0, 0],
@@ -259,10 +293,10 @@ function colunasDosItens(itens: string[], largura: number, colunas: number) {
   return { peca, altura };
 }
 
-function alturaDoCabecalho(cartoes: Cartao[]) {
-  const linhas = Math.max(...cartoes.map((c) => PAGINA_2_NOVA.cartoes[c.grupo].linhas.length));
-  const linha = alturaDoTexto('X', 200, CABECALHO_CARTAO.tamanho, CABECALHO_CARTAO.entrelinha, true);
-  return Math.max(CABECALHO_CARTAO.icone, linhas * linha) + 2 * CABECALHO_CARTAO.paddingY;
+function alturaDoCabecalho(cartoes: Cartao[], larguraDoCartao: number) {
+  const altura = (c: Cartao) =>
+    PAGINA_2_NOVA.cartoes[c.grupo].linhas.length * alturaDoTexto('X', 200, tituloDoCartao(c.grupo, larguraDoCartao).tamanho, CABECALHO_CARTAO.entrelinha, true);
+  return Math.max(CABECALHO_CARTAO.icone, ...cartoes.map(altura)) + 2 * CABECALHO_CARTAO.paddingY;
 }
 
 /** Foto no pé do cartão, cantos de baixo arredondados (ou o lugar reservado, em cinza). */
@@ -308,13 +342,15 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
   const raio = 9;
   const config = PAGINA_2_NOVA.cartoes[cartao.grupo];
   const laranja = cartao.grupo === 'BOMBEIROS';
-  // fundo laranja com texto branco: o laranja escuro aprovado (4,84:1), não o da marca (3,04:1)
-  const fundo = laranja ? COR.laranjaFundo : COR.marinho;
+  // Laranja DA MARCA com texto branco: exceção consciente à regra de contraste (CLAUDE.md, cores),
+  // porque a página fica entre as artes do cliente, de laranja vivo. Compensa: título maior.
+  const fundo = laranja ? COR.laranja : COR.marinho;
   const corIcone = laranja ? COR.branco : COR.laranja;
   const desenho = { DOCUMENTACAO: ICONE.documento, BOMBEIROS: ICONE.chama, MATERIAL: ICONE.chave }[cartao.grupo];
   const total = alturas.cabecalho + alturas.itens + alturas.foto;
   const itens = colunasDosItens(cartao.itens, largura - 2 * ITENS_CARTAO.paddingX, colunasDeItens);
-  const linhaTitulo = alturaDoTexto('X', 200, CABECALHO_CARTAO.tamanho, CABECALHO_CARTAO.entrelinha, true);
+  const { tamanho: tamanhoTitulo, espacamento } = tituloDoCartao(cartao.grupo, largura);
+  const linhaTitulo = alturaDoTexto('X', 200, tamanhoTitulo, CABECALHO_CARTAO.entrelinha, true);
   const alturaTitulo = config.linhas.length * linhaTitulo;
   const alturaInternaCabecalho = alturas.cabecalho - 2 * CABECALHO_CARTAO.paddingY;
 
@@ -349,10 +385,10 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
                     margin: [0, Math.max(0, (alturaInternaCabecalho - alturaTitulo) / 2), 0, 0],
                     stack: config.linhas.map((linha) => ({
                       text: comTrechoLaranja(linha, laranja ? '' : config.laranja, COR.branco),
-                      fontSize: CABECALHO_CARTAO.tamanho,
+                      fontSize: tamanhoTitulo,
                       bold: true,
                       lineHeight: CABECALHO_CARTAO.entrelinha,
-                      characterSpacing: 0.5,
+                      characterSpacing: espacamento,
                     })),
                   },
                 ],
@@ -452,7 +488,7 @@ export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; foto
   const gap = 10;
   const largura = (LARGURA - (cartoes.length - 1) * gap) / cartoes.length;
   const colunasDeItens = cartoes.length === 1 ? 2 : 1;
-  const cabecalho = alturaDoCabecalho(cartoes);
+  const cabecalho = alturaDoCabecalho(cartoes, largura);
   const itensMedidos = Math.max(
     ...cartoes.map((c) => colunasDosItens(c.itens, largura - 2 * ITENS_CARTAO.paddingX, colunasDeItens).altura),
   );
@@ -496,16 +532,16 @@ export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; foto
 function secaoEmLista(cartao: Cartao): Peca {
   const config = PAGINA_2_NOVA.cartoes[cartao.grupo];
   const laranja = cartao.grupo === 'BOMBEIROS';
-  const fundo = laranja ? COR.laranjaFundo : COR.marinho;
+  const fundo = laranja ? COR.laranja : COR.marinho; // exceção consciente: ver cartaoDoEscopo
   const COLUNAS = 3;
   // a soma das colunas e dos espaçamentos (11 nas bordas, 4 de cada lado entre colunas) fecha com a largura
   const larguraColuna = (LARGURA - 2 * ITENS_CARTAO.paddingX - (COLUNAS - 1) * 2 * 4) / COLUNAS;
-  const celula = (item?: string): Peca =>
+  const celula = (item?: ItemDoEscopo): Peca =>
     item
       ? {
           columns: [
             { width: ITENS_CARTAO.marcador, svg: TIQUE, height: ITENS_CARTAO.marcador, margin: [0, 0.5, 0, 0] },
-            { width: '*', text: item, fontSize: ITENS_CARTAO.tamanho, lineHeight: ITENS_CARTAO.entrelinha },
+            { width: '*', text: pecaDoItem(item), fontSize: ITENS_CARTAO.tamanho, lineHeight: ITENS_CARTAO.entrelinha },
           ],
           columnGap: ITENS_CARTAO.gap,
         }
@@ -520,7 +556,7 @@ function secaoEmLista(cartao: Cartao): Peca {
       colSpan: COLUNAS,
       fillColor: fundo,
       text: comTrechoLaranja(titulo, laranja ? '' : config.laranja, COR.branco),
-      fontSize: CABECALHO_CARTAO.tamanho,
+      fontSize: tituloDoCartao(cartao.grupo, LARGURA).tamanho,
       bold: true,
       characterSpacing: 0.5,
       margin: [0, 2, 0, 2],
@@ -594,6 +630,19 @@ export function documentoDaPropostaNova(o: OrcamentoParaPdf): TDocumentDefinitio
     pageMargins: [LATERAL, MARGEM_PAGINA, LATERAL, MARGEM_PAGINA],
     info: { title: `Proposta ${o.codigo} — ${EMPRESA.nome}`, author: EMPRESA.nome, subject: 'Proposta comercial' },
     defaultStyle: { font: 'PlexSans', fontSize: 10, color: COR.texto, lineHeight: 1.15 },
+    // "Página X de N" nas páginas 2 em diante; a capa (página 1) é a arte, sem rodapé do sistema
+    footer: (pagina: number, total: number) => {
+      if (pagina === 1) return null;
+      const R = RODAPE_DA_PROPOSTA_NOVA;
+      return {
+        text: R.texto.replace('{pagina}', String(pagina)).replace('{total}', String(total)),
+        fontSize: R.tamanho,
+        color: pagina === total ? R.corSobreAArte : R.cor,
+        alignment: R.alinhamento,
+        characterSpacing: R.espacamento,
+        margin: [LATERAL, MARGEM_PAGINA - R.distanciaDaBase - R.tamanho, LATERAL, 0],
+      } as Content;
+    },
     content: [
       ...paginaDeArte(capa(o), 1, o),
       { text: '', pageBreak: 'after' },

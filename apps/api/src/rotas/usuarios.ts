@@ -23,6 +23,7 @@ const camposPublicos = {
   email: true,
   papel: true,
   equipeId: true,
+  cargoNaProposta: true,
   ativo: true,
   senhaTemporaria: true,
   criadoEm: true,
@@ -34,6 +35,14 @@ const camposPublicos = {
 /** Linha no log da hospedagem (quem fez o quê), como os eventos de login. Nunca a senha. */
 const registrar = (evento: string, dados: Record<string, unknown>) =>
   console.warn(JSON.stringify({ quando: new Date().toISOString(), evento, ...dados }));
+
+/** "Cargo na proposta": texto livre; em branco volta ao padrão. Ausente (tela antiga) não muda nada. */
+const cargoNaProposta = z
+  .string()
+  .trim()
+  .max(40, 'Use até 40 caracteres')
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v || 'Consultor'));
 
 async function equipeValida(papel: Papel, equipeId: string | null | undefined) {
   if (papel !== 'TECNICO') return null; // equipe só faz sentido para técnico
@@ -63,6 +72,7 @@ rotasUsuarios.post(
         email: z.string().trim().toLowerCase().email('E-mail inválido'),
         papel: z.enum(PAPEIS),
         equipeId: z.string().nullish(),
+        cargoNaProposta,
       })
       .parse(req.body);
     if (await prisma.usuario.findUnique({ where: { email: dados.email } })) {
@@ -71,7 +81,15 @@ rotasUsuarios.post(
     const equipeId = await equipeValida(dados.papel, dados.equipeId);
     const senha = gerarSenhaTemporaria();
     const usuario = await prisma.usuario.create({
-      data: { nome: dados.nome, email: dados.email, papel: dados.papel, equipeId, senhaHash: await gerarHash(senha), senhaTemporaria: true },
+      data: {
+        nome: dados.nome,
+        email: dados.email,
+        papel: dados.papel,
+        equipeId,
+        ...(dados.cargoNaProposta ? { cargoNaProposta: dados.cargoNaProposta } : {}),
+        senhaHash: await gerarHash(senha),
+        senhaTemporaria: true,
+      },
       select: camposPublicos,
     });
     registrar('usuario_criado', { por: req.usuario!.id, usuario: usuario.id, email: usuario.email, papel: usuario.papel });
@@ -93,6 +111,7 @@ rotasUsuarios.patch(
         papel: z.enum(PAPEIS).optional(),
         equipeId: z.string().nullish(),
         ativo: z.boolean().optional(),
+        cargoNaProposta,
       })
       .parse(req.body);
     const atual = await prisma.usuario.findUnique({ where: { id: req.params.id } });
@@ -113,7 +132,7 @@ rotasUsuarios.patch(
     const mudaAcesso = papel !== atual.papel || ativo !== atual.ativo || equipeId !== atual.equipeId;
     const usuario = await prisma.usuario.update({
       where: { id: atual.id },
-      data: { nome: dados.nome, papel, equipeId, ativo, ...(mudaAcesso ? { sessaoVersao: { increment: 1 } } : {}) },
+      data: { nome: dados.nome, cargoNaProposta: dados.cargoNaProposta, papel, equipeId, ativo, ...(mudaAcesso ? { sessaoVersao: { increment: 1 } } : {}) },
       select: camposPublicos,
     });
     if (mudaAcesso) esquecerSessao(atual.id);
