@@ -27,8 +27,11 @@ export const CATEGORIAS_PRODUTO = [
 ] as const;
 export type CategoriaProduto = (typeof CATEGORIAS_PRODUTO)[number];
 
-/** Parte da proposta em PDF em que o item sai (materiais primeiro, documentação depois). */
-export const GRUPOS_NA_PROPOSTA = ['MATERIAL', 'DOCUMENTACAO'] as const;
+/**
+ * Seção da proposta em PDF em que o item sai. Esta é a ordem do banco (valor novo entra no fim);
+ * a ordem das telas e do PDF é ORDEM_DOS_GRUPOS_NA_PROPOSTA (rotulos.ts).
+ */
+export const GRUPOS_NA_PROPOSTA = ['MATERIAL', 'DOCUMENTACAO', 'BOMBEIROS'] as const;
 export type GrupoNaProposta = (typeof GRUPOS_NA_PROPOSTA)[number];
 
 export const UNIDADES = ['UN', 'PECA', 'KIT', 'M', 'BARRA', 'ROLO', 'SERVICO', 'KWP'] as const;

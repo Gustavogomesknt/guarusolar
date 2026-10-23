@@ -25,6 +25,8 @@ export type ItemFormulario = {
   precoTabela: number;
   quantidade: string;
   precoUnitario: string;
+  /** listado no PDF do cliente (no preço entra sempre); começa como o catálogo */
+  apareceNaProposta: boolean;
 };
 
 export type FormularioOrcamento = {
@@ -52,8 +54,6 @@ export type FormularioOrcamento = {
   observacoes: string;
   /** título do serviço no PDF ("Instalação de carregador veicular · Residencial") */
   descricaoServico: string;
-  /** PDF com preço unitário e subtotal de cada item (padrão: só item e quantidade) */
-  detalharPrecosNoPdf: boolean;
   /** prazo de execução, texto livre; rascunho pode ficar sem, mas sem ele não há PDF nem envio */
   prazoExecucao: string;
   /** garantia do serviço no PDF; começa no texto padrão (compartilhado/textosDaProposta.ts) */
@@ -106,7 +106,6 @@ export function valoresIniciais(): FormularioOrcamento {
     validade: dataDaquiA(DIAS_DE_VALIDADE),
     observacoes: '',
     descricaoServico: '',
-    detalharPrecosNoPdf: false,
     prazoExecucao: '',
     garantia: GARANTIA_PADRAO,
     atualizarDadosCliente: false,
@@ -123,6 +122,7 @@ export function itemDoProduto(produto: Produto): ItemFormulario {
     precoTabela,
     quantidade: '1',
     precoUnitario: formatarDecimal(precoTabela),
+    apareceNaProposta: produto.apareceNaProposta ?? true,
   };
 }
 
@@ -243,7 +243,6 @@ export function paraApi(f: FormularioOrcamento) {
       : {}),
     observacoes: f.observacoes.trim() || undefined,
     descricaoServico: f.descricaoServico.trim() || undefined,
-    detalharPrecosNoPdf: f.detalharPrecosNoPdf,
     // sempre enviados, mesmo vazios: vazio apaga o que estava gravado
     prazoExecucao: f.prazoExecucao.trim(),
     garantia: f.garantia.trim(),
@@ -252,6 +251,7 @@ export function paraApi(f: FormularioOrcamento) {
       produtoId: item.produtoId,
       quantidade: lerNumero(item.quantidade),
       precoUnitario: lerNumero(item.precoUnitario),
+      apareceNaProposta: item.apareceNaProposta,
     })),
   };
 }
@@ -383,6 +383,7 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
       precoTabela: Number(item.precoTabela),
       quantidade: formatarQuantidade(Number(item.quantidade)),
       precoUnitario: formatarDecimal(Number(item.precoUnitario)),
+      apareceNaProposta: item.apareceNaProposta ?? true,
     })),
     // a margem GRAVADA: orçamento anterior ao campo abre com zero, não com o padrão
     margem: formatarDecimal(Number(o.margem ?? 0)),
@@ -401,7 +402,6 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     validade: o.validade.slice(0, 10),
     observacoes: o.observacoes ?? '',
     descricaoServico: o.descricaoServico ?? '',
-    detalharPrecosNoPdf: o.detalharPrecosNoPdf,
     prazoExecucao: o.prazoExecucao ?? '',
     // sem garantia gravada (orçamento anterior ao campo), parte do padrão: é o que o PDF mostra
     garantia: o.garantia || GARANTIA_PADRAO,
@@ -414,6 +414,8 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   codigo: o.codigo,
   status: o.status,
   subtotal: o.subtotal,
+  // sem ela, ao abrir um orçamento salvo a linha "Itens" mostrava o subtotal já com a margem
+  margem: o.margem,
   descontoAplicado: o.descontoAplicado,
   impostoAplicado: o.impostoAplicado,
   valorTotal: o.valorTotal,

@@ -11,6 +11,7 @@ import {
   calcularMargem,
   formatarBRL,
   GRUPOS_NA_PROPOSTA,
+  ORDEM_DOS_GRUPOS_NA_PROPOSTA,
   ROTULO_CATEGORIA,
   TITULO_GRUPO_NA_PROPOSTA,
   UNIDADES,
@@ -58,6 +59,7 @@ const esquema = z.object({
   nome: z.string().trim().min(3, 'Informe o nome do item (pelo menos 3 letras)'),
   categoria: z.enum(CATEGORIAS_PRODUTO),
   grupoNaProposta: z.enum(GRUPOS_NA_PROPOSTA),
+  apareceNaProposta: z.boolean(),
   unidade: z.enum(UNIDADES),
   // opcional: em branco = custo desconhecido; 0 = custo zero de verdade
   precoCusto: z.string().refine((v) => v.trim() === '' || lerNumero(v) >= 0, 'Informe um valor válido ou deixe em branco'),
@@ -73,8 +75,9 @@ function valoresDoItem(item: Produto | null): DadosItem {
     nome: item?.nome ?? '',
     // o catálogo da Guarusolar é quase todo elétrico e de carregador: "Outros" obriga a escolher
     categoria: item?.categoria ?? 'OUTROS',
-    // ninguém é classificado sozinho: todo item começa como material
+    // ninguém é classificado sozinho: todo item começa em Infraestrutura, aparecendo na proposta
     grupoNaProposta: item?.grupoNaProposta ?? 'MATERIAL',
+    apareceNaProposta: item?.apareceNaProposta ?? true,
     unidade: item?.unidade ?? 'UN',
     precoCusto: item && item.precoCusto !== null ? formatarDecimal(Number(item.precoCusto)) : '',
     precoVenda: item ? formatarDecimal(Number(item.precoVenda)) : '',
@@ -88,6 +91,7 @@ const paraApi = (d: DadosItem) => ({
   nome: d.nome.trim(),
   categoria: d.categoria,
   grupoNaProposta: d.grupoNaProposta,
+  apareceNaProposta: d.apareceNaProposta,
   unidade: d.unidade,
   precoCusto: d.precoCusto.trim() === '' ? null : lerNumero(d.precoCusto),
   precoVenda: lerNumero(d.precoVenda),
@@ -234,10 +238,10 @@ export function PainelItem({
               <Campo
                 id="item-grupo"
                 rotulo="Na proposta em PDF, sai em"
-                ajuda="Documentação e engenharia: ART, diagrama unifilar, memorial descritivo, Kit IT 41... Sai numa seção própria do PDF, depois dos materiais, com subtotal."
+                ajuda="Documentação: ART, diagrama unifilar, memorial descritivo. Bombeiros: Kit IT 41, botoeira de emergência, placas de sinalização, interface de seccionamento. O resto fica em Infraestrutura. No PDF, nesta ordem."
               >
                 <select id="item-grupo" {...register('grupoNaProposta')} className={CLASSE_SELECT}>
-                  {GRUPOS_NA_PROPOSTA.map((g) => (
+                  {ORDEM_DOS_GRUPOS_NA_PROPOSTA.map((g) => (
                     <option key={g} value={g}>
                       {TITULO_GRUPO_NA_PROPOSTA[g]}
                     </option>
@@ -303,6 +307,31 @@ export function PainelItem({
                   className="rounded-[10px] text-sm leading-relaxed"
                 />
               </Campo>
+
+              <Controller
+                control={control}
+                name="apareceNaProposta"
+                render={({ field }) => (
+                  <div className="flex items-start justify-between gap-4 rounded-[10px] border px-3.5 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <label htmlFor="item-aparece" className="text-sm font-medium">
+                        {field.value ? 'Aparece na proposta' : 'Não aparece na proposta'}
+                      </label>
+                      <p id="item-aparece-ajuda" className="text-[13px] text-muted-foreground">
+                        Desligado, o item entra no orçamento e no preço, mas não é listado no PDF do cliente. Vale
+                        para os próximos orçamentos; em cada orçamento dá para mudar item a item.
+                      </p>
+                    </div>
+                    <Switch
+                      id="item-aparece"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-describedby="item-aparece-ajuda"
+                      className="mt-0.5"
+                    />
+                  </div>
+                )}
+              />
 
               <Controller
                 control={control}

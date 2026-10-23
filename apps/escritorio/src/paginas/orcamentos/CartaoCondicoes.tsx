@@ -384,32 +384,9 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
         />
       </Campo>
 
-      <Controller
-        control={control}
-        name="detalharPrecosNoPdf"
-        render={({ field }) => (
-          <div className="flex items-start justify-between gap-3">
-            <Label htmlFor="detalhar-precos" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
-              Detalhar preços por item no PDF
-              <span id="detalhar-precos-ajuda" className="text-xs font-normal text-muted-foreground">
-                Desmarcado, o cliente vê só os itens, as quantidades e o valor total.
-              </span>
-              {field.value && margem > 0 && (
-                <span id="detalhar-precos-margem" className="text-xs font-normal text-destaque-texto">
-                  No PDF, o preço de cada item sai com a margem distribuída (para a soma fechar com o subtotal de{' '}
-                  {formatarBRL(subtotal)}). Por isso fica diferente do preço do catálogo: não é defeito.
-                </span>
-              )}
-            </Label>
-            <Switch
-              id="detalhar-precos"
-              aria-describedby="detalhar-precos-ajuda"
-              checked={field.value}
-              onCheckedChange={field.onChange}
-            />
-          </div>
-        )}
-      />
+      {/* "Detalhar preços por item no PDF" saiu em 23/10/2026: a proposta lista o escopo, sem
+          quantidade nem preço por item, e o preço aparece uma vez, no total. A coluna
+          detalharPrecosNoPdf continua no banco (e o histórico do git tem esta parte da tela). */}
     </section>
   );
 }

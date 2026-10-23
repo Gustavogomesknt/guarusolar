@@ -4,7 +4,7 @@ import { Loader2, Package, Pencil, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CATEGORIAS_PRODUTO,
-  GRUPOS_NA_PROPOSTA,
+  ORDEM_DOS_GRUPOS_NA_PROPOSTA,
   ROTULO_CATEGORIA,
   ROTULO_GRUPO_NA_PROPOSTA,
   ROTULO_UNIDADE,
@@ -88,9 +88,9 @@ export function PaginaCatalogo() {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* parte da proposta em PDF: materiais ou documentação (o cliente marca item a item) */}
+          {/* seção da proposta em PDF (o cliente marca item a item) */}
           <div role="group" aria-label="Filtrar pela parte da proposta" className="flex h-10 overflow-hidden rounded-[10px] border border-input">
-            {(['TODOS', ...GRUPOS_NA_PROPOSTA] as FiltroGrupo[]).map((g) => (
+            {(['TODOS', ...ORDEM_DOS_GRUPOS_NA_PROPOSTA] as FiltroGrupo[]).map((g) => (
               <button
                 key={g}
                 type="button"
@@ -101,7 +101,7 @@ export function PaginaCatalogo() {
                   grupo === g ? 'bg-foreground text-white' : 'bg-card text-foreground hover:bg-muted',
                 )}
               >
-                {g === 'TODOS' ? 'Material e documentação' : ROTULO_GRUPO_NA_PROPOSTA[g]}
+                {g === 'TODOS' ? 'Todas as seções' : ROTULO_GRUPO_NA_PROPOSTA[g]}
               </button>
             ))}
           </div>
@@ -245,10 +245,15 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
         >
           {ROTULO_CATEGORIA[item.categoria]}
         </span>
-        {/* só a exceção ganha etiqueta: material é o padrão de todos */}
-        {item.grupoNaProposta === 'DOCUMENTACAO' && (
+        {/* só a exceção ganha etiqueta: Infraestrutura e "aparece na proposta" são o padrão */}
+        {item.grupoNaProposta && item.grupoNaProposta !== 'MATERIAL' && (
           <span className="inline-block rounded-full border border-destaque bg-destaque-suave px-2 py-0.5 text-[11px] font-medium text-destaque-texto">
-            Documentação
+            {ROTULO_GRUPO_NA_PROPOSTA[item.grupoNaProposta]}
+          </span>
+        )}
+        {item.apareceNaProposta === false && (
+          <span className="inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            Fora do PDF
           </span>
         )}
       </span>

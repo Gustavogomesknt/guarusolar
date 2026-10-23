@@ -41,8 +41,18 @@ export function LinhaItem({ indice, onRemover }: { indice: number; onRemover: ()
         <span id={`${idBase}-nome`} className="text-sm font-semibold">
           {item.nome}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
           {ROTULO_CATEGORIA[item.categoria]} · por {ROTULO_UNIDADE[item.unidade]}
+          {/* discreto, dentro da célula do nome: nada de coluna nova (pedido do cliente) */}
+          <label className="inline-flex cursor-pointer items-center gap-1">
+            <input
+              type="checkbox"
+              aria-label={`${item.nome} aparece no PDF da proposta`}
+              {...register(`itens.${indice}.apareceNaProposta`)}
+              className="size-3.5 accent-primary"
+            />
+            {item.apareceNaProposta ? 'Na proposta' : <span className="text-destaque-texto">Fora do PDF (entra no preço)</span>}
+          </label>
         </span>
         {ajustado && (
           <span id={`${idBase}-ajuste`} className="text-xs text-destaque-texto">

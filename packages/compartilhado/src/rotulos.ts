@@ -16,15 +16,22 @@ export const ROTULO_CATEGORIA: Record<CategoriaProduto, string> = {
   OUTROS: 'Outros',
 };
 
-/** Grupo do item: rótulo curto (catálogo) e título da seção na proposta em PDF. */
+/**
+ * Grupo do item: rótulo curto (catálogo) e título da seção na proposta em PDF, com os nomes que
+ * a Guarusolar usa na peça dela. MATERIAL continua sendo o padrão de todo item.
+ */
 export const ROTULO_GRUPO_NA_PROPOSTA: Record<GrupoNaProposta, string> = {
-  MATERIAL: 'Material',
   DOCUMENTACAO: 'Documentação',
+  BOMBEIROS: 'Bombeiros · IT 41',
+  MATERIAL: 'Infraestrutura',
 };
 export const TITULO_GRUPO_NA_PROPOSTA: Record<GrupoNaProposta, string> = {
-  MATERIAL: 'Materiais e equipamentos',
-  DOCUMENTACAO: 'Documentação e engenharia',
+  DOCUMENTACAO: 'Documentação de engenharia',
+  BOMBEIROS: 'Adequação Corpo de Bombeiros · IT 41',
+  MATERIAL: 'Infraestrutura da instalação',
 };
+/** Ordem das seções no PDF e nas escolhas das telas. */
+export const ORDEM_DOS_GRUPOS_NA_PROPOSTA: readonly GrupoNaProposta[] = ['DOCUMENTACAO', 'BOMBEIROS', 'MATERIAL'];
 
 /** Unidade abreviada, usada em "por un", "40 m", "1 kit". */
 export const ROTULO_UNIDADE: Record<Unidade, string> = {

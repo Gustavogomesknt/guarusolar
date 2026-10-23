@@ -13,8 +13,11 @@ rotasProdutos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
 const produtoSchema = z.object({
   nome: z.string().min(3),
   categoria: z.enum(CATEGORIAS_PRODUTO),
-  // parte da proposta em PDF (materiais ou documentação); ausente = MATERIAL ao criar, mantém ao editar
+  // seção da proposta em PDF; ausente = MATERIAL ao criar, mantém ao editar
   grupoNaProposta: z.enum(GRUPOS_NA_PROPOSTA).optional(),
+  // desligado, o item entra no orçamento e no preço, mas não é listado no PDF; ausente = ligado ao
+  // criar, mantém ao editar (tela da versão anterior, durante uma publicação)
+  apareceNaProposta: z.boolean().optional(),
   unidade: z.enum(UNIDADES).default('UN'),
   // código que a Guarusolar já usa (113, 320...); texto vazio vira null
   codigoFornecedor: z

@@ -547,9 +547,16 @@ pasta de armazenamento não são removidos.
   é obrigatório para gerar o PDF e enviar (o rascunho pode ficar sem), e a garantia já vem com o
   texto padrão de 12 meses. As sugestões de prazo e o texto padrão da garantia ficam num lugar
   só: `packages/compartilhado/src/textosDaProposta.ts`. Depois de editar, `npm run pdf:exemplo` gera três PDFs de exemplo, sem banco
-  (padrão, com preços e com muitos itens), para conferir. No gerador de orçamentos, "Serviço"
-  vira o título da proposta e "Detalhar preços por item no PDF" (desmarcado por padrão) mostra
-  preço unitário e subtotal de cada item.
+  (padrão em três seções, uma lista só e muitos itens), para conferir. No gerador de orçamentos,
+  "Serviço" vira o título da proposta.
+- **Itens na proposta = lista de escopo** (23/10/2026): o PDF mostra só o nome de cada item (e a
+  descrição técnica, se houver), sem quantidade e sem preço unitário; o preço aparece uma vez, no
+  total. As seções seguem a ordem da peça da Guarusolar: "Documentação de engenharia",
+  "Adequação Corpo de Bombeiros · IT 41" e "Infraestrutura da instalação" (padrão de todo item;
+  se todos estão nela, a lista sai sem títulos de seção). Quem marca a seção é o cliente, no
+  catálogo. Item com **"aparece na proposta"** desligado (no catálogo, valendo para os próximos
+  orçamentos, ou na caixa "Na proposta" da linha do item, no gerador) entra no orçamento e no
+  preço, mas não é listado no PDF. O antigo "Detalhar preços por item no PDF" saiu da tela.
 - **Publicar:** ver "Publicar em produção (Render)" abaixo.
 
 ## Publicar em produção (Render)

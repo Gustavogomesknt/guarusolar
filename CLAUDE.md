@@ -156,8 +156,9 @@ apps/api/                      API (Express + Prisma)
                                quebram o subset do pdfkit; Bricolage só existe variável: títulos
                                em Plex negrito). Conferir com `npm run pdf:exemplo` e olhar o PDF
   src/conteudo/proposta.ts     EDITÁVEL: dados da empresa, textos fixos da página 1 e a página
-                               institucional inteira. Orçamento: descricaoServico (título) e
-                               detalharPrecosNoPdf (preço unitário e subtotal; padrão false).
+                               institucional inteira. Orçamento: descricaoServico (título).
+                               Itens = lista de ESCOPO (só o nome; sem quantidade nem preço:
+                               23/10/2026). detalharPrecosNoPdf continua no banco, sem uso
                                Prazo e garantia NÃO ficam aqui: são texto de cada orçamento
   scripts/pdf-exemplo.ts       npm run pdf:exemplo [pasta]: PDFs de exemplo sem banco
   scripts/importar-produtos.ts npm run produtos:importar -- revisar|gravar: catálogo a partir de
@@ -364,9 +365,9 @@ O `.env` da API fica em `apps/api/.env`.
    -> + imposto -> total -> entrada e cartão.
    A margem entra ANTES do desconto (decisão): o cliente não a vê, e "10% de desconto" tem de ser
    10% do preço que ele vê; a tela avisa, sem bloquear, quando o desconto passa da margem.
-   **O cliente NUNCA vê a margem**: nem linha no PDF, nem no WhatsApp. Com "detalhar preços", o PDF
-   distribui a margem nos preços dos itens (`distribuirMargem`, centavos inteiros: a soma das
-   linhas fecha com o subtotal); os preços gravados nos itens não mudam. Fica GRAVADA em
+   **O cliente NUNCA vê a margem**: nem linha no PDF, nem no WhatsApp. O PDF não mostra preço por
+   item (só o total), então a margem fica embutida no total; `distribuirMargem` serviu ao antigo
+   "detalhar preços" e ficou no código para o caso de ele voltar. Fica GRAVADA em
    `Orcamento.margem`; orçamento anterior ao campo tem zero e abre com zero (não com o padrão).
    **Imposto do orçamento** (14/10/2026): `impostoPct`, editável por proposta, padrão 0; incide
    sobre o valor JÁ com os dois descontos (`impostoAplicado`, em R$) e `valorTotal` já o inclui,
@@ -379,12 +380,15 @@ O `.env` da API fica em `apps/api/.env`.
    gravados no item (e também a `descricaoTecnica`, que sai no PDF). Mudança futura no catálogo
    não altera orçamento antigo. Na edição (PUT),
    itens que já estavam no orçamento mantêm a cópia gravada; só itens novos copiam o catálogo.
-   O `grupoNaProposta` também é cópia: MATERIAL ou DOCUMENTACAO (ART, diagrama unifilar, memorial
-   descritivo, Kit IT 41...), marcado pelo cliente no catálogo; nenhum item foi classificado
-   automaticamente (o campo `categoria`, que já existia, NÃO decide isso). Com algum item de
-   documentação, o PDF divide a tabela em "Materiais e equipamentos" e "Documentação e
-   engenharia", cada uma com subtotal (margem e imposto embutido distribuídos); sem nenhum, o PDF
-   é o de antes. Marcar no catálogo depois não muda orçamento já montado.
+   O `grupoNaProposta` também é cópia: DOCUMENTACAO ("Documentação de engenharia": ART, diagrama
+   unifilar, memorial descritivo), BOMBEIROS ("Adequação Corpo de Bombeiros · IT 41": Kit IT 41,
+   botoeira, sinalização, interface de seccionamento) ou MATERIAL ("Infraestrutura da
+   instalação", o padrão), marcado pelo cliente no catálogo; nenhum item foi classificado
+   automaticamente (o campo `categoria`, que já existia, NÃO decide isso). No PDF as seções saem
+   nessa ordem (`ORDEM_DOS_GRUPOS_NA_PROPOSTA`, não a ordem do enum), SEM subtotal; com todos os
+   itens em Infraestrutura, uma lista só. O `apareceNaProposta` também é cópia do catálogo
+   (padrão: sim), mudável item a item no orçamento: desligado, o item entra no preço e não é
+   listado no PDF. Marcar no catálogo depois não muda orçamento já montado.
    **Os dados do cliente também são cópia** (`clienteNome`, `clienteDocumento`, `clienteWhatsapp`,
    `clienteEmail`, endereço e `clienteCopiadoEm` no orçamento): o PDF e o texto do WhatsApp usam a
    cópia, e editar o cadastro não muda proposta salva. A cópia é feita ao criar, ao trocar de

@@ -30,6 +30,9 @@ const itemSchema = z.object({
   produtoId: z.string().uuid(),
   quantidade: z.number().positive(),
   precoUnitario: z.number().nonnegative().optional(), // ausente = preço do catálogo
+  // se o item é listado no PDF do cliente (no preço ele entra sempre). Ausente (tela da versão
+  // anterior, durante uma publicação): o item que já estava mantém o gravado; o novo copia o catálogo
+  apareceNaProposta: z.boolean().optional(),
 });
 
 const orcamentoSchema = z.object({
@@ -53,9 +56,10 @@ const orcamentoSchema = z.object({
   absorverTaxaCartao: z.boolean().default(false),
   bancoFinanciamento: z.string().optional(),
   observacoes: z.string().optional(),
-  // proposta em PDF: serviço no título e se a tabela mostra os preços de cada item
+  // proposta em PDF: serviço no título. O detalharPrecosNoPdf saiu da tela (23/10/2026: o PDF
+  // lista o escopo, sem preço por item); ausente mantém o gravado (não se perde a escolha antiga)
   descricaoServico: z.string().trim().max(100, 'Use até 100 caracteres').optional(),
-  detalharPrecosNoPdf: z.boolean().default(false),
+  detalharPrecosNoPdf: z.boolean().optional(),
   // texto livre, impressos no PDF. Vazio apaga; ausente (tela da versão anterior, durante uma
   // publicação) mantém o que estava gravado. Sem prazo só o RASCUNHO: ver conferirPrazo
   prazoExecucao: z.string().trim().max(PRAZO_MAXIMO_DE_CARACTERES, `Use até ${PRAZO_MAXIMO_DE_CARACTERES} caracteres`).optional(),
@@ -152,6 +156,7 @@ type CopiaDoItem = {
   unidade: Unidade;
   precoTabela: Prisma.Decimal;
   grupoNaProposta: GrupoNaProposta;
+  apareceNaProposta: boolean;
 };
 
 /**
@@ -180,6 +185,7 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
     const unidade = copia?.unidade ?? produto.unidade;
     const precoTabela = copia ? Number(copia.precoTabela) : Number(produto.precoVenda);
     const grupoNaProposta = copia?.grupoNaProposta ?? produto.grupoNaProposta;
+    const apareceNaProposta = item.apareceNaProposta ?? copia?.apareceNaProposta ?? produto.apareceNaProposta;
     const precoUnitario = item.precoUnitario ?? precoTabela;
     return {
       produtoId: produto.id,
@@ -187,6 +193,7 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
       descricaoTecnica,
       unidade,
       grupoNaProposta,
+      apareceNaProposta,
       quantidade: new Prisma.Decimal(item.quantidade),
       precoUnitario: new Prisma.Decimal(precoUnitario),
       precoTabela: new Prisma.Decimal(precoTabela),
@@ -404,7 +411,7 @@ rotasOrcamentos.post(
           bancoFinanciamento: dados.bancoFinanciamento,
           observacoes: dados.observacoes,
           descricaoServico: dados.descricaoServico || null,
-          detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
+          detalharPrecosNoPdf: dados.detalharPrecosNoPdf ?? false,
           prazoExecucao: dados.prazoExecucao || null,
           garantia: dados.garantia || null,
           subtotal: totais.subtotal,
@@ -491,7 +498,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         bancoFinanciamento: dados.bancoFinanciamento,
         observacoes: dados.observacoes,
         descricaoServico: dados.descricaoServico || null,
-        detalharPrecosNoPdf: dados.detalharPrecosNoPdf,
+        ...(dados.detalharPrecosNoPdf === undefined ? {} : { detalharPrecosNoPdf: dados.detalharPrecosNoPdf }),
         ...(dados.prazoExecucao === undefined ? {} : { prazoExecucao: dados.prazoExecucao || null }),
         ...(dados.garantia === undefined ? {} : { garantia: dados.garantia || null }),
         subtotal: totais.subtotal,

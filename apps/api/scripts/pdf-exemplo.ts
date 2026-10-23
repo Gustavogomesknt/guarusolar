@@ -2,8 +2,9 @@
  * npm run pdf:exemplo: gera propostas de EXEMPLO (dados fictícios, sem banco) para conferir o
  * layout depois de mexer em src/lib/pdf-orcamento.ts ou em src/conteudo/proposta.ts.
  *
- *   proposta-exemplo.pdf            padrão: só item e quantidade; entrada de 30% + 12x no cartão
- *   proposta-exemplo-precos.pdf     com "detalhar preços por item no PDF" (12x)
+ *   proposta-exemplo.pdf            padrão: escopo em três seções (Documentação, Bombeiros,
+ *                                   Infraestrutura), um item fora do PDF; entrada de 30% + 12x
+ *   proposta-exemplo-simples.pdf    todos os itens em Infraestrutura: uma lista só, sem seções (12x)
  *   proposta-exemplo-longa.pdf      muitos itens e observação longa (quebra de página), 18x
  *
  * Os valores saem do mesmo cálculo que a API grava (calcularOrcamento), e as contas do cartão
@@ -19,7 +20,18 @@ import { gerarPdfOrcamento, type OrcamentoParaPdf } from '../src/lib/pdf-orcamen
 
 const D = (v: number) => new Prisma.Decimal(v);
 
-function item(ordem: number, descricao: string, descricaoTecnica: string | null, quantidade: number, preco: number, unidade: 'UN' | 'M' | 'KIT' | 'SERVICO' = 'UN') {
+type Grupo = 'MATERIAL' | 'DOCUMENTACAO' | 'BOMBEIROS';
+
+function item(
+  ordem: number,
+  descricao: string,
+  descricaoTecnica: string | null,
+  quantidade: number,
+  preco: number,
+  unidade: 'UN' | 'M' | 'KIT' | 'SERVICO' = 'UN',
+  grupoNaProposta: Grupo = 'MATERIAL',
+  apareceNaProposta = true,
+) {
   return {
     id: `item-${ordem}`,
     orcamentoId: 'exemplo',
@@ -31,21 +43,26 @@ function item(ordem: number, descricao: string, descricaoTecnica: string | null,
     precoUnitario: D(preco),
     precoTabela: D(preco),
     subtotal: D(Math.round(quantidade * preco * 100) / 100),
+    grupoNaProposta,
+    apareceNaProposta,
     ordem,
     produto: { categoria: 'OUTROS' as const },
   };
 }
 
-function exemplo(opcoes: { detalhar: boolean; longo?: boolean; parcelas: number }): OrcamentoParaPdf {
+function exemplo(opcoes: { secoes: boolean; longo?: boolean; parcelas: number }): OrcamentoParaPdf {
+  const g = (grupo: Grupo): Grupo => (opcoes.secoes ? grupo : 'MATERIAL');
   const itens = [
     item(0, 'Instalação completa', 'Mão de obra especializada', 1, 3200, 'SERVICO'),
     item(1, 'Materiais', 'Carregador não incluso', 1, 2480),
     item(2, 'Quadro de proteção', null, 1, 1650),
-    item(3, 'ART elétrica / TRT / diagrama unifilar', null, 1, 980),
-    item(4, 'ART civil', null, 1, 760),
-    item(5, 'Kit IT 41', 'Sinalização e segurança', 1, 690, 'KIT'),
+    item(3, 'ART elétrica / TRT / diagrama unifilar', null, 1, 980, 'UN', g('DOCUMENTACAO')),
+    item(4, 'ART civil', null, 1, 760, 'UN', g('DOCUMENTACAO')),
+    item(5, 'Kit IT 41', 'Sinalização e segurança', 1, 690, 'KIT', g('BOMBEIROS')),
+    // entra no preço, não aparece no PDF ("aparece na proposta" desligado)
+    item(6, 'Parafusos e buchas (não aparece no PDF)', null, 40, 1.5, 'UN', 'MATERIAL', false),
     ...(opcoes.longo
-      ? Array.from({ length: 14 }, (_, i) => item(6 + i, `Cabo solar 6 mm² — trecho ${i + 1}`, 'Preto e vermelho, dupla isolação', 25 + i, 9.9, 'M'))
+      ? Array.from({ length: 14 }, (_, i) => item(7 + i, `Cabo solar 6 mm² — trecho ${i + 1}`, 'Preto e vermelho, dupla isolação', 25 + i, 9.9, 'M'))
       : []),
   ];
   // o mesmo cálculo que a API faz ao salvar
@@ -91,7 +108,7 @@ function exemplo(opcoes: { detalhar: boolean; longo?: boolean; parcelas: number 
       ? Array.from({ length: 6 }, () => 'Instalação condicionada à vistoria técnica do local e à disponibilidade de carga no padrão de entrada. ').join('')
       : 'Instalação em até 3 metros do quadro de distribuição. Vistoria técnica incluída.',
     descricaoServico: 'Instalação de carregador veicular · Residencial',
-    detalharPrecosNoPdf: opcoes.detalhar,
+    detalharPrecosNoPdf: false,
     prazoExecucao: opcoes.longo
       ? '45 dias após a aprovação, conforme a homologação na concessionária e a liberação do acesso ao local da instalação'
       : SUGESTOES_DE_PRAZO[2],
@@ -130,9 +147,9 @@ async function main() {
   const pasta = path.resolve(process.argv[2] ?? '.');
   mkdirSync(pasta, { recursive: true });
   const casos: [string, OrcamentoParaPdf][] = [
-    ['proposta-exemplo.pdf', exemplo({ detalhar: false, parcelas: 12 })],
-    ['proposta-exemplo-precos.pdf', exemplo({ detalhar: true, parcelas: 12 })],
-    ['proposta-exemplo-longa.pdf', exemplo({ detalhar: true, longo: true, parcelas: 18 })],
+    ['proposta-exemplo.pdf', exemplo({ secoes: true, parcelas: 12 })],
+    ['proposta-exemplo-simples.pdf', exemplo({ secoes: false, parcelas: 12 })],
+    ['proposta-exemplo-longa.pdf', exemplo({ secoes: true, longo: true, parcelas: 18 })],
   ];
   mostrarContas(casos[0][1]);
   for (const [nome, orcamento] of casos) {

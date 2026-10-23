@@ -9,8 +9,9 @@
  * desconto à vista -> total. Ou seja, o desconto percentual incide também sobre a margem: o
  * cliente não vê a margem, e "10% de desconto" tem de ser 10% do preço que ele vê.
  *
- * O cliente NUNCA vê a margem como linha: ela está embutida no total do PDF e do WhatsApp. Com
- * "detalhar preços" ligado, o PDF distribui a margem nos preços dos itens (distribuirMargem).
+ * O cliente NUNCA vê a margem como linha: ela está embutida no total do PDF e do WhatsApp.
+ * (distribuirMargem servia ao "detalhar preços por item", que saiu em 23/10/2026: o PDF lista o
+ * escopo sem preço por item. Fica aqui para o caso de o detalhamento voltar.)
  *
  * Orçamento salvo GRAVA a margem que usou: mudar o padrão não altera proposta existente.
  * Orçamentos anteriores a este campo têm margem zero.

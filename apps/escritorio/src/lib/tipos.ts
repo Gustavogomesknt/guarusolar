@@ -165,7 +165,8 @@ export type OrcamentoCompleto = {
   parcelas: number | null;
   observacoes: string | null;
   descricaoServico: string | null;
-  detalharPrecosNoPdf: boolean;
+  /** não é mais usado (o PDF lista o escopo, sem preço por item); continua gravado */
+  detalharPrecosNoPdf?: boolean;
   /** texto livre do PDF; null em orçamento anterior aos campos (ou rascunho sem prazo) */
   prazoExecucao?: string | null;
   garantia?: string | null;
@@ -208,6 +209,8 @@ export type OrcamentoCompleto = {
     quantidade: string;
     precoUnitario: string;
     precoTabela: string;
+    /** ausente em resposta da versão anterior da API (= aparece) */
+    apareceNaProposta?: boolean;
     produto: { categoria: CategoriaProduto };
   }[];
 };
@@ -219,6 +222,8 @@ export type Produto = {
   categoria: CategoriaProduto;
   /** parte da proposta em PDF; ausente em resposta da versão anterior da API (= MATERIAL) */
   grupoNaProposta?: GrupoNaProposta;
+  /** listado no PDF do cliente; ausente em resposta da versão anterior da API (= sim) */
+  apareceNaProposta?: boolean;
   unidade: Unidade;
   /** null = custo em branco (desconhecido) */
   precoCusto: string | null;

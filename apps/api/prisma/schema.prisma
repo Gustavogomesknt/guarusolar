@@ -175,12 +175,15 @@ enum Unidade {
   KWP
 }
 
-/// Em que parte da proposta em PDF o item sai: "Materiais e equipamentos" ou "Documentação e
-/// engenharia" (ART, diagrama unifilar, memorial descritivo, Kit IT 41...). Independe da
-/// categoria do catálogo: quem marca é o cliente, item a item.
+/// Em que seção da proposta em PDF o item sai: "Infraestrutura da instalação" (MATERIAL),
+/// "Documentação de engenharia" (ART, diagrama unifilar, memorial descritivo...) ou "Adequação
+/// Corpo de Bombeiros · IT 41" (Kit IT 41, botoeira de emergência, sinalização, interface de
+/// seccionamento). Independe da categoria do catálogo: quem marca é o cliente, item a item.
+/// A ORDEM no PDF não é a do enum: ORDEM_DOS_GRUPOS_NA_PROPOSTA (compartilhado/rotulos.ts)
 enum GrupoNaProposta {
   MATERIAL
   DOCUMENTACAO
+  BOMBEIROS
 }
 
 model Produto {
@@ -188,6 +191,8 @@ model Produto {
   nome             String
   categoria        CategoriaProduto
   grupoNaProposta  GrupoNaProposta  @default(MATERIAL)
+  /// desligado: o item entra no orçamento e no preço, mas não é listado no PDF do cliente
+  apareceNaProposta Boolean         @default(true)
   unidade          Unidade          @default(UN)
   /// em branco = custo desconhecido (sem margem para mostrar); zero = custo zero de verdade
   precoCusto       Decimal?         @db.Decimal(12, 2)
@@ -334,8 +339,10 @@ model Orcamento {
   clienteCidade       String?
   clienteUf           String?     @db.Char(2)
   clienteCopiadoEm    DateTime?
-  // proposta em PDF: o serviço no título ("Instalação de carregador veicular · Residencial") e
-  // se a tabela mostra preço unitário e subtotal de cada item (padrão: só item e quantidade)
+  // proposta em PDF: o serviço no título ("Instalação de carregador veicular · Residencial").
+  // detalharPrecosNoPdf NÃO é mais usado (23/10/2026: o PDF lista o escopo, sem quantidade nem
+  // preço por item); a coluna fica para não quebrar a versão anterior durante a publicação
+  // e para o caso de o detalhamento voltar
   descricaoServico    String?
   detalharPrecosNoPdf Boolean     @default(false)
   // prazo de execução e garantia do serviço, texto livre impresso no PDF (sugestões e texto
@@ -376,6 +383,8 @@ model ItemOrcamento {
   unidade          Unidade
   /// cópia do grupo do produto ao entrar no orçamento (regra 2)
   grupoNaProposta  GrupoNaProposta @default(MATERIAL)
+  /// cópia do "aparece na proposta" do produto ao entrar; o vendedor muda item a item
+  apareceNaProposta Boolean        @default(true)
   quantidade       Decimal         @db.Decimal(12, 3)
   precoUnitario    Decimal         @db.Decimal(12, 2)
   precoTabela      Decimal         @db.Decimal(12, 2) // preço padrão do catálogo, para medir desvio
