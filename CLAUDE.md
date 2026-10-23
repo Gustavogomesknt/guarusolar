@@ -169,7 +169,11 @@ apps/api/                      API (Express + Prisma)
                                tela Usuários, padrão "Consultor"). Rodapé "Página X de N" da
                                página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Página 3: os três
                                valores GRAVADOS (proposta*) e o contato, em posições de
-                               PAGINA_3_NOVA (conteudo/proposta.ts). Texto por cima das artes
+                               PAGINA_3_NOVA (conteudo/proposta.ts), e a faixa fixa das logos das
+                               montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
+                               Fotos dos cartões: 3:4, 40 mm (FOTO_DO_CARTAO; os arquivos têm
+                               ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
+                               foto. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".

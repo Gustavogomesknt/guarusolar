@@ -112,13 +112,35 @@ export const CAPAS_DA_PROPOSTA = {
   textoDaCapaPadrao: 'Instalação de Carregador Veicular',
 };
 
+/** Tamanho da foto dos cartões (3:4, retrato). Menor só se o cartão não tiver altura para ela. */
+export const FOTO_DO_CARTAO = {
+  /** 40 mm: com os arquivos de ~225 px, uns 145 dpi; acima disso a foto borra no PDF */
+  larguraMm: 40,
+  proporcao: 3 / 4,
+};
+
 export const ARTES_DA_PROPOSTA_NOVA = {
   /** fundo de página inteira (A4 em retrato, 2480 x 3508 px = 300 dpi); a capa está acima */
   fundoPagina3: 'assets/proposta/pagina-3.jpg',
-  /** foto no pé de cada cartão do escopo (preenche a área e é cortada nas sobras) */
+  /**
+   * foto no pé de cada cartão do escopo: RETRATO 3:4, as três no mesmo tamanho (FOTO_DO_CARTAO,
+   * abaixo). Os arquivos de 23/10/2026 têm uns 225 px de largura: não passe de 40 mm
+   */
   fotoDocumentacao: 'assets/proposta/foto-documentacao.jpg',
   fotoBombeiros: 'assets/proposta/foto-bombeiros.jpg',
   fotoInfraestrutura: 'assets/proposta/foto-infraestrutura.jpg',
+  /**
+   * logos das montadoras (página 3), na ordem da faixa. Todas na mesma caixa de 480 x 220 px com
+   * fundo transparente (a normalização está no arquivo): saem todas do mesmo tamanho
+   */
+  logosDasMontadoras: [
+    'assets/proposta/logo-byd.png',
+    'assets/proposta/logo-weg.png',
+    'assets/proposta/logo-geely.png',
+    'assets/proposta/logo-volvo.png',
+    'assets/proposta/logo-jeep.png',
+    'assets/proposta/logo-bmw.png',
+  ],
 };
 
 /**
@@ -155,6 +177,12 @@ export const PAGINA_3_NOVA = {
     cartao: { titulo: 'NO CARTÃO DE CRÉDITO', x: 394, y: 470, largura: 165, altura: 112 },
   },
   contato: { titulo: 'FALE COM A GENTE', x: 36, y: 690, largura: 523, altura: 90 },
+  /**
+   * faixa das logos das montadoras (ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras): fixa, igual em
+   * toda proposta. As logos ficam espalhadas por igual entre x e x + largura, no y dado.
+   * larguraMm de cada logo: até 25 mm (a 24 mm a WEG, a de menor resolução, passa de 300 dpi)
+   */
+  montadoras: { x: 36, y: 618, largura: 523, larguraMm: 24 },
 };
 
 /** Página 2 do modelo novo: textos fixos. */

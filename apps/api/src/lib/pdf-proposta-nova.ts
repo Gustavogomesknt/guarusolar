@@ -3,7 +3,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { formatarBRL, formatarQuantidade, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
-import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
+import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, FOTO_DO_CARTAO, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
@@ -54,6 +54,8 @@ const artes = () => ({
     BOMBEIROS: arte(ARTES_DA_PROPOSTA_NOVA.fotoBombeiros),
     MATERIAL: arte(ARTES_DA_PROPOSTA_NOVA.fotoInfraestrutura),
   } as Record<GrupoNaProposta, Arte>,
+  // logo que falta é pulada (a faixa segue com as outras)
+  montadoras: ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras.map(arte).filter((a) => a.arquivo !== null),
 });
 
 const RESERVADO = '#D5DBE3'; // cinza do lugar reservado das artes
@@ -299,43 +301,50 @@ function alturaDoCabecalho(cartoes: Cartao[], larguraDoCartao: number) {
   return Math.max(CABECALHO_CARTAO.icone, ...cartoes.map(altura)) + 2 * CABECALHO_CARTAO.paddingY;
 }
 
-/** Foto no pé do cartão, cantos de baixo arredondados (ou o lugar reservado, em cinza). */
-function fotoDoCartao(foto: Arte, largura: number, altura: number, raio: number): Peca {
-  if (!foto.arquivo) {
-    return {
-      stack: [
-        {
-          canvas: [
-            { type: 'rect', x: 0, y: 0, w: largura, h: altura, r: raio, color: RESERVADO },
-            { type: 'rect', x: 0, y: 0, w: largura, h: raio, color: RESERVADO },
-          ],
-          relativePosition: { x: 0, y: 0 },
-        },
-        {
-          // tabela de altura fixa: o lugar reservado ocupa exatamente a altura da foto
-          table: { widths: [largura - 12], heights: [altura], body: [[{ text: `Foto: ${foto.nome}`, fontSize: 7.5, color: RESERVADO_TEXTO, alignment: 'center', margin: [0, altura / 2 - 6, 0, 0] }]] },
-          layout: semBordas([6, 0, 6, 0]),
-        },
-      ],
-    };
-  }
-  // A imagem preenche a área (cortada nas sobras). Os cantos de baixo são arredondados por duas
-  // máscaras brancas por cima (o cartão está sobre a página branca) e pela borda, redesenhada.
-  const r = raio;
-  const w = largura;
-  const h = altura;
+const MM = 72 / 25.4;
+/** Margem da foto até as bordas do cartão e até os itens. */
+const RESPIRO_DA_FOTO = 11;
+
+/**
+ * Tamanho da foto: 3:4 (retrato), FOTO_DO_CARTAO.larguraMm de largura (o mesmo nos três cartões,
+ * em qualquer arranjo); menor, mantendo os 3:4, só se a altura que sobra no cartão não couber.
+ * Largura e altura saem SEMPRE na proporção: o pdfmake distorce se receber outra.
+ */
+function tamanhoDaFoto(larguraDoCartao: number, alturaDaArea: number) {
+  const larguraMaxima = Math.min(FOTO_DO_CARTAO.larguraMm * MM, larguraDoCartao - 2 * RESPIRO_DA_FOTO);
+  const alturaMaxima = alturaDaArea - 2 * RESPIRO_DA_FOTO;
+  const largura = Math.min(larguraMaxima, alturaMaxima * FOTO_DO_CARTAO.proporcao);
+  return { largura, altura: largura / FOTO_DO_CARTAO.proporcao };
+}
+
+/**
+ * Foto no pé do cartão, centrada, com os cantos arredondados (máscaras brancas por cima: o cartão
+ * é branco). Sem o arquivo, o cartão sai sem foto (a área fica em branco) e o PDF segue.
+ */
+function fotoDoCartao(foto: Arte, larguraDoCartao: number, alturaDaArea: number): Peca {
+  // a área tem altura fixa (o cartão inteiro foi medido com ela), com ou sem foto
+  const area = (conteudo: Peca[]): Peca => ({
+    table: { widths: [larguraDoCartao], heights: [alturaDaArea], body: [[{ stack: conteudo }]] },
+    layout: semBordas([0, 0, 0, 0]),
+  });
+  if (!foto.arquivo) return area([]);
+  const { largura: w, altura: h } = tamanhoDaFoto(larguraDoCartao, alturaDaArea);
+  const r = 6;
+  const canto = (x: number, y: number, sx: number, sy: number) =>
+    `<path d="M${x} ${y + sy * r} L${x} ${y} L${x + sx * r} ${y} A${r} ${r} 0 0 ${sx * sy > 0 ? 0 : 1} ${x} ${y + sy * r} Z" fill="#FFFFFF"/>`;
   const mascaras =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
-    `<path d="M0 ${h - r} L0 ${h} L${r} ${h} A${r} ${r} 0 0 1 0 ${h - r} Z" fill="#FFFFFF"/>` +
-    `<path d="M${w} ${h - r} L${w} ${h} L${w - r} ${h} A${r} ${r} 0 0 0 ${w} ${h - r} Z" fill="#FFFFFF"/>` +
-    `<path d="M0.4 0 L0.4 ${h - r} A${r - 0.4} ${r - 0.4} 0 0 0 ${r} ${h - 0.4} L${w - r} ${h - 0.4} A${r - 0.4} ${r - 0.4} 0 0 0 ${w - 0.4} ${h - r} L${w - 0.4} 0" fill="none" stroke="${COR.borda}" stroke-width="0.75"/>` +
+    canto(0, 0, 1, 1) + canto(w, 0, -1, 1) + canto(0, h, 1, -1) + canto(w, h, -1, -1) +
     `</svg>`;
-  return {
-    stack: [
-      { image: foto.arquivo, cover: { width: w, height: h, align: 'center', valign: 'center' }, relativePosition: { x: 0, y: 0 } },
-      { svg: mascaras, width: w, height: h },
-    ],
-  };
+  const x = (larguraDoCartao - w) / 2;
+  const y = alturaDaArea - RESPIRO_DA_FOTO - h; // no pé, com o respiro embaixo
+  return area([
+    // cover na MESMA proporção do arquivo (3:4): não distorce; a sobra de um arquivo que não seja
+    // 3:4 exato (o de materiais tem 178 x 237) é cortada, menos de 1 px
+    // as duas no mesmo ponto, fora do fluxo (a altura da área é a da tabela)
+    { image: foto.arquivo, cover: { width: w, height: h, align: 'center', valign: 'center' }, relativePosition: { x, y } },
+    { svg: mascaras, width: w, height: h, relativePosition: { x, y } },
+  ]);
 }
 
 function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: number; itens: number; foto: number }, colunasDeItens: number, foto: Arte): Peca {
@@ -407,7 +416,7 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
         },
         layout: semBordas([ITENS_CARTAO.paddingX, ITENS_CARTAO.paddingTop, ITENS_CARTAO.paddingX, ITENS_CARTAO.paddingBottom]),
       },
-      ...(alturas.foto > 0 ? [fotoDoCartao(foto, largura, alturas.foto, raio)] : []),
+      ...(alturas.foto > 0 ? [fotoDoCartao(foto, largura, alturas.foto)] : []),
     ],
   };
 }
@@ -702,7 +711,27 @@ function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
       columnGap: 16,
     } as Content,
   ];
-  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...contato];
+  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), ...contato];
+}
+
+/**
+ * Faixa das logos das montadoras (página 3): fixa, todas do MESMO tamanho, na proporção do arquivo
+ * (480 x 220). Logo cujo arquivo falta é pulada e as outras se espalham na mesma faixa.
+ */
+function faixaDasMontadoras(): Content[] {
+  const F = PAGINA_3_NOVA.montadoras;
+  const logos = artes().montadoras;
+  if (logos.length === 0) return [];
+  const largura = Math.min(F.larguraMm, 25) * MM;
+  const altura = (largura * 220) / 480;
+  const espaco = logos.length > 1 ? (F.largura - logos.length * largura) / (logos.length - 1) : 0;
+  const inicio = logos.length > 1 ? F.x : F.x + (F.largura - largura) / 2;
+  return logos.map((logo, i) => ({
+    image: logo.arquivo!,
+    width: largura,
+    height: altura,
+    absolutePosition: { x: inicio + i * (largura + espaco), y: F.y },
+  }));
 }
 
 /** Capa do tipo de serviço do orçamento (ou a padrão), no mesmo formato das outras artes. */
