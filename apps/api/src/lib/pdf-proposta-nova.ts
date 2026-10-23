@@ -520,19 +520,28 @@ export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; foto
   // os cartões ficam com a altura que sobra na folha; a foto, com o que sobra dentro deles
   const disponivel =
     ALTURA_UTIL - cliente.altura - ESPACO.aposCliente - titulo.altura - ESPACO.aposTitulo - ESPACO.aposCartoes - contempla.altura - FOLGA;
-  const foto = disponivel - cabecalho - itens;
+  // o que sobra na folha para a foto; o cartão NÃO estica até ele: a área da foto tem a altura da
+  // própria foto (40 mm em 3:4) e a sobra vai para antes do "contempla", que fica no pé da folha
+  const sobra = disponivel - cabecalho - itens;
+  const algumaFoto = cartoes.some((c) => A.fotos[c.grupo].arquivo !== null);
+  const fotoInteira = algumaFoto ? tamanhoDaFoto(largura, Infinity).altura + 2 * RESPIRO_DA_FOTO : 0;
+  const foto = Math.min(sobra, fotoInteira);
   const topo: Content[] = [cliente.peca, { ...titulo.peca, margin: [0, ESPACO.aposCliente, 0, 0] }];
-  const fim: Content = { ...contempla.peca, margin: [0, ESPACO.aposCartoes, 0, 0], unbreakable: true };
+  const fim: Content = { ...contempla.peca, margin: [0, ESPACO.aposCartoes + Math.max(0, sobra - foto), 0, 0], unbreakable: true };
 
   // Itens demais para caber com a foto mínima: formato de reserva, as seções uma embaixo da
   // outra, na largura toda, sem foto, podendo seguir na folha seguinte (o título da seção se
   // repete no alto da folha nova). Cartão de altura fixa não passa de uma folha.
-  if (foto < FOTO_MINIMA) {
+  if (sobra < FOTO_MINIMA) {
     return {
       foto: 0,
       itens: itensMedidos,
       cartoes: cartoes.length,
-      conteudo: [...topo, ...cartoes.map((c, i) => ({ ...secaoEmLista(c), margin: [0, i ? 10 : ESPACO.aposTitulo, 0, 0] }) as Content), fim],
+      conteudo: [
+        ...topo,
+        ...cartoes.map((c, i) => ({ ...secaoEmLista(c), margin: [0, i ? 10 : ESPACO.aposTitulo, 0, 0] }) as Content),
+        { ...contempla.peca, margin: [0, ESPACO.aposCartoes, 0, 0], unbreakable: true },
+      ],
     };
   }
   const alturas = { cabecalho, itens, foto };
@@ -643,7 +652,19 @@ const A_DEFINIR = '[A DEFINIR]';
 const n = (v: { toString(): string } | null | undefined) => (v == null ? null : Number(v));
 
 /** Os três blocos: só o que está GRAVADO (propostaInvestimento, propostaAVista..., propostaCartao...). */
-function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista' | 'cartao', { valor: string; detalhes: string[] }> {
+/**
+ * Texto de cada bloco. `valores`: as linhas GRANDES (todas do mesmo tamanho e peso); `colunas`, em
+ * vez delas, no cartão com entrada mostrado lado a lado (PAGINA_3_NOVA.entradaNoCartao).
+ */
+type TextoDoBloco = {
+  valores: string[];
+  /** complemento PEQUENO na mesma linha de cada linha grande ("R$ 3.298,88 de entrada"); null = sem */
+  sufixos?: (string | null)[];
+  colunas?: { rotulo: string; valor: string }[];
+  detalhes: string[];
+};
+
+function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista' | 'cartao', TextoDoBloco> {
   const investimento = n(o.propostaInvestimento);
   const aVista = n(o.propostaAVistaValor);
   const pct = n(o.propostaAVistaPct) ?? 0;
@@ -654,22 +675,84 @@ function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista'
   const total = n(o.propostaCartaoTotal);
   const temCartao = parcelas != null && parcela != null && total != null;
   return {
-    investimento: { valor: investimento == null ? A_DEFINIR : formatarBRL(investimento), detalhes: [] },
+    investimento: { valores: [investimento == null ? A_DEFINIR : formatarBRL(investimento)], detalhes: [] },
     aVista: {
-      valor: aVista == null ? A_DEFINIR : formatarBRL(aVista),
+      valores: [aVista == null ? A_DEFINIR : formatarBRL(aVista)],
       detalhes: aVista == null ? [] : [pct > 0 ? `${formatarQuantidade(pct)}% de desconto` : 'sem desconto'],
     },
-    cartao: !temCartao
-      ? { valor: A_DEFINIR, detalhes: [] }
-      : {
-          valor: o.propostaCartaoDebito ? `${formatarBRL(total - entrada)} no débito` : `${parcelas} × ${formatarBRL(parcela)}`,
-          detalhes: [
-            ...(!o.propostaCartaoDebito && primeira != null && primeira !== parcela ? [`1ª parcela de ${formatarBRL(primeira)}`] : []),
-            ...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []),
-            `total de ${formatarBRL(total)}`,
-          ],
-        },
+    cartao: !temCartao ? { valores: [A_DEFINIR], detalhes: [] } : textoDoCartao(o, { parcelas, parcela, primeira, entrada, total }),
   };
+}
+
+/** O bloco do cartão. Sem entrada: como sempre (parcelas em destaque). Com entrada: ela no mesmo peso. */
+function textoDoCartao(
+  o: OrcamentoParaPdf,
+  c: { parcelas: number; parcela: number; primeira: number | null; entrada: number; total: number },
+): TextoDoBloco {
+  const debito = Boolean(o.propostaCartaoDebito);
+  const noCartao = debito ? `${formatarBRL(c.total - c.entrada)} no débito` : `${c.parcelas} × ${formatarBRL(c.parcela)}`;
+  const primeira = !debito && c.primeira != null && c.primeira !== c.parcela ? [`1ª parcela de ${formatarBRL(c.primeira)}`] : [];
+  if (c.entrada <= 0) return { valores: [noCartao], detalhes: [...primeira, `total de ${formatarBRL(c.total)}`] };
+  if (PAGINA_3_NOVA.entradaNoCartao === 'lado-a-lado') {
+    return {
+      valores: [],
+      colunas: [
+        { rotulo: 'Entrada via Pix', valor: formatarBRL(c.entrada) },
+        { rotulo: debito ? '+ no débito' : `+ ${c.parcelas}× no cartão`, valor: debito ? formatarBRL(c.total - c.entrada) : formatarBRL(c.parcela) },
+      ],
+      detalhes: [...primeira, `total de ${formatarBRL(c.total)}`],
+    };
+  }
+  // 'empilhado': as duas linhas grandes, na ordem em que o cliente paga, cada uma com a legenda
+  return {
+    valores: [formatarBRL(c.entrada), `+ ${noCartao}`],
+    sufixos: [' de entrada', null],
+    detalhes: [['entrada via Pix', ...(primeira.length ? [`1ª de ${formatarBRL(c.primeira!)}`] : [])].join(' · '), `total de ${formatarBRL(c.total)}`],
+  };
+}
+
+/**
+ * O maior tamanho (até o do valor) em que todas as linhas grandes cabem na largura do bloco;
+ * `extra[i]`: o que já está ocupado naquela linha (o sufixo pequeno), descontado só dela.
+ */
+function tamanhoQueCabe(linhas: string[], largura: number, extra: number[] = []) {
+  for (let t = PAGINA_3_NOVA.tamanhoDoValor; t > 11; t -= 0.5) {
+    if (linhas.every((l, i) => medirLargura(l, t, 0) + (extra[i] ?? 0) <= largura)) return t;
+  }
+  return 11;
+}
+
+/** As linhas grandes do bloco, todas no mesmo tamanho e peso (o maior que cabe), ou as duas colunas. */
+function valoresDoBloco(t: TextoDoBloco, largura: number): Peca[] {
+  const P = PAGINA_3_NOVA;
+  if (t.colunas) {
+    const metade = (largura - 10) / 2;
+    const tamanho = tamanhoQueCabe(t.colunas.map((c) => c.valor), metade);
+    return [
+      {
+        columns: t.colunas.map((c) => ({
+          width: metade,
+          stack: [
+            { text: c.rotulo, fontSize: 8, color: P.cores.detalhe },
+            { text: c.valor, fontSize: tamanho, bold: true, color: P.cores.valor, margin: [0, 1, 0, 0] },
+          ],
+        })),
+        columnGap: 10,
+        margin: [0, 4, 0, 0],
+      },
+    ];
+  }
+  // o sufixo pequeno ocupa parte da linha: a medida desconta a largura dele
+  const sufixo = (i: number) => t.sufixos?.[i] ?? null;
+  const tamanho = tamanhoQueCabe(t.valores, largura, t.valores.map((_, i) => (sufixo(i) ? medirLargura(sufixo(i)!, 9, 0) : 0)));
+  return t.valores.map((v, i) => ({
+    text: [v, ...(sufixo(i) ? [{ text: sufixo(i)!, fontSize: 9, bold: false, color: P.cores.detalhe }] : [])],
+    fontSize: tamanho,
+    bold: true,
+    color: P.cores.valor,
+    lineHeight: 1.05,
+    margin: [0, i === 0 ? 4 : 2, 0, 0],
+  }));
 }
 
 function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
@@ -686,7 +769,7 @@ function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
         // tabela de uma célula: em posição absoluta é ela que limita a largura do texto ao bloco
         table: { widths: [b.largura - 2 * P.respiro], body: [[{ stack: [
           { text: b.titulo, fontSize: 8, bold: true, characterSpacing: 1, color: P.cores.titulo },
-          { text: t.valor, fontSize: P.tamanhoDoValor, bold: true, color: P.cores.valor, margin: [0, 4, 0, 0] },
+          ...valoresDoBloco(t, b.largura - 2 * P.respiro),
           ...t.detalhes.map((d) => ({ text: d, fontSize: 8.5, color: P.cores.detalhe, margin: [0, 2, 0, 0] })),
         ] }]] },
         layout: semBordas([0, 0, 0, 0]),

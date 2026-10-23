@@ -173,7 +173,10 @@ apps/api/                      API (Express + Prisma)
                                montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
                                Fotos dos cartões: 3:4, 40 mm (FOTO_DO_CARTAO; os arquivos têm
                                ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
-                               foto. Arte faltando (artesQueFaltam): aviso no log ao subir e em
+                               foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
+                               antes do "contempla", que segue no pé da folha. Cartão de crédito com
+                               entrada (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
+                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura

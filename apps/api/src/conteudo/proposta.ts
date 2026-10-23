@@ -170,6 +170,12 @@ export const PAGINA_3_NOVA = {
   /** margem interna de cada bloco */
   respiro: 14,
   tamanhoDoValor: 17,
+  /**
+   * Cartão COM entrada (sem entrada, sai só "12 × R$ 730,49"): 'empilhado' = "R$ 3.298,88 de
+   * entrada" e "+ 12 × R$ 730,49" em duas linhas grandes iguais; 'lado-a-lado' = entrada e parcela
+   * em duas colunas, cada uma com um rótulo pequeno em cima. Só apresentação: a conta é a mesma.
+   */
+  entradaNoCartao: 'empilhado' as 'empilhado' | 'lado-a-lado',
   cores: { titulo: '#F26B21', valor: '#0E2E60', detalhe: '#5A6675' },
   blocos: {
     investimento: { titulo: 'VALOR DO INVESTIMENTO', x: 36, y: 470, largura: 165, altura: 112 },
