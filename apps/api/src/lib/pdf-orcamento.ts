@@ -117,11 +117,29 @@ function condicaoPorExtenso(o: OrcamentoParaPdf): string {
         ? `À vista, via Pix ou transferência bancária, com ${pct(o.descontoAVistaPct)} de desconto já aplicado no valor total.`
         : 'À vista, via Pix ou transferência bancária.';
     case 'ENTRADA_PARCELAS': {
+      // "Cartão de crédito em 4 parcelas de R$ 1.443,73, sem juros (última de R$ 1.443,72)."
+      // A entrada só existe em orçamento salvo antes de 25/10/2026 (sai como foi enviado)
+      const entrada = numero(o.valorEntrada);
       const parcelas = o.parcelas ?? 1;
-      const saldo = `${parcelas} ${parcelas === 1 ? 'parcela mensal' : 'parcelas mensais'} de ${formatarBRL(numero(o.valorParcela))}, sem juros, no boleto ou no cartão de crédito`;
-      return numero(o.valorEntrada) > 0
-        ? `Entrada de ${formatarBRL(numero(o.valorEntrada))} (${pct(o.entradaPct)} do total) e o saldo em ${saldo}.`
-        : `Sem entrada: ${saldo}.`;
+      const parcela = numero(o.valorParcela);
+      const ultima = o.valorUltimaParcela != null ? numero(o.valorUltimaParcela) : null;
+      const primeira = o.valorPrimeiraParcela != null ? numero(o.valorPrimeiraParcela) : null;
+      const diferente =
+        parcelas < 2
+          ? ''
+          : ultima != null && ultima !== parcela
+            ? ` (última de ${formatarBRL(ultima)})`
+            : ultima == null && primeira != null && primeira !== parcela
+              ? ` (1ª de ${formatarBRL(primeira)})`
+              : '';
+      const cartao = o.pagamentoDebito
+        ? `cartão de débito: ${formatarBRL(numero(o.valorTotalCliente ?? o.valorTotal) - entrada)}`
+        : parcelas === 1
+          ? `cartão de crédito em 1 parcela de ${formatarBRL(parcela)}`
+          : `cartão de crédito em ${parcelas} parcelas de ${formatarBRL(parcela)}, sem juros${diferente}`;
+      return entrada > 0
+        ? `Entrada de ${formatarBRL(entrada)} (${pct(o.entradaPct)} do total) e o saldo no ${cartao}.`
+        : `${cartao.charAt(0).toUpperCase()}${cartao.slice(1)}.`;
     }
     case 'FINANCIAMENTO':
       return (

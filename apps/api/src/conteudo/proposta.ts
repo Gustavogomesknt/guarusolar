@@ -36,7 +36,8 @@ export const PAGINA_1 = {
   /** rodapé da tabela de itens */
   notaDosItens: 'Todos os equipamentos e serviços seguem rigorosamente as normas ABNT NBR.',
   /** abaixo da condição de pagamento escolhida no orçamento */
-  notaDoPagamento: 'Parcelamos em até 18x no cartão, com taxa da operadora. À vista no Pix ou transferência, com desconto.',
+  // "sem juros": desde 25/10/2026 a taxa do cartão é da Guarusolar (REPASSAR_TAXA_DO_CARTAO)
+  notaDoPagamento: 'Parcelamos em até 18x no cartão, sem juros. À vista no Pix ou transferência, com desconto.',
   /** o texto vem do orçamento (prazoExecucao); semPrazo só em proposta enviada antes de o campo existir */
   prazo: { titulo: 'PRAZO DE EXECUÇÃO', semPrazo: 'A combinar' },
   /** o texto vem do orçamento (garantia); sem ele, GARANTIA_PADRAO (compartilhado/textosDaProposta.ts) */
@@ -190,12 +191,17 @@ export const PAGINA_3_NOVA = {
    */
   montadoras: { x: 36, y: 618, largura: 523, larguraMm: 24 },
   /**
-   * prazo de execução do orçamento (prazoExecucao), na caixa "Prazo de execução:" da arte, logo
-   * abaixo do rótulo, até a barra que separa da garantia. Mesmo estilo do "12 MESES" da arte:
-   * negrito laranja, de tamanhoMaximo para baixo até caber (mínimo tamanhoMinimo; não cabendo
-   * nem assim, as últimas palavras viram "…"). Sem prazo: PAGINA_1.prazo.semPrazo
+   * SELOS da faixa da arte: o prazo (prazoExecucao) abaixo de "Prazo de execução:" e a garantia
+   * (garantia) abaixo de "Garantia do serviço:", cada um até a barra que separa do próximo. Só a
+   * duração, em negrito laranja, de tamanhoMaximo para baixo até caber; NUNCA abaixo de
+   * tamanhoMinimo nem cortado: a API recusa salvar o que não cabe (cabeNoSelo,
+   * pdf-proposta-nova.ts). Sem prazo: PAGINA_1.prazo.semPrazo; sem garantia: GARANTIA_PADRAO
    */
-  prazo: { x: 73, y: 516, largura: 95, altura: 25, tamanhoMaximo: 11, tamanhoMinimo: 6, cor: '#F7941D' },
+  selos: {
+    prazo: { x: 73, y: 516, largura: 95, altura: 25 },
+    garantia: { x: 235, y: 516, largura: 85, altura: 25 },
+  },
+  estiloDosSelos: { tamanhoMaximo: 11, tamanhoMinimo: 9, cor: '#F7941D' },
 };
 
 /** Página 2 do modelo novo: textos fixos. */

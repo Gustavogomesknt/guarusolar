@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
-import { formatarBRL, formatarQuantidade, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
+import { formatarBRL, formatarQuantidade, GARANTIA_PADRAO, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
 import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, FOTO_DO_CARTAO, PAGINA_1, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
@@ -820,32 +820,50 @@ function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
       columnGap: 16,
     } as Content,
   ];
-  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), prazoNaArte(o), ...contato];
+  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), ...selosNaArte(o), ...contato];
 }
 
-const ENTRELINHA_DO_PRAZO = 1.05;
+const ENTRELINHA_DO_SELO = 1.05;
+type Selo = keyof typeof PAGINA_3_NOVA.selos;
+
+/** O maior tamanho (do máximo ao mínimo, de 0,5 em 0,5) em que o texto cabe no selo; null = não cabe. */
+function tamanhoNoSelo(selo: Selo, texto: string): number | null {
+  const caixa = PAGINA_3_NOVA.selos[selo];
+  const E = PAGINA_3_NOVA.estiloDosSelos;
+  for (let t = E.tamanhoMaximo; t >= E.tamanhoMinimo; t -= 0.5) {
+    if (alturaDoTexto(texto, caixa.largura, t, ENTRELINHA_DO_SELO, true) <= caixa.altura) return t;
+  }
+  return null;
+}
+
+/** Para a API conferir ao salvar: o texto cabe no selo sem passar do tamanho mínimo. */
+export function cabeNoSelo(selo: Selo, texto: string): boolean {
+  return tamanhoNoSelo(selo, texto.trim()) !== null;
+}
 
 /**
- * O prazo de execução na caixa da arte (PAGINA_3_NOVA.prazo): o maior tamanho em que o texto
- * inteiro cabe, medido com o pdfkit. Abaixo do mínimo não diminui: corta as últimas palavras.
+ * Prazo e garantia nos selos da arte (PAGINA_3_NOVA.selos), medidos com o pdfkit. Nunca corta nem
+ * passa abaixo do mínimo: o que não cabe é barrado na entrada (cabeNoSelo); orçamento antigo com
+ * texto maior sai no mínimo, inteiro (o comando orcamentos:prazo-garantia lista esses).
  */
-function prazoNaArte(o: OrcamentoParaPdf): Content {
-  const P = PAGINA_3_NOVA.prazo;
-  const cabe = (texto: string, t: number) => alturaDoTexto(texto, P.largura, t, ENTRELINHA_DO_PRAZO, true) <= P.altura;
-  let texto = o.prazoExecucao?.trim() || PAGINA_1.prazo.semPrazo;
-  let tamanho = P.tamanhoMaximo;
-  while (tamanho > P.tamanhoMinimo && !cabe(texto, tamanho)) tamanho -= 0.5;
-  if (!cabe(texto, tamanho)) {
-    const palavras = texto.split(/\s+/);
-    while (palavras.length > 1 && !cabe(`${palavras.join(' ')}…`, tamanho)) palavras.pop();
-    texto = `${palavras.join(' ')}…`;
-  }
-  return {
-    absolutePosition: { x: P.x, y: P.y },
-    // tabela de uma célula: em posição absoluta é ela que limita a largura do texto à caixa
-    table: { widths: [P.largura], body: [[{ text: texto, fontSize: tamanho, bold: true, color: P.cor, lineHeight: ENTRELINHA_DO_PRAZO }]] },
-    layout: semBordas([0, 0, 0, 0]),
-  } as Content;
+function selosNaArte(o: OrcamentoParaPdf): Content[] {
+  const textos: Record<Selo, string> = {
+    prazo: o.prazoExecucao?.trim() || PAGINA_1.prazo.semPrazo,
+    garantia: o.garantia?.trim() || GARANTIA_PADRAO,
+  };
+  const E = PAGINA_3_NOVA.estiloDosSelos;
+  return (Object.keys(textos) as Selo[]).map((selo) => {
+    const caixa = PAGINA_3_NOVA.selos[selo];
+    return {
+      absolutePosition: { x: caixa.x, y: caixa.y },
+      // tabela de uma célula: em posição absoluta é ela que limita a largura do texto à caixa
+      table: {
+        widths: [caixa.largura],
+        body: [[{ text: textos[selo], fontSize: tamanhoNoSelo(selo, textos[selo]) ?? E.tamanhoMinimo, bold: true, color: E.cor, lineHeight: ENTRELINHA_DO_SELO }]],
+      },
+      layout: semBordas([0, 0, 0, 0]),
+    } as Content;
+  });
 }
 
 /**

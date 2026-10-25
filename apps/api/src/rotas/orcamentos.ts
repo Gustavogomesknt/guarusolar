@@ -23,6 +23,7 @@ import {
   type ResultadoCalculo,
   problemaNasParcelas,
 } from '@guarusolar/compartilhado';
+import { cabeNoSelo } from '../lib/pdf-proposta-nova';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
 import { tipoTemCapa } from '../lib/capaDaProposta';
@@ -72,8 +73,10 @@ const orcamentoSchema = z.object({
   detalharPrecosNoPdf: z.boolean().optional(),
   // texto livre, impressos no PDF. Vazio apaga; ausente (tela da versão anterior, durante uma
   // publicação) mantém o que estava gravado. Sem prazo só o RASCUNHO: ver conferirPrazo
-  prazoExecucao: z.string().trim().max(PRAZO_MAXIMO_DE_CARACTERES, `Use até ${PRAZO_MAXIMO_DE_CARACTERES} caracteres`).optional(),
-  garantia: z.string().trim().max(GARANTIA_MAXIMO_DE_CARACTERES, `Use até ${GARANTIA_MAXIMO_DE_CARACTERES} caracteres`).optional(),
+  // o limite (24, só a duração) é conferido em conferirSelos: orçamento antigo com texto maior
+  // salva sem mudar o texto. Aqui só o teto dos campos antigos (160 e 300)
+  prazoExecucao: z.string().trim().max(160).optional(),
+  garantia: z.string().trim().max(300).optional(),
   // o vendedor pediu para trocar a cópia gravada do cliente pelos dados atuais do cadastro
   atualizarDadosCliente: z.boolean().default(false),
   itens: z.array(itemSchema).min(1, 'Inclua ao menos um item no orçamento'),
@@ -151,6 +154,25 @@ export function copiaDoCliente(c: Cliente) {
  * O prazo de execução é obrigatório para a proposta sair (PDF e envio ao cliente); só o rascunho
  * pode ficar sem. Orçamento APROVADO anterior ao campo não tem como ser editado: passa.
  */
+/**
+ * Prazo e garantia são SÓ A DURAÇÃO, num selo da arte da proposta: até 24 caracteres e cabendo no
+ * selo a 9 pt ou mais (cabeNoSelo). Texto IGUAL ao gravado passa (orçamento de antes de
+ * 25/10/2026: abre e salva sem travar; orcamentos:prazo-garantia lista esses para revisão).
+ */
+function conferirSelos(dados: { prazoExecucao?: string; garantia?: string }, gravado?: { prazoExecucao: string | null; garantia: string | null }) {
+  const campos = [
+    { selo: 'prazo', valor: dados.prazoExecucao, antes: gravado?.prazoExecucao, max: PRAZO_MAXIMO_DE_CARACTERES, nome: 'O prazo de execução' },
+    { selo: 'garantia', valor: dados.garantia, antes: gravado?.garantia, max: GARANTIA_MAXIMO_DE_CARACTERES, nome: 'A garantia' },
+  ] as const;
+  for (const c of campos) {
+    if (!c.valor || c.valor === c.antes?.trim()) continue;
+    if (c.valor.length > c.max) {
+      throw new ErroHttp(400, `${c.nome} vai até ${c.max} caracteres: escreva só a duração, como "15 dias úteis".`);
+    }
+    if (!cabeNoSelo(c.selo, c.valor)) throw new ErroHttp(400, `${c.nome} "${c.valor}" não cabe na proposta: encurte o texto.`);
+  }
+}
+
 function conferirPrazo(orcamento: { prazoExecucao: string | null }) {
   if (!orcamento.prazoExecucao?.trim()) throw new ErroHttp(409, AVISO_SEM_PRAZO);
 }
@@ -416,6 +438,7 @@ rotasOrcamentos.post(
       throw new ErroHttp(400, 'Escolha o tipo de serviço do orçamento.');
     }
     await conferirTipoDeServico(dados.tipoDeServicoId);
+    conferirSelos(dados);
     const cliente = await clienteDoOrcamento(dados.clienteId);
     const itens = await prepararItens(dados.itens);
     const entradaDoCalculo: EntradaCalculo = {
@@ -495,6 +518,8 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
 
   // ausente: tela da versão anterior (a nova sempre manda); o que estava gravado continua
   if (dados.tipoDeServicoId !== undefined) await conferirTipoDeServico(dados.tipoDeServicoId, atual.tipoDeServicoId);
+
+  conferirSelos(dados, atual);
 
   // só o rascunho fica sem prazo: quem já saiu para o cliente não pode perdê-lo numa edição
   if (atual.status !== 'RASCUNHO' && dados.prazoExecucao === '') {

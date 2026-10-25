@@ -52,9 +52,9 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
     clearErrors,
     formState: { errors },
   } = useFormContext<FormularioOrcamento>();
-  const [descontoTipo, descontoValor, condicao, garantia, impostoPct] = useWatch({
+  const [descontoTipo, descontoValor, condicao, garantia, impostoPct, prazo] = useWatch({
     control,
-    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia', 'impostoPct'],
+    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia', 'impostoPct', 'prazoExecucao'],
   });
   const preencher = (campo: 'prazoExecucao' | 'garantia', texto: string) => {
     setValue(campo, texto, { shouldDirty: true });
@@ -321,21 +321,22 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
         />
       </Campo>
 
-      {/* Prazo e garantia: texto livre, impressos na proposta em PDF */}
+      {/* Prazo e garantia: SÓ A DURAÇÃO (selo da arte da proposta); a qualificação é texto fixo */}
       <Campo
         id="prazoExecucao"
         rotulo="Prazo de execução"
         erro={errors.prazoExecucao?.message}
-        ajuda="Obrigatório para gerar o PDF e enviar ao cliente. O rascunho pode ficar sem."
+        ajuda="Só a duração. Obrigatório para gerar o PDF e enviar ao cliente; o rascunho pode ficar sem."
       >
-        <Textarea
+        <Input
           {...ariaDoCampo('prazoExecucao', errors.prazoExecucao?.message)}
           {...register('prazoExecucao', { onChange: () => clearErrors('prazoExecucao') })}
-          rows={2}
           maxLength={PRAZO_MAXIMO_DE_CARACTERES}
-          placeholder="Ex.: 25 dias úteis após a aprovação e liberação do acesso ao local"
-          className="rounded-[10px] text-sm leading-relaxed"
+          autoComplete="off"
+          placeholder="Ex.: 15 dias úteis"
+          className="h-11 rounded-[10px]"
         />
+        <Contador texto={prazo} maximo={PRAZO_MAXIMO_DE_CARACTERES} />
         <div role="group" aria-label="Sugestões de prazo" className="flex flex-wrap gap-1.5">
           {SUGESTOES_DE_PRAZO.map((sugestao) => (
             <button
@@ -350,19 +351,20 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
         </div>
       </Campo>
 
-      <Campo id="garantia" rotulo="Garantia do serviço" erro={errors.garantia?.message}>
-        <Textarea
+      <Campo id="garantia" rotulo="Garantia do serviço" erro={errors.garantia?.message} ajuda="Só a duração.">
+        <Input
           {...ariaDoCampo('garantia', errors.garantia?.message)}
           {...register('garantia', { onChange: () => clearErrors('garantia') })}
-          rows={3}
           maxLength={GARANTIA_MAXIMO_DE_CARACTERES}
-          className="rounded-[10px] text-sm leading-relaxed"
+          autoComplete="off"
+          className="h-11 rounded-[10px]"
         />
+        <Contador texto={garantia} maximo={GARANTIA_MAXIMO_DE_CARACTERES} />
         {garantia.trim() !== GARANTIA_PADRAO && (
           <p className="text-xs text-muted-foreground">
-            {garantia.trim() ? 'Texto diferente do padrão.' : 'Em branco, o PDF sai com o texto padrão.'}{' '}
+            {garantia.trim() ? 'Diferente do padrão.' : 'Em branco, o PDF sai com o padrão.'}{' '}
             <button type="button" onClick={() => preencher('garantia', GARANTIA_PADRAO)} className="font-medium text-primary underline-offset-2 hover:underline">
-              Usar o texto padrão
+              Usar o padrão ({GARANTIA_PADRAO})
             </button>
           </p>
         )}
@@ -383,6 +385,26 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
           quantidade nem preço por item, e o preço aparece uma vez, no total. A coluna
           detalharPrecosNoPdf continua no banco (e o histórico do git tem esta parte da tela). */}
     </section>
+  );
+}
+
+/**
+ * Caracteres usados do campo, enquanto se digita. Acima do limite só um orçamento de antes de
+ * 25/10/2026 (o campo não deixa digitar mais): salva assim, mas ao mudar o texto a API pede o curto.
+ */
+function Contador({ texto, maximo }: { texto: string; maximo: number }) {
+  const usados = texto.trim().length;
+  if (usados > maximo) {
+    return (
+      <p className="text-xs text-destaque-texto">
+        {usados} de {maximo} caracteres: texto de antes da regra nova. Deixe só a duração, como "15 dias úteis".
+      </p>
+    );
+  }
+  return (
+    <p className="text-right font-mono text-xs text-muted-foreground">
+      {usados}/{maximo}
+    </p>
   );
 }
 

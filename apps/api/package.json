@@ -32,6 +32,7 @@
     "usuario": "tsx scripts/usuario.ts",
     "pdf:exemplo": "tsx scripts/pdf-exemplo.ts",
     "orcamentos:condicoes": "tsx scripts/condicoes-da-proposta.ts",
+    "orcamentos:prazo-garantia": "tsx scripts/prazo-garantia.ts",
     "produtos:importar": "tsx scripts/importar-produtos.ts"
   },
   "prisma": {

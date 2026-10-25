@@ -544,8 +544,9 @@ pasta de armazenamento não são removidos.
   `apps/api/src/conteudo/proposta.ts`; texto entre colchetes, como `[BANCO PARCEIRO]`, é pendência
   e sai assim no PDF. **Prazo de execução e garantia** são preenchidos em cada orçamento: o prazo
   é obrigatório para gerar o PDF e enviar (o rascunho pode ficar sem), e a garantia já vem com o
-  texto padrão de 12 meses. As sugestões de prazo e o texto padrão da garantia ficam num lugar
-  só: `packages/compartilhado/src/textosDaProposta.ts`. Depois de editar, `npm run pdf:exemplo` gera quatro PDFs de exemplo, sem banco
+  padrão "12 meses". As sugestões de prazo e o texto padrão da garantia ficam num lugar
+  só: `packages/compartilhado/src/textosDaProposta.ts`. Os dois são só a duração (até 24
+  caracteres: viram selos na proposta); `npm run orcamentos:prazo-garantia` converte os antigos. Depois de editar, `npm run pdf:exemplo` gera quatro PDFs de exemplo, sem banco
   (padrão em três seções, duas seções, uma seção só e muitos itens), para conferir. No gerador de orçamentos,
   "Serviço" vira o título da proposta.
 - **Modelo novo da proposta (em construção):** três páginas no formato enviado pelo cliente,

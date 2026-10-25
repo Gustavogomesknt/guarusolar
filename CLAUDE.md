@@ -176,8 +176,8 @@ apps/api/                      API (Express + Prisma)
                                foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
                                antes do "contempla", que segue no pé da folha. Cartão de crédito com
                                entrada, só orçamento salvo antes de 25/10/2026 (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
-                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Prazo de execução na caixa da arte
-                               (PAGINA_3_NOVA.prazo): reduz até 6 pt; cabem ~90 caracteres, o resto vira "…". Arte faltando (artesQueFaltam): aviso no log ao subir e em
+                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Prazo e garantia nos SELOS da arte
+                               (PAGINA_3_NOVA.selos): 11 pt a 9 pt, nunca cortados (a API barra o que não cabe). Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
@@ -577,7 +577,12 @@ O `.env` da API fica em `apps/api/.env`.
   formato é conferido (11 ou 14 dígitos) e não se repete entre clientes (409 com o nome). Toda
   tela que mostra o documento trata o nulo. Sem documento NÃO há conferência de cliente repetido.
 - **Prazo de execução e garantia são texto de cada orçamento** (`Orcamento.prazoExecucao` e
-  `garantia`), impressos nas caixas da página 1 do PDF. O PRAZO não tem padrão e é obrigatório
+  `garantia`), impressos nas caixas da página 1 do PDF e, no modelo novo, nos SELOS da arte da
+  página 3. Desde 25/10/2026 são SÓ A DURAÇÃO ("15 dias úteis", "12 meses"): até 24 caracteres
+  e cabendo no selo a 9 pt (`conferirSelos` em orcamentos.ts, com `cabeNoSelo`); a qualificação
+  é texto fixo da proposta. Texto igual ao gravado passa (orçamento antigo abre e salva sem
+  travar); `npm run orcamentos:prazo-garantia` (só lê; `-- --executar` grava) converte os textos
+  que o sistema oferecia e lista o resto para revisão. Nunca cortar nem trocar de modelo por isso. O PRAZO não tem padrão e é obrigatório
   para a proposta sair: o rascunho salva sem, mas sem prazo o gerador desabilita "Gerar PDF" e
   "Enviar via WhatsApp" com o motivo, e a API recusa o envio pelo WhatsApp, a passagem para
   "Enviado" e o PDF do rascunho (`conferirPrazo` em orcamentos.ts; orcamentoPdf.ts). Orçamento

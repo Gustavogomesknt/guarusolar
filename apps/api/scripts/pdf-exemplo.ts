@@ -145,7 +145,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     tipoDeServico: { nome: 'Instalação de carregador veicular' },
     detalharPrecosNoPdf: false,
     prazoExecucao: opcoes.longo
-      ? '45 dias após a aprovação, conforme a homologação na concessionária e a liberação do acesso ao local da instalação'
+      ? SUGESTOES_DE_PRAZO[3]
       : SUGESTOES_DE_PRAZO[2],
     garantia: GARANTIA_PADRAO,
     enviadoEm: null,

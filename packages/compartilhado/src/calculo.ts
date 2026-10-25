@@ -176,10 +176,14 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
       const n = Math.max(1, Math.trunc(Number(entrada.parcelas || 1)));
       cartao = calcularCartao(valorTotal, n, Boolean(entrada.debito), Boolean(entrada.absorverTaxaCartao));
       valorParcela = cartao.valorParcela;
+      // a mesma redação do PDF (condicaoPorExtenso): "Cartão de crédito em 4 parcelas de
+      // R$ 1.443,73, sem juros (última de R$ 1.443,72)"; vai também no WhatsApp
       resumoPagamento = cartao.debito
-        ? `Débito de ${brl(cartao.valorCobrado)}`
-        : `${cartao.parcelas}x de ${brl(cartao.valorParcela)}` +
-          (cartao.valorUltimaParcela !== cartao.valorParcela ? ` (última de ${brl(cartao.valorUltimaParcela)})` : '');
+        ? `Cartão de débito: ${brl(cartao.valorCobrado)}`
+        : cartao.parcelas === 1
+          ? `Cartão de crédito em 1 parcela de ${brl(cartao.valorParcela)}`
+          : `Cartão de crédito em ${cartao.parcelas} parcelas de ${brl(cartao.valorParcela)}, sem juros` +
+            (cartao.valorUltimaParcela !== cartao.valorParcela ? ` (última de ${brl(cartao.valorUltimaParcela)})` : '');
       break;
     }
     case 'FINANCIAMENTO': {
