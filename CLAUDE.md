@@ -392,7 +392,9 @@ O `.env` da API fica em `apps/api/.env`.
    arredondado para cima (nunca valor × (1 + taxa)). Parcelas em centavos inteiros (25/10/2026):
    parcela = cobrado ÷ n arredondado PARA CIMA e a ÚLTIMA leva a diferença (`valorUltimaParcela`,
    `propostaCartaoUltima`), nunca acima do valor em destaque; a soma fecha com o cobrado. Salvos
-   antes têm a 1ª com a sobra (`valorPrimeiraParcela`) e saem assim. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
+   antes têm a 1ª com a sobra (`valorPrimeiraParcela`) e saem assim. Guarda: `problemaNasParcelas`
+   (condicoesDaProposta.ts) recusa, na API e no gerador, valor tão baixo para o número de parcelas
+   que a última sairia zerada ou negativa (os dois cartões: o escolhido e o das três condições). `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.

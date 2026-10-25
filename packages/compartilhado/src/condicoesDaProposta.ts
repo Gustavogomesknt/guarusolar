@@ -78,3 +78,18 @@ export function calcularCondicoesDaProposta(
   }
   return { investimento, aVista, cartao };
 }
+
+/**
+ * Guarda das parcelas: com a parcela arredondada para cima (calcularCartao), um valor muito baixo
+ * para o número de parcelas (uns R$ 3 em 12x) deixaria a ÚLTIMA zerada ou negativa. Confere o
+ * cartão da condição escolhida e o das três condições; a API recusa o orçamento com esta
+ * mensagem e o gerador a mostra no campo de parcelas. null = tudo certo.
+ */
+export function problemaNasParcelas(
+  entrada: EntradaCalculo,
+  padroes: typeof CONDICOES_PADRAO_DA_PROPOSTA = CONDICOES_PADRAO_DA_PROPOSTA,
+): string | null {
+  const cartoes = [calcularOrcamento(entrada).cartao, calcularCondicoesDaProposta(entrada, padroes).cartao?.detalhe ?? null];
+  const ruim = cartoes.find((c) => c && !c.debito && c.parcelas > 1 && c.valorCobrado > 0 && c.valorUltimaParcela <= 0);
+  return ruim ? `Valor baixo demais para ${ruim.parcelas}x no cartão: use menos parcelas.` : null;
+}

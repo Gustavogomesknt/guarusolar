@@ -1,4 +1,12 @@
-import { CONDICOES_PADRAO_DA_PROPOSTA, GARANTIA_PADRAO, MARGEM_PADRAO, MAXIMO_PARCELAS, partesNoFuso, TAXAS_CARTAO } from '@guarusolar/compartilhado';
+import {
+  CONDICOES_PADRAO_DA_PROPOSTA,
+  GARANTIA_PADRAO,
+  MARGEM_PADRAO,
+  MAXIMO_PARCELAS,
+  partesNoFuso,
+  problemaNasParcelas,
+  TAXAS_CARTAO,
+} from '@guarusolar/compartilhado';
 import type {
   CategoriaProduto,
   CondicaoPagamento,
@@ -222,6 +230,10 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
   }
   if (f.condicaoPagamento === 'ENTRADA_PARCELAS' && f.parcelas.trim() === '') {
     problemas.push({ campo: 'parcelas', mensagem: 'Escolha o número de parcelas' });
+  } else {
+    // a mesma guarda da API: a última parcela nunca sai zerada ou negativa
+    const parcelas = problemaNasParcelas(entradaDoCalculo(f));
+    if (parcelas) problemas.push({ campo: 'parcelas', mensagem: parcelas });
   }
   if (!f.validade) {
     problemas.push({ campo: 'validade', mensagem: 'Informe até quando o orçamento vale' });

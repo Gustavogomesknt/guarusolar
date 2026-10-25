@@ -21,6 +21,7 @@ import {
   ROTULO_STATUS_ORCAMENTO,
   type CondicaoPagamento,
   type ResultadoCalculo,
+  problemaNasParcelas,
 } from '@guarusolar/compartilhado';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
@@ -429,6 +430,8 @@ rotasOrcamentos.post(
       debito: dados.pagamentoDebito,
       absorverTaxaCartao: dados.absorverTaxaCartao,
     };
+    const parcelasRuins = problemaNasParcelas(entradaDoCalculo);
+    if (parcelasRuins) throw new ErroHttp(400, parcelasRuins);
     const totais = calcularOrcamento(entradaDoCalculo);
 
     // o código sai dentro da mesma transação: se a criação falhar, o número não é perdido
@@ -515,6 +518,8 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
     debito: dados.pagamentoDebito,
     absorverTaxaCartao: dados.absorverTaxaCartao,
   };
+  const parcelasRuins = problemaNasParcelas(entradaDoCalculo);
+  if (parcelasRuins) throw new ErroHttp(400, parcelasRuins);
   const totais = calcularOrcamento(entradaDoCalculo);
 
   // troca os itens em bloco: se algo falhar, nada é gravado
