@@ -169,14 +169,15 @@ apps/api/                      API (Express + Prisma)
                                tela Usuários, padrão "Consultor"). Rodapé "Página X de N" da
                                página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Página 3: os três
                                valores GRAVADOS (proposta*) e o contato, em posições de
-                               PAGINA_3_NOVA (conteudo/proposta.ts), e a faixa fixa das logos das
+                               PAGINA_3_NOVA (conteudo/proposta.ts), e, SÓ SEM A ARTE (ela já traz as logos), a faixa das logos das
                                montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
                                Fotos dos cartões: 3:4, 40 mm (FOTO_DO_CARTAO; os arquivos têm
                                ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
                                foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
-                               antes do "contempla", que segue no pé da folha. Cartão de crédito com
-                               entrada, só orçamento salvo antes de 25/10/2026 (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
-                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Prazo e garantia nos SELOS da arte
+                               antes do "contempla", que segue no pé da folha. Página 3 (arte de
+                               25/10/2026, 1055 x 1491 px): SETE campos em PAGINA_3_NOVA (pontos do PDF; px x 0,5643):
+                               selos de prazo e garantia, investimento, à vista, parcelas, total no cartão e
+                               consultora + WhatsApp; rótulos e logos são da arte. Prazo e garantia nos SELOS da arte
                                (PAGINA_3_NOVA.selos): 11 pt a 9 pt, nunca cortados (a API barra o que não cabe). Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,

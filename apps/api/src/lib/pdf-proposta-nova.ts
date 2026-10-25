@@ -651,176 +651,127 @@ function sobreAArte(numero: 1 | 3, o: OrcamentoParaPdf, comArte: boolean): Conte
 const A_DEFINIR = '[A DEFINIR]';
 const n = (v: { toString(): string } | null | undefined) => (v == null ? null : Number(v));
 
-/** Os três blocos: só o que está GRAVADO (propostaInvestimento, propostaAVista..., propostaCartao...). */
-/**
- * Texto de cada bloco. `valores`: as linhas GRANDES (todas do mesmo tamanho e peso); `colunas`, em
- * vez delas, no cartão com entrada mostrado lado a lado (PAGINA_3_NOVA.entradaNoCartao).
- */
-type TextoDoBloco = {
-  valores: string[];
-  /** complemento PEQUENO na mesma linha de cada linha grande ("R$ 3.298,88 de entrada"); null = sem */
-  sufixos?: (string | null)[];
-  colunas?: { rotulo: string; valor: string }[];
-  detalhes: string[];
-};
+/** Uma linha de texto num campo da página 3 (tamanho, peso e cor próprios). */
+type Linha = { texto: string; tamanho: number; negrito?: boolean; cor?: string; acima?: number; entrelinha?: number };
 
-function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista' | 'cartao', TextoDoBloco> {
+/**
+ * O maior tamanho (do máximo ao mínimo) em que o texto cabe numa linha da largura; null = não
+ * cabe nem no mínimo. Mede em negrito: para texto normal sobra folga.
+ */
+function tamanhoQueCabe(texto: string, largura: number, maximo = PAGINA_3_NOVA.tamanhoDoValor, minimo = 11): number | null {
+  for (let t = maximo; t >= minimo; t -= 0.5) if (medirLargura(texto, t, 0) <= largura) return t;
+  return null;
+}
+
+/** Linhas empilhadas num campo de PAGINA_3_NOVA.campos (posição absoluta, largura da caixa). */
+function campo(nome: keyof typeof PAGINA_3_NOVA.campos, linhas: Linha[]): Content {
+  const c = PAGINA_3_NOVA.campos[nome];
+  return {
+    absolutePosition: { x: c.x, y: c.y },
+    // tabela de uma célula: em posição absoluta é ela que limita a largura do texto ao campo
+    table: {
+      widths: [c.largura],
+      body: [[{
+        stack: linhas.map((l) => ({
+          text: l.texto,
+          fontSize: l.tamanho,
+          bold: l.negrito ?? false,
+          color: l.cor ?? PAGINA_3_NOVA.cores.valor,
+          lineHeight: l.entrelinha ?? 1.05,
+          margin: [0, l.acima ?? 0, 0, 0],
+        })),
+      }]],
+    },
+    layout: semBordas([0, 0, 0, 0]),
+  } as Content;
+}
+
+/** Valor grande de um campo: o maior tamanho que cabe na largura dele. */
+const valorGrande = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string): Linha => ({
+  texto,
+  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura) ?? 11,
+  negrito: true,
+});
+
+/** Linha de apoio (cor de detalhe), sempre numa linha só: de `maximo` até 7 pt. */
+const linhaDeApoio = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string, maximo: number, acima = 0): Linha => ({
+  texto,
+  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura, maximo, 7) ?? 7,
+  cor: PAGINA_3_NOVA.cores.detalhe,
+  acima,
+});
+
+/**
+ * Os campos dos valores, só com o que está GRAVADO (propostaInvestimento, propostaAVista...,
+ * propostaCartao...). Os rótulos ("VALOR DO INVESTIMENTO", "CARTÃO DE CRÉDITO"...) são da arte.
+ */
+function camposDosValores(o: OrcamentoParaPdf): Content[] {
+  const P = PAGINA_3_NOVA;
   const investimento = n(o.propostaInvestimento);
   const aVista = n(o.propostaAVistaValor);
-  const pct = n(o.propostaAVistaPct) ?? 0;
   const parcelas = o.propostaCartaoParcelas;
   const parcela = n(o.propostaCartaoParcela);
-  const primeira = n(o.propostaCartaoPrimeira);
-  const ultima = n(o.propostaCartaoUltima);
-  const entrada = n(o.propostaCartaoEntrada) ?? 0;
   const total = n(o.propostaCartaoTotal);
-  const temCartao = parcelas != null && parcela != null && total != null;
-  return {
-    investimento: { valores: [investimento == null ? A_DEFINIR : formatarBRL(investimento)], detalhes: [] },
-    aVista: {
-      valores: [aVista == null ? A_DEFINIR : formatarBRL(aVista)],
-      detalhes: aVista == null ? [] : [pct > 0 ? `${formatarQuantidade(pct)}% de desconto` : 'sem desconto'],
-    },
-    cartao: !temCartao ? { valores: [A_DEFINIR], detalhes: [] } : textoDoCartao(o, { parcelas, parcela, primeira, ultima, entrada, total }),
-  };
-}
-
-/** O bloco do cartão. Sem entrada: como sempre (parcelas em destaque). Com entrada: ela no mesmo peso. */
-function textoDoCartao(
-  o: OrcamentoParaPdf,
-  c: { parcelas: number; parcela: number; primeira: number | null; ultima: number | null; entrada: number; total: number },
-): TextoDoBloco {
-  const debito = Boolean(o.propostaCartaoDebito);
-  const noCartao = debito ? `${formatarBRL(c.total - c.entrada)} no débito` : `${c.parcelas} × ${formatarBRL(c.parcela)}`;
-  // a parcela diferente: a última (regra de 25/10/2026) ou, em orçamento salvo antes, a 1ª
-  const outraParcela =
-    debito || c.parcelas < 2
-      ? []
-      : c.ultima != null
-        ? c.ultima !== c.parcela
-          ? [`última parcela de ${formatarBRL(c.ultima)}`]
-          : []
-        : c.primeira != null && c.primeira !== c.parcela
-          ? [`1ª parcela de ${formatarBRL(c.primeira)}`]
-          : [];
-  if (c.entrada <= 0) return { valores: [noCartao], detalhes: [...outraParcela, `total de ${formatarBRL(c.total)}`] };
-  if (PAGINA_3_NOVA.entradaNoCartao === 'lado-a-lado') {
-    return {
-      valores: [],
-      colunas: [
-        { rotulo: 'Entrada via Pix', valor: formatarBRL(c.entrada) },
-        { rotulo: debito ? '+ no débito' : `+ ${c.parcelas}× no cartão`, valor: debito ? formatarBRL(c.total - c.entrada) : formatarBRL(c.parcela) },
-      ],
-      detalhes: [...outraParcela, `total de ${formatarBRL(c.total)}`],
-    };
+  const campos: Content[] = [
+    campo('investimento', [valorGrande('investimento', investimento == null ? A_DEFINIR : formatarBRL(investimento))]),
+    campo('aVista', [valorGrande('aVista', aVista == null ? A_DEFINIR : formatarBRL(aVista))]),
+  ];
+  if (parcelas == null || parcela == null || total == null) {
+    return [...campos, campo('cartaoParcelas', [valorGrande('cartaoParcelas', A_DEFINIR)])];
   }
-  // 'empilhado': as duas linhas grandes, na ordem em que o cliente paga, cada uma com a legenda
-  return {
-    valores: [formatarBRL(c.entrada), `+ ${noCartao}`],
-    sufixos: [' de entrada', null],
-    detalhes: [['entrada via Pix', ...outraParcela].join(' · '), `total de ${formatarBRL(c.total)}`],
-  };
+  const debito = Boolean(o.propostaCartaoDebito);
+  const entrada = n(o.propostaCartaoEntrada) ?? 0;
+  const ultima = n(o.propostaCartaoUltima);
+  const primeira = n(o.propostaCartaoPrimeira);
+  // a parcela diferente: a última (regra de 25/10/2026) ou, em orçamento salvo antes, a 1ª
+  const outra =
+    debito || parcelas < 2
+      ? null
+      : ultima != null
+        ? ultima !== parcela
+          ? `última parcela de ${formatarBRL(ultima)}`
+          : null
+        : primeira != null && primeira !== parcela
+          ? `1ª parcela de ${formatarBRL(primeira)}`
+          : null;
+  // entrada: só orçamento salvo antes de 25/10/2026 (sai como foi enviado), na linha de baixo
+  const acima = debito ? 'no débito' : `${parcelas} ${parcelas === 1 ? 'parcela' : 'parcelas'} de`;
+  const valor = debito ? formatarBRL(total - entrada) : formatarBRL(parcela);
+  const abaixo = [...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []), ...(outra ? [outra] : [])];
+  // duas linhas de apoio (só orçamento antigo com entrada): menores, para caber antes do total
+  const tamanhoAbaixo = abaixo.length > 1 ? 7.5 : 8.5;
+  return [
+    ...campos,
+    campo('cartaoParcelas', [
+      linhaDeApoio('cartaoParcelas', acima, 10),
+      { ...valorGrande('cartaoParcelas', valor), acima: 1 },
+      ...abaixo.map((t, i) => ({ ...linhaDeApoio('cartaoParcelas', t, tamanhoAbaixo, i === 0 ? (abaixo.length > 1 ? 1 : 2) : 0), entrelinha: abaixo.length > 1 ? 0.95 : 1.05 })),
+    ]),
+    campo('cartaoTotal', [linhaDeApoio('cartaoTotal', `total de ${formatarBRL(total)}`, 9)]),
+  ];
 }
 
 /**
- * O maior tamanho (até o do valor) em que todas as linhas grandes cabem na largura do bloco;
- * `extra[i]`: o que já está ocupado naquela linha (o sufixo pequeno), descontado só dela.
+ * Nome da consultora e o WhatsApp dela na faixa "PRONTO PARA APROVAR?": numa linha (10,5 a 8,5
+ * pt); nome longo demais para isso, em duas linhas de 7,5 pt (a faixa tem altura para as duas).
  */
-function tamanhoQueCabe(linhas: string[], largura: number, extra: number[] = []) {
-  for (let t = PAGINA_3_NOVA.tamanhoDoValor; t > 11; t -= 0.5) {
-    if (linhas.every((l, i) => medirLargura(l, t, 0) + (extra[i] ?? 0) <= largura)) return t;
-  }
-  return 11;
-}
-
-/** As linhas grandes do bloco, todas no mesmo tamanho e peso (o maior que cabe), ou as duas colunas. */
-function valoresDoBloco(t: TextoDoBloco, largura: number): Peca[] {
-  const P = PAGINA_3_NOVA;
-  if (t.colunas) {
-    const metade = (largura - 10) / 2;
-    const tamanho = tamanhoQueCabe(t.colunas.map((c) => c.valor), metade);
-    return [
-      {
-        columns: t.colunas.map((c) => ({
-          width: metade,
-          stack: [
-            { text: c.rotulo, fontSize: 8, color: P.cores.detalhe },
-            { text: c.valor, fontSize: tamanho, bold: true, color: P.cores.valor, margin: [0, 1, 0, 0] },
-          ],
-        })),
-        columnGap: 10,
-        margin: [0, 4, 0, 0],
-      },
-    ];
-  }
-  // o sufixo pequeno ocupa parte da linha: a medida desconta a largura dele
-  const sufixo = (i: number) => t.sufixos?.[i] ?? null;
-  const tamanho = tamanhoQueCabe(t.valores, largura, t.valores.map((_, i) => (sufixo(i) ? medirLargura(sufixo(i)!, 9, 0) : 0)));
-  return t.valores.map((v, i) => ({
-    text: [v, ...(sufixo(i) ? [{ text: sufixo(i)!, fontSize: 9, bold: false, color: P.cores.detalhe }] : [])],
-    fontSize: tamanho,
-    bold: true,
-    color: P.cores.valor,
-    lineHeight: 1.05,
-    margin: [0, i === 0 ? 4 : 2, 0, 0],
-  }));
-}
-
-function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
-  const P = PAGINA_3_NOVA;
-  const caixas = !comArte && P.caixasSemArte;
-  const textos = textosDosValores(o);
-  const bloco = (chave: 'investimento' | 'aVista' | 'cartao'): Content[] => {
-    const b = P.blocos[chave];
-    const t = textos[chave];
-    return [
-      ...(caixas ? [{ canvas: [{ type: 'rect', x: 0, y: 0, w: b.largura, h: b.altura, r: 10, color: COR.branco, lineColor: COR.borda, lineWidth: 0.75 }], absolutePosition: { x: b.x, y: b.y } } as Content] : []),
-      {
-        absolutePosition: { x: b.x + P.respiro, y: b.y + P.respiro },
-        // tabela de uma célula: em posição absoluta é ela que limita a largura do texto ao bloco
-        table: { widths: [b.largura - 2 * P.respiro], body: [[{ stack: [
-          { text: b.titulo, fontSize: 8, bold: true, characterSpacing: 1, color: P.cores.titulo },
-          ...valoresDoBloco(t, b.largura - 2 * P.respiro),
-          ...t.detalhes.map((d) => ({ text: d, fontSize: 8.5, color: P.cores.detalhe, margin: [0, 2, 0, 0] })),
-        ] }]] },
-        layout: semBordas([0, 0, 0, 0]),
-      } as Content,
-    ];
-  };
-
-  const c = P.contato;
+function campoDoContato(o: OrcamentoParaPdf): Content {
+  const largura = PAGINA_3_NOVA.campos.contato.largura;
   const fone = o.vendedor.telefone?.replace(/\D/g, '') ?? '';
-  const cargo = o.vendedor.cargoNaProposta?.trim() || 'Consultor';
-  const contato: Content[] = [
-    ...(caixas ? [{ canvas: [{ type: 'rect', x: 0, y: 0, w: c.largura, h: c.altura, r: 10, color: COR.branco, lineColor: COR.borda, lineWidth: 0.75 }], absolutePosition: { x: c.x, y: c.y } } as Content] : []),
-    {
-      absolutePosition: { x: c.x + P.respiro, y: c.y + P.respiro },
-      // larguras fixas: em posição absoluta o pdfmake não limita as colunas pela caixa
-      columns: [
-        {
-          width: c.largura - 2 * P.respiro - 220 - 16,
-          stack: [
-            { text: c.titulo, fontSize: 8, bold: true, characterSpacing: 1, color: P.cores.titulo },
-            { text: o.vendedor.nome, fontSize: 12, bold: true, color: P.cores.valor, margin: [0, 4, 0, 0] },
-            { text: cargo, fontSize: 9, color: P.cores.detalhe },
-            ...(fone ? [{ text: `WhatsApp ${mascararTelefone(fone)}`, fontSize: 9.5, color: P.cores.valor, margin: [0, 3, 0, 0] }] : []),
-          ],
-        },
-        {
-          width: 220,
-          alignment: 'right',
-          stack: [
-            [EMPRESA.telefone, EMPRESA.email].filter(Boolean).join(' · '),
-            [EMPRESA.instagram, EMPRESA.site].filter(Boolean).join(' · '),
-          ]
-            .filter(Boolean)
-            .map((linha, i) => ({ text: linha, fontSize: 9, color: i === 0 ? P.cores.valor : P.cores.detalhe, margin: [0, i === 0 ? 16 : 2, 0, 0] })),
-        },
-      ],
-      columnGap: 16,
-    } as Content,
-  ];
-  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), ...selosNaArte(o), ...contato];
+  const whatsapp = fone ? `WhatsApp ${mascararTelefone(fone)}` : null;
+  const umaLinha = [o.vendedor.nome, ...(whatsapp ? [whatsapp] : [])].join('  ·  ');
+  const tamanho = tamanhoQueCabe(umaLinha, largura, 10.5, 8.5);
+  if (tamanho !== null) return campo('contato', [{ texto: umaLinha, tamanho, negrito: true }]);
+  // duas linhas a 7,5 pt, entrelinha justa: cabem entre o título e a borda de baixo da faixa
+  return campo('contato', [
+    { texto: o.vendedor.nome, tamanho: tamanhoQueCabe(o.vendedor.nome, largura, 7.5, 6.5) ?? 6.5, negrito: true, entrelinha: 0.95 },
+    ...(whatsapp ? [{ texto: whatsapp, tamanho: 7.5, negrito: true, entrelinha: 0.95 }] : []),
+  ]);
+}
+
+/** Os sete campos da página 3 (posições em conteudo/proposta.ts); as logos, só sem a arte. */
+function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
+  return [...selosNaArte(o), ...camposDosValores(o), campoDoContato(o), ...(comArte ? [] : faixaDasMontadoras())];
 }
 
 const ENTRELINHA_DO_SELO = 1.05;

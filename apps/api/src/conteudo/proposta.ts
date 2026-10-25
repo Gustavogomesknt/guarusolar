@@ -160,33 +160,33 @@ export const RODAPE_DA_PROPOSTA_NOVA = {
 };
 
 /**
- * Página 3 do modelo novo: os três valores e o contato, POR CIMA da arte. Posições em pontos a
- * partir do canto de cima à esquerda da folha (A4 = 595 x 842). Quando a arte chegar, ajuste x,
- * y, largura e altura de cada bloco para cair nos espaços dela e desligue `caixasSemArte` se a
- * arte já desenha os quadros. Os valores vêm gravados no orçamento (condições da proposta).
+ * Página 3 do modelo novo: SETE campos POR CIMA da arte (assets/proposta/pagina-3.jpg, 1055 x
+ * 1491 px, A4 exato: 1 px da arte = 0,5643 pt). Posições em PONTOS do PDF (1/72 de polegada), a
+ * partir do canto de cima à esquerda da folha (A4 = 595,28 x 841,89); px da arte x 0,5643 = pt.
+ * Medidas em 25/10/2026 na arte sem os valores embutidos. Cada campo é uma caixa: o texto não
+ * passa da largura (diminui até caber) e a altura dela fica livre da régua laranja e do texto
+ * fixo da arte. Os valores vêm gravados no orçamento (condições da proposta).
  */
 export const PAGINA_3_NOVA = {
-  /** sem a arte (retângulo cinza), desenha os quadros brancos para mostrar onde cada bloco fica */
-  caixasSemArte: true,
-  /** margem interna de cada bloco */
-  respiro: 14,
+  /** tamanho máximo do valor grande (diminui até caber na largura do campo, mínimo 11) */
   tamanhoDoValor: 17,
-  /**
-   * Cartão COM entrada (sem entrada, sai só "12 × R$ 730,49"): 'empilhado' = "R$ 3.298,88 de
-   * entrada" e "+ 12 × R$ 730,49" em duas linhas grandes iguais; 'lado-a-lado' = entrada e parcela
-   * em duas colunas, cada uma com um rótulo pequeno em cima. Só apresentação: a conta é a mesma.
-   */
-  entradaNoCartao: 'empilhado' as 'empilhado' | 'lado-a-lado',
-  cores: { titulo: '#F26B21', valor: '#0E2E60', detalhe: '#5A6675' },
-  blocos: {
-    investimento: { titulo: 'VALOR DO INVESTIMENTO', x: 36, y: 470, largura: 165, altura: 112 },
-    aVista: { titulo: 'À VISTA VIA PIX', x: 215, y: 470, largura: 165, altura: 112 },
-    cartao: { titulo: 'NO CARTÃO DE CRÉDITO', x: 394, y: 470, largura: 165, altura: 112 },
+  /** sobre os cartões escuros da arte */
+  cores: { valor: '#FFFFFF', detalhe: '#CBDBF0' },
+  campos: {
+    /** cartão da esquerda: entre o título e a régua laranja (y 676,5) */
+    investimento: { x: 35, y: 638, largura: 158, altura: 30 },
+    /** cartão do meio: idem (régua em y 676,5) */
+    aVista: { x: 225, y: 638, largura: 150, altura: 30 },
+    /** cartão da direita (sem régua): parcelas em duas linhas e, embaixo, a última diferente */
+    cartaoParcelas: { x: 409, y: 634, largura: 152, altura: 56 },
+    /** cartão da direita, embaixo (o quadro escuro acaba em y 705, o cartão em 709) */
+    cartaoTotal: { x: 409, y: 692, largura: 152, altura: 11 },
+    /** faixa "PRONTO PARA APROVAR?": abaixo do título, até a diagonal laranja (x ~ 400) */
+    contato: { x: 104, y: 741, largura: 285, altura: 19 },
   },
-  contato: { titulo: 'FALE COM A GENTE', x: 36, y: 690, largura: 523, altura: 90 },
   /**
-   * faixa das logos das montadoras (ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras): fixa, igual em
-   * toda proposta. As logos ficam espalhadas por igual entre x e x + largura, no y dado.
+   * faixa das logos das montadoras (ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras): SÓ SEM A ARTE
+   * (a arte de 25/10/2026 já traz as logos). Espalhadas por igual entre x e x + largura, no y dado.
    * larguraMm de cada logo: até 25 mm (a 24 mm a WEG, a de menor resolução, passa de 300 dpi)
    */
   montadoras: { x: 36, y: 618, largura: 523, larguraMm: 24 },

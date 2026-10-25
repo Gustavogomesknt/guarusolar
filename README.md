@@ -555,11 +555,23 @@ pasta de armazenamento não são removidos.
   cada caso nos dois modelos (o novo na subpasta `nova/`). Artes e fotos dos cartões: pasta
   `apps/api/assets/proposta/` (o LEIA-ME de lá tem os nomes); textos fixos em
   `src/conteudo/proposta.ts` (`PAGINA_2_NOVA`).
-- **Antes de ligar o modelo novo** (`PROPOSTA_MODELO=nova` na Render): preencha os dois padrões
-  em `packages/compartilhado/src/condicoesDaProposta.ts` (sem eles a API recusa e diz qual falta,
-  em `/saude`), publique e rode, com a `DATABASE_URL` de produção na sua janela,
-  `npm run orcamentos:condicoes` (mostra quantos orçamentos tocaria) e depois
-  `npm run orcamentos:condicoes -- --executar`. Pode rodar de novo: o que já está certo não muda.
+- **Virada para o modelo novo, nesta ordem** (os comandos com a `DATABASE_URL` de produção na
+  sua janela; todos podem rodar de novo sem estragar o que já está certo):
+  1. Preencha os dois padrões em `packages/compartilhado/src/condicoesDaProposta.ts` (sem eles a
+     API recusa o modelo novo e diz qual falta, em `/saude`).
+  2. Publique (as migrations entram e o gerador passa a pedir prazo e garantia curtos).
+  3. `npm run orcamentos:prazo-garantia`: só lê. Mostra quantos textos de prazo e garantia ele
+     converteria e a lista dos que ele não sabe converter.
+  4. `npm run orcamentos:prazo-garantia -- --executar`: grava as conversões.
+  5. Revise no gerador, um por um, os orçamentos da lista: deixe só a duração ("15 dias úteis",
+     "12 meses") e salve. Rode o passo 3 de novo até sair **"Para REVISAR …: 0"**. Não ligue o
+     modelo novo com a lista cheia: texto longo não cabe no selo da página 3.
+  6. `npm run orcamentos:condicoes`: só mostra quantos orçamentos ganhariam as três condições.
+  7. `npm run orcamentos:condicoes -- --executar`: grava.
+  8. Ligue `PROPOSTA_MODELO: nova` no `render.yaml` (o valor do arquivo é reaplicado pela
+     Render; só no painel não dura) e publique.
+  9. Confira o `/saude` de produção: `"proposta":{"modelo":"nova"}`, sem `recusado` nem
+     `artesFaltando`.
 - **Capa por tipo de serviço:** a página 1 do modelo novo é uma imagem fixa com o serviço
   impresso, em `apps/api/assets/proposta/capas/`, com o nome do tipo sem acento, em minúsculas e
   com hífens (`instalacao-de-carregador-veicular.jpg`). Para outro tipo, basta pôr o arquivo dele
