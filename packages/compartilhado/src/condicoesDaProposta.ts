@@ -6,8 +6,8 @@
  * calcularCondicoesDaProposta, pelas mesmas regras de calcularOrcamento); o PDF só imprime.
  *
  * As entradas são do vendedor: o % de desconto à vista e o número de parcelas, que o gerador
- * mostra e deixa ajustar junto das três condições (o cartão da condição "Entrada + cartão" sai
- * como ele montou: entrada, débito, taxa absorvida). Campo em branco usa o padrão abaixo, que
+ * mostra e deixa ajustar junto das três condições (o cartão da condição "Cartão" sai como ele
+ * montou: parcelas ou débito). Campo em branco usa o padrão abaixo, que
  * também é o valor inicial dos dois campos num orçamento novo.
  *
  * PENDENTE (23/10/2026): os valores dependem de confirmação com a Guarusolar. Com algum padrão
@@ -21,7 +21,7 @@ import { MAXIMO_PARCELAS } from './taxasCartao.js';
 export const CONDICOES_PADRAO_DA_PROPOSTA: {
   /** % de desconto à vista via Pix quando o vendedor escolheu outra condição */
   descontoAVistaPct: number | null;
-  /** parcelas no cartão (sem entrada) quando o vendedor escolheu outra condição */
+  /** parcelas no cartão quando o vendedor escolheu outra condição */
   parcelas: number | null;
 } = {
   descontoAVistaPct: null,
@@ -58,7 +58,7 @@ export function calcularCondicoesDaProposta(
       ? null
       : { descontoPct: pctAVista, valor: calcularOrcamento({ ...entrada, condicaoPagamento: 'A_VISTA', descontoAVistaPct: pctAVista }).valorTotal };
 
-  // o cartão do vendedor, como ele montou (entrada, débito, taxa absorvida); senão o padrão, sem entrada
+  // o cartão do vendedor, como ele montou (parcelas ou débito); senão o padrão
   const doVendedor = entrada.condicaoPagamento === 'ENTRADA_PARCELAS';
   const parcelas = doVendedor ? (entrada.parcelas ?? 1) : (entrada.parcelas ?? padroes.parcelas);
   let cartao: CondicoesDaProposta['cartao'] = null;
@@ -69,7 +69,6 @@ export function calcularCondicoesDaProposta(
         : {
             ...entrada,
             condicaoPagamento: 'ENTRADA_PARCELAS',
-            entradaPct: 0,
             parcelas: Math.min(Math.max(1, Math.trunc(parcelas)), MAXIMO_PARCELAS),
             debito: false,
             absorverTaxaCartao: false,

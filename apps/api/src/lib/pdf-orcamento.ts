@@ -404,7 +404,7 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
       : o.resumoPagamento
     : condicaoPorExtenso(o);
   const desconto = numero(o.descontoAplicado);
-  // O cliente vê o total JÁ com a taxa do cartão repassada, sem linha de "taxa da operadora".
+  // O cliente vê o total JÁ com a taxa do cartão (se repassada), sem linha de "taxa da operadora".
   const totalCliente = numero(o.valorTotalCliente ?? o.valorTotal);
   // Impostos: linha própria, no mesmo estilo do desconto, logo abaixo dele (só com o interruptor
   // "mostrar impostos na proposta" ligado; desligado, o imposto está embutido nos preços).

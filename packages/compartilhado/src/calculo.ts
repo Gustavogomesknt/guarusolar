@@ -21,7 +21,6 @@ export type EntradaCalculo = {
   impostoPct?: number | null;
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct?: number | null;
-  entradaPct?: number | null;
   parcelas?: number | null;
   /** ENTRADA_PARCELAS: saldo no débito (taxa do débito, parcela única) */
   debito?: boolean | null;
@@ -30,8 +29,8 @@ export type EntradaCalculo = {
 };
 
 /**
- * Saldo pago no cartão (ENTRADA_PARCELAS). A entrada é Pix ou transferência: sem taxa.
- * Valores em reais, já arredondados a centavos.
+ * Pagamento no cartão (ENTRADA_PARCELAS): o valor INTEIRO, sem entrada (25/10/2026; a coluna
+ * entradaPct e o valorEntrada de orçamentos antigos ficam só como registro). Em reais, a centavos.
  */
 export type PagamentoCartao = {
   debito: boolean;
@@ -39,7 +38,7 @@ export type PagamentoCartao = {
   /** taxa da operadora usada (%), gravada no orçamento */
   taxaPct: number;
   absorvida: boolean;
-  /** saldo da proposta que vai para o cartão (valor total − entrada) */
+  /** o que vai para o cartão: o valor total (não há entrada) */
   saldo: number;
   /** o que o cliente paga no cartão: saldo ÷ (1 − taxa), arredondado PARA CIMA; absorvida = saldo */
   valorCobrado: number;
@@ -62,12 +61,12 @@ export type ResultadoCalculo = {
   descontoAplicado: number;
   /** imposto em R$ (base: o valor depois dos descontos) */
   impostoAplicado: number;
-  /** com o imposto: é a base do pagamento (entrada, cartão) */
+  /** com o imposto: é a base do pagamento (à vista, cartão) */
   valorTotal: number;
   entrada: number;
   valorParcela: number;
   resumoPagamento: string;
-  /** o que o cliente paga (com a taxa do cartão repassada); igual a valorTotal sem cartão */
+  /** o que o cliente paga (com a taxa do cartão, se repassada); igual a valorTotal sem cartão ou com a taxa absorvida */
   valorTotalCliente: number;
   cartao: PagamentoCartao | null;
 };
@@ -117,8 +116,8 @@ export function calcularCartao(saldo: number, parcelas: number, debito: boolean,
  *   3. − desconto geral         % ou R$, sobre o subtotal do passo 2
  *   4. − desconto à vista       só em A_VISTA; %, sobre o valor do passo 3
  *   5. + imposto                %, sobre o valor JÁ com os dois descontos (passo 4)
- *   = valorTotal                a base do pagamento: entrada e cartão (parcelas da maquininha,
- *                               com a taxa repassada) saem daqui, já com o imposto
+ *   = valorTotal                a base do pagamento: o cartão (parcelas da maquininha, sem
+ *                               entrada) sai daqui, já com o imposto
  * A margem entra ANTES dos descontos (o cliente não a vê: o desconto é sobre o preço que ele vê),
  * e o imposto DEPOIS (é cobrado sobre o que o cliente de fato paga, não sobre o preço cheio).
  */
@@ -152,7 +151,8 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
   const impostoAplicado = cent((aposDescontos * Math.max(Number(entrada.impostoPct || 0), 0)) / 100);
   const valorTotal = cent(aposDescontos + impostoAplicado);
 
-  let entradaValor = 0;
+  // não há mais entrada (25/10/2026); o campo do resultado fica, sempre 0
+  const entradaValor = 0;
   let valorParcela = 0;
   let resumoPagamento = '';
   let cartao: PagamentoCartao | null = null;
@@ -164,17 +164,14 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
       break;
     }
     case 'ENTRADA_PARCELAS': {
-      // entrada no Pix ou transferência (sem taxa); só o saldo vai para o cartão
-      const pct = Number(entrada.entradaPct || 0);
+      // sem entrada (25/10/2026): o valor inteiro vai para o cartão; entradaValor fica 0
       const n = Math.max(1, Math.trunc(Number(entrada.parcelas || 1)));
-      entradaValor = cent((valorTotal * pct) / 100);
-      cartao = calcularCartao(cent(valorTotal - entradaValor), n, Boolean(entrada.debito), Boolean(entrada.absorverTaxaCartao));
+      cartao = calcularCartao(valorTotal, n, Boolean(entrada.debito), Boolean(entrada.absorverTaxaCartao));
       valorParcela = cartao.valorParcela;
-      const noCartao = cartao.debito
-        ? `${entradaValor > 0 ? 'débito' : 'Débito'} de ${brl(cartao.valorCobrado)}`
+      resumoPagamento = cartao.debito
+        ? `Débito de ${brl(cartao.valorCobrado)}`
         : `${cartao.parcelas}x de ${brl(cartao.valorParcela)}` +
           (cartao.valorPrimeiraParcela !== cartao.valorParcela ? ` (1ª de ${brl(cartao.valorPrimeiraParcela)})` : '');
-      resumoPagamento = (entradaValor > 0 ? `Entrada de ${brl(entradaValor)} + ` : '') + noCartao;
       break;
     }
     case 'FINANCIAMENTO': {

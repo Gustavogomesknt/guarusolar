@@ -4,6 +4,7 @@ import {
   GARANTIA_PADRAO,
   PRAZO_MAXIMO_DE_CARACTERES,
   SUGESTOES_DE_PRAZO,
+  REPASSAR_TAXA_DO_CARTAO,
   TAXAS_CARTAO,
   type CondicaoPagamento,
   type TipoDesconto,
@@ -17,7 +18,6 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Campo, ariaDoCampo } from '@/components/Campo';
 import {
-  OPCOES_ENTRADA,
   OPCOES_PARCELAS,
   problemaNoDesconto,
   problemaNoImposto,
@@ -27,7 +27,11 @@ import type { Totais } from './ResumoOrcamento';
 
 const CONDICOES: { valor: CondicaoPagamento; titulo: string; descricao: string }[] = [
   { valor: 'A_VISTA', titulo: 'À vista', descricao: 'Pix ou transferência, com desconto' },
-  { valor: 'ENTRADA_PARCELAS', titulo: 'Entrada + cartão', descricao: 'Entrada no Pix, saldo no cartão com a taxa repassada' },
+  {
+    valor: 'ENTRADA_PARCELAS',
+    titulo: 'Cartão',
+    descricao: REPASSAR_TAXA_DO_CARTAO ? 'Valor inteiro no cartão, com a taxa repassada' : 'Valor inteiro no cartão, sem entrada',
+  },
   { valor: 'FINANCIAMENTO', titulo: 'Financiamento', descricao: 'Linha de crédito solar do banco parceiro' },
 ];
 
@@ -157,7 +161,7 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
       </div>
 
       {/* Impostos: espelho do desconto, somando. Incide sobre o valor JÁ com os descontos
-          (inclusive o à vista), e o pagamento (entrada e cartão) é calculado com ele */}
+          (inclusive o à vista), e o pagamento (à vista e cartão) é calculado com ele */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor="imposto-pct" className="text-[13px] font-medium text-foreground/80">
@@ -276,15 +280,6 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
 
         {condicao === 'ENTRADA_PARCELAS' && (
           <div className="grid grid-cols-2 gap-2.5">
-            <Campo id="entrada-pct" rotulo="Entrada" erro={errors.entradaPct?.message}>
-              <select {...ariaDoCampo('entrada-pct', errors.entradaPct?.message)} {...register('entradaPct', { onChange: () => clearErrors('entradaPct') })} className={CLASSE_SELECT}>
-                {OPCOES_ENTRADA.map((pct) => (
-                  <option key={pct} value={pct}>
-                    {pct === '0' ? 'Sem entrada' : `${pct}%`}
-                  </option>
-                ))}
-              </select>
-            </Campo>
             <Campo id="parcelas" rotulo="Parcelas" erro={errors.parcelas?.message}>
               <select {...ariaDoCampo('parcelas', errors.parcelas?.message)} {...register('parcelas', { onChange: () => clearErrors('parcelas') })} className={CLASSE_SELECT}>
                 {OPCOES_PARCELAS.map(({ valor, rotulo }) => (
@@ -408,12 +403,7 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
   const linhas: [string, string][] = [
     ['No cartão', parcelas],
     ['Taxa da operadora', `${pct(c.taxaPct)} · ${c.absorvida ? 'absorvida pela Guarusolar' : 'repassada ao cliente'}`],
-    [
-      'Cliente paga no total',
-      totais.entrada > 0
-        ? `${formatarBRL(totais.valorTotalCliente)} (${formatarBRL(totais.entrada)} no Pix + ${formatarBRL(c.valorCobrado)} no cartão)`
-        : formatarBRL(totais.valorTotalCliente),
-    ],
+    ['Cliente paga no total', formatarBRL(totais.valorTotalCliente)],
     ['Guarusolar recebe', formatarBRL(recebe)],
   ];
 
@@ -428,21 +418,24 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
         ))}
       </dl>
 
-      <Controller
-        control={control}
-        name="absorverTaxaCartao"
-        render={({ field }) => (
-          <div className="flex items-start justify-between gap-3">
-            <Label htmlFor="absorver-taxa" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
-              Absorver a taxa nesta proposta
-              <span id="absorver-taxa-ajuda" className="text-xs font-normal text-muted-foreground">
-                Para negociação: o cliente paga o valor da proposta e a Guarusolar arca com a taxa.
-              </span>
-            </Label>
-            <Switch id="absorver-taxa" aria-describedby="absorver-taxa-ajuda" checked={field.value} onCheckedChange={field.onChange} />
-          </div>
-        )}
-      />
+      {/* com a taxa sempre absorvida (REPASSAR_TAXA_DO_CARTAO = false) não há o que escolher */}
+      {REPASSAR_TAXA_DO_CARTAO && (
+        <Controller
+          control={control}
+          name="absorverTaxaCartao"
+          render={({ field }) => (
+            <div className="flex items-start justify-between gap-3">
+              <Label htmlFor="absorver-taxa" className="flex flex-col items-start gap-0.5 text-[13px] font-medium text-foreground/80">
+                Absorver a taxa nesta proposta
+                <span id="absorver-taxa-ajuda" className="text-xs font-normal text-muted-foreground">
+                  Para negociação: o cliente paga o valor da proposta e a Guarusolar arca com a taxa.
+                </span>
+              </Label>
+              <Switch id="absorver-taxa" aria-describedby="absorver-taxa-ajuda" checked={field.value} onCheckedChange={field.onChange} />
+            </div>
+          )}
+        />
+      )}
       {c.absorvida && (
         <p role="status" className="rounded-[10px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
           A Guarusolar deixa de receber <strong>{formatarBRL(c.valorAbsorvido)}</strong>: recebe {formatarBRL(recebe)} em vez de{' '}
@@ -450,7 +443,7 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        Taxas do Mercado Pago atualizadas em {TAXAS_CARTAO.atualizadoEm}. A entrada é no Pix ou na transferência, sem taxa.
+        Taxas do Mercado Pago atualizadas em {TAXAS_CARTAO.atualizadoEm}.
       </p>
     </div>
   );

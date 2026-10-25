@@ -9,7 +9,7 @@
  * O QUE MUDA: só as colunas proposta*. NENHUM valor já gravado da condição escolhida é alterado
  * (valorTotal, entrada, parcelas, taxa, resumo, cópia do cliente, itens...). E a condição
  * escolhida, na página 3, sai COPIADA do que está gravado, não recalculada: o cartão de um
- * orçamento de "Entrada + cartão" fica com a taxa e as parcelas que o cliente já recebeu, mesmo
+ * orçamento de cartão fica com a taxa, a entrada (se tinha) e as parcelas que o cliente já recebeu, mesmo
  * que a tabela de taxas tenha mudado depois. Só a OUTRA condição é calculada, com os padrões de
  * compartilhado/condicoesDaProposta.ts (recusa se algum estiver em branco).
  *
@@ -92,7 +92,6 @@ async function main() {
       // as entradas do vendedor só valem para a condição que ele escolheu: a outra usa o padrão
       // (antes das três condições, um valor gravado da condição NÃO escolhida era resto de edição)
       descontoAVistaPct: o.condicaoPagamento === 'A_VISTA' ? num(o.descontoAVistaPct) : null,
-      entradaPct: num(o.entradaPct),
       parcelas: o.condicaoPagamento === 'ENTRADA_PARCELAS' ? o.parcelas : null,
       debito: o.pagamentoDebito,
       absorverTaxaCartao: o.absorverTaxaCartao,

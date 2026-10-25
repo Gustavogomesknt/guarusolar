@@ -44,7 +44,6 @@ export type FormularioOrcamento = {
   mostrarImpostosNoPdf: boolean;
   condicaoPagamento: CondicaoPagamento;
   descontoAVistaPct: string;
-  entradaPct: string;
   /** 'D' = débito; '1' a '18' = crédito em N vezes */
   parcelas: string;
   /** a Guarusolar absorve a taxa do cartão (negociação) */
@@ -66,7 +65,6 @@ export type FormularioOrcamento = {
 export const ESTILO_SOMENTE_LEITURA =
   '[&:disabled_.busca-catalogo]:hidden [&:disabled_button]:cursor-not-allowed [&:disabled_button]:opacity-40 [&:disabled_input]:opacity-60 [&:disabled_select]:opacity-60';
 
-export const OPCOES_ENTRADA =['0', '10', '20', '30', '40', '50'];
 const pct = (v: number) => `${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 export const DEBITO = 'D';
 /** Débito e 1x a 18x no crédito, com a taxa da tabela (compartilhado/taxasCartao.ts). */
@@ -111,7 +109,6 @@ export function valoresIniciais(): FormularioOrcamento {
     // desconto à vista e parcelas começam nos padrões das três condições da proposta
     // (compartilhado/condicoesDaProposta.ts); sem padrão, como antes
     descontoAVistaPct: PADRAO_A_VISTA ?? '0',
-    entradaPct: '30',
     parcelas: PADRAO_PARCELAS ?? '6',
     absorverTaxaCartao: false,
     validade: dataDaquiA(DIAS_DE_VALIDADE),
@@ -161,7 +158,6 @@ export function entradaDoCalculo(f: FormularioOrcamento): EntradaCalculo {
     condicaoPagamento: f.condicaoPagamento,
     // em branco = null: as três condições da proposta usam o padrão
     descontoAVistaPct: numeroOuNulo(f.descontoAVistaPct),
-    entradaPct: numeroOuZero(f.entradaPct),
     parcelas: f.parcelas === DEBITO ? 1 : f.parcelas.trim() === '' ? null : Math.max(1, Math.trunc(numeroOuZero(f.parcelas))),
     debito: f.parcelas === DEBITO,
     absorverTaxaCartao: f.absorverTaxaCartao,
@@ -236,8 +232,8 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
 }
 
 /**
- * Corpo do POST/PUT /api/orcamentos. Entrada, débito e taxa absorvida só da condição "Entrada +
- * cartão"; desconto à vista e parcelas SEMPRE (são as entradas das três condições da proposta;
+ * Corpo do POST/PUT /api/orcamentos. Débito e taxa absorvida só da condição "Cartão" (sem
+ * entrada: o valor inteiro vai para o cartão); desconto à vista e parcelas SEMPRE (são as entradas das três condições da proposta;
  * null = em branco, a API usa o padrão).
  */
 export function paraApi(f: FormularioOrcamento) {
@@ -256,7 +252,6 @@ export function paraApi(f: FormularioOrcamento) {
     parcelas: f.parcelas === DEBITO ? 1 : f.parcelas.trim() === '' ? null : Math.trunc(numeroOuZero(f.parcelas)),
     ...(f.condicaoPagamento === 'ENTRADA_PARCELAS'
       ? {
-          entradaPct: numeroOuZero(f.entradaPct),
           pagamentoDebito: f.parcelas === DEBITO,
           absorverTaxaCartao: f.absorverTaxaCartao,
         }
@@ -363,7 +358,10 @@ export function diferencasDoCadastro(copia: DadosClienteDocumento, cadastro: Dad
   return grupos.filter(([, campos]) => campos.some((c) => !igual(copia[c], cadastro[c]))).map(([rotulo]) => rotulo);
 }
 
-/** O pagamento no cartão como foi GRAVADO (a taxa da época; a tabela atual não entra). */
+/**
+ * O pagamento no cartão como foi GRAVADO (a taxa da época; a tabela atual não entra). A entrada
+ * só existe em orçamento salvo antes de 25/10/2026: o que foi ao cliente continua como foi.
+ */
 export function cartaoDoSalvo(s: OrcamentoSalvo): PagamentoCartao | null {
   if (s.taxaCartaoPct == null || s.valorTotalCliente == null) return null;
   const entrada = Number(s.valorEntrada ?? 0);
@@ -421,7 +419,6 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
         ? numeroTexto(o.descontoAVistaPct, '0')
         : numeroTexto(o.propostaAVistaPct, PADRAO_A_VISTA ?? ''),
     // os selects só têm estas opções; valores fora delas voltam ao padrão
-    entradaPct: OPCOES_ENTRADA.includes(String(Number(o.entradaPct))) ? String(Number(o.entradaPct)) : '30',
     parcelas:
       o.condicaoPagamento === 'ENTRADA_PARCELAS'
         ? o.pagamentoDebito

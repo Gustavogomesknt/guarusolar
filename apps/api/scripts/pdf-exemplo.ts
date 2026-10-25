@@ -92,7 +92,6 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     descontoTipo: 'PERCENTUAL',
     descontoValor: 5,
     condicaoPagamento: 'ENTRADA_PARCELAS',
-    entradaPct: 30,
     parcelas: opcoes.parcelas,
   };
   const t = calcularOrcamento(entrada);
@@ -113,7 +112,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     valorTotal: D(t.valorTotal),
     condicaoPagamento: 'ENTRADA_PARCELAS',
     descontoAVistaPct: null,
-    entradaPct: D(30),
+    entradaPct: null,
     parcelas: c.parcelas,
     bancoFinanciamento: null,
     valorEntrada: D(t.entrada),

@@ -175,7 +175,7 @@ apps/api/                      API (Express + Prisma)
                                ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
                                foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
                                antes do "contempla", que segue no pé da folha. Cartão de crédito com
-                               entrada (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
+                               entrada, só orçamento salvo antes de 25/10/2026 (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
                                tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
@@ -383,21 +383,24 @@ O `.env` da API fica em `apps/api/.env`.
 1. **Quem calcula é o servidor.** O front envia itens, desconto e condição de pagamento;
    a API recalcula tudo com `calcularOrcamento` (`packages/compartilhado/src/calculo.ts`) e grava.
    Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
-   **Cartão (Entrada + cartão):** a entrada é Pix ou transferência, sem taxa; só o saldo vai ao
-   cartão, com a taxa da operadora (MDR) REPASSADA: cobrado = saldo ÷ (1 − taxa), arredondado
-   para cima (nunca saldo × (1 + taxa)). Parcelas em centavos inteiros; a 1ª leva a sobra e a soma
-   fecha com o cobrado. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
+   **Cartão (condição ENTRADA_PARCELAS, na tela "Cartão"):** desde 25/10/2026 NÃO há entrada: o
+   valor inteiro vai ao cartão (a conta ignora `entradaPct`; a coluna e o `valorEntrada` ficam só
+   em orçamentos antigos, que saem como foram enviados). A taxa da operadora (MDR) é ABSORVIDA
+   (`REPASSAR_TAXA_DO_CARTAO = false`): o cliente paga o valor da proposta e `valorTaxaAbsorvida`
+   grava quanto a empresa deixa de receber. Com repasse ligado: cobrado = valor ÷ (1 − taxa),
+   arredondado para cima (nunca valor × (1 + taxa)). Parcelas em centavos inteiros; a 1ª leva a
+   sobra e a soma fecha com o cobrado. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
    **Repasse da taxa:** `REPASSAR_TAXA_DO_CARTAO` (taxasCartao.ts), usado em `calcularCartao`;
-   `false` faz a empresa absorver a taxa em todo orçamento. PENDENTE de confirmação (23/10/2026):
-   a proposta modelo do cliente soma as parcelas no valor cheio.
+   `false` (definido em 25/10/2026, pela proposta real do cliente) faz a empresa absorver a taxa
+   em todo orçamento, e o interruptor "Absorver a taxa" some da tela.
    **Três condições na proposta (modelo novo, 23/10/2026):** ao salvar, a API grava também
    `proposta*` (investimento = sem desconto à vista nem taxa; à vista via Pix; cartão) com
    `calcularCondicoesDaProposta`: a condição escolhida usa o que o vendedor informou (o cartão
-   dele com entrada, débito e taxa absorvida); a outra, os padrões de `condicoesDaProposta.ts`
-   (cartão padrão sem entrada). `valorTotal` continua sendo o da condição escolhida (indicadores
+   dele, em parcelas ou no débito); a outra, os padrões de `condicoesDaProposta.ts`
+   (cartão padrão). `valorTotal` continua sendo o da condição escolhida (indicadores
    não mudam). Desconto à vista e parcelas são gravados em QUALQUER condição (entradas das três;
    null = padrão), e o gerador mostra as três (`CondicoesDaProposta.tsx`, só com o modelo novo
    ligado), com os dois campos da condição não escolhida ajustáveis ali.
@@ -410,7 +413,7 @@ O `.env` da API fica em `apps/api/.env`.
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
    percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
    (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista
-   -> + imposto -> total -> entrada e cartão.
+   -> + imposto -> total -> cartão (sem entrada).
    A margem entra ANTES do desconto (decisão): o cliente não a vê, e "10% de desconto" tem de ser
    10% do preço que ele vê; a tela avisa, sem bloquear, quando o desconto passa da margem.
    **O cliente NUNCA vê a margem**: nem linha no PDF, nem no WhatsApp. O PDF não mostra preço por
@@ -419,7 +422,7 @@ O `.env` da API fica em `apps/api/.env`.
    `Orcamento.margem`; orçamento anterior ao campo tem zero e abre com zero (não com o padrão).
    **Imposto do orçamento** (14/10/2026): `impostoPct`, editável por proposta, padrão 0; incide
    sobre o valor JÁ com os dois descontos (`impostoAplicado`, em R$) e `valorTotal` já o inclui,
-   então entrada e parcelas da maquininha saem do total com imposto. No PDF, linha "Impostos (X%)"
+   então as parcelas da maquininha saem do total com imposto. No PDF, linha "Impostos (X%)"
    junto com a do desconto; com `mostrarImpostosNoPdf` desligado, o imposto vai embutido nos preços
    e no subtotal mostrado, como a margem (a conta subtotal − desconto continua fechando).
    `valorTotal` (indicadores, "valor aprovado") inclui o imposto; o valor sem ele é

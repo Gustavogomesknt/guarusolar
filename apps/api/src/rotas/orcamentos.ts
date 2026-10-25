@@ -57,6 +57,8 @@ const orcamentoSchema = z.object({
   // desconto à vista e parcelas valem em QUALQUER condição: são as entradas das três condições da
   // proposta (condicoesDaProposta.ts). null = em branco (usa o padrão); ausente = mantém o gravado
   descontoAVistaPct: z.number().min(0).max(100).nullish(),
+  // não há mais entrada no cartão (25/10/2026): aceito da tela anterior durante a publicação e
+  // ignorado (a conta não usa; grava null). A coluna fica com o que orçamentos antigos tinham
   entradaPct: z.number().min(0).max(100).optional(),
   parcelas: z.number().int().min(1).max(MAXIMO_PARCELAS, `Até ${MAXIMO_PARCELAS}x no cartão`).nullish(),
   pagamentoDebito: z.boolean().default(false),
@@ -421,7 +423,6 @@ rotasOrcamentos.post(
       impostoPct: dados.impostoPct ?? 0,
       condicaoPagamento: dados.condicaoPagamento,
       descontoAVistaPct: dados.descontoAVistaPct,
-      entradaPct: dados.entradaPct,
       parcelas: dados.parcelas,
       debito: dados.pagamentoDebito,
       absorverTaxaCartao: dados.absorverTaxaCartao,
@@ -446,7 +447,7 @@ rotasOrcamentos.post(
           mostrarImpostosNoPdf: dados.mostrarImpostosNoPdf ?? true,
           condicaoPagamento: dados.condicaoPagamento,
           descontoAVistaPct: dados.descontoAVistaPct,
-          entradaPct: dados.entradaPct,
+          entradaPct: null,
           parcelas: dados.parcelas,
           bancoFinanciamento: dados.bancoFinanciamento,
           observacoes: dados.observacoes,
@@ -508,7 +509,6 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
     impostoPct: dados.impostoPct ?? Number(atual.impostoPct),
     condicaoPagamento: dados.condicaoPagamento,
     descontoAVistaPct: dados.descontoAVistaPct,
-    entradaPct: dados.entradaPct,
     parcelas: dados.parcelas,
     debito: dados.pagamentoDebito,
     absorverTaxaCartao: dados.absorverTaxaCartao,
@@ -535,7 +535,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
         ...(dados.mostrarImpostosNoPdf === undefined ? {} : { mostrarImpostosNoPdf: dados.mostrarImpostosNoPdf }),
         condicaoPagamento: dados.condicaoPagamento,
         descontoAVistaPct: dados.descontoAVistaPct,
-        entradaPct: dados.entradaPct,
+        entradaPct: null,
         parcelas: dados.parcelas,
         bancoFinanciamento: dados.bancoFinanciamento,
         observacoes: dados.observacoes,
