@@ -231,7 +231,9 @@ function tituloDoEscopo(): { peca: Peca; altura: number } {
   const t = PAGINA_2_NOVA.titulo;
   const larguraTexto = medirLargura(`${t.azul} ${t.laranja}`, tamanho);
   return {
-    altura: tamanho * 1.15,
+    // MEDIDA com o pdfkit (a linha da Plex a 15 pt tem ~19,5 pt, não 15 x 1,15): os cartões
+    // esticam até o "contempla", então qualquer ponto a mais aqui empurra o bloco de folha
+    altura: alturaDoTexto(`${t.azul} ${t.laranja}`, LARGURA, tamanho, 1, true),
     peca: {
       columns: [
         { width: 'auto', text: [{ text: `${t.azul} `, color: COR.marinho }, { text: t.laranja, color: COR.laranja }], fontSize: tamanho, bold: true, lineHeight: 1, characterSpacing: 0.4 },
@@ -348,7 +350,8 @@ const MM = 72 / 25.4;
  * Foto no pé do cartão, na LARGURA INTEIRA e na altura que sobra abaixo dos itens (proporção
  * variável). Não distorce: `cover` escala a imagem PROPORCIONALMENTE até cobrir o box e corta o
  * que passa (o pdfmake recorta no próprio box), centrada; sem borda branca. Os cantos de baixo
- * acompanham o cartão (máscaras brancas; o contorno é redesenhado por cima em cartaoDoEscopo).
+ * acompanham o cartão (máscaras brancas) e o contorno do cartão é redesenhado por cima, só na área
+ * da foto (um desenho do tamanho dela: nada aqui ocupa mais altura que a própria área).
  * Sem o arquivo, a área fica em branco e o PDF segue.
  */
 function fotoDoCartao(foto: Arte, largura: number, altura: number, raio: number): Peca {
@@ -356,10 +359,12 @@ function fotoDoCartao(foto: Arte, largura: number, altura: number, raio: number)
     table: { widths: [largura], heights: [altura], body: [[{ stack: conteudo }]] },
     layout: semBordas([0, 0, 0, 0]),
   });
-  if (!foto.arquivo) return area([]);
   const canto = (x: number, sx: number) =>
     `<path d="M${x} ${altura - raio} L${x} ${altura} L${x + sx * raio} ${altura} A${raio} ${raio} 0 0 ${sx > 0 ? 1 : 0} ${x} ${altura - raio} Z" fill="#FFFFFF"/>`;
-  const mascaras = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}">${canto(0, 1)}${canto(largura, -1)}</svg>`;
+  // o contorno (laterais e o pé com os cantos arredondados), como o do cartão por baixo da foto
+  const m = 0.375; // metade da espessura: a linha fica inteira dentro do cartão, como a do canvas
+  const contorno = `<path d="M${m} 0 L${m} ${altura - raio} A${raio - m} ${raio - m} 0 0 0 ${raio} ${altura - m} L${largura - raio} ${altura - m} A${raio - m} ${raio - m} 0 0 0 ${largura - m} ${altura - raio} L${largura - m} 0" fill="none" stroke="${COR.borda}" stroke-width="0.75"/>`;
+  const mascaras = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}">${canto(0, 1)}${canto(largura, -1)}${contorno}</svg>`;
   return area([
     { image: foto.arquivo, cover: { width: largura, height: altura, align: 'center', valign: 'center' }, relativePosition: { x: 0, y: 0 } },
     { svg: mascaras, width: largura, height: altura, relativePosition: { x: 0, y: 0 } },
@@ -444,9 +449,11 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
       },
       comFoto
         ? fotoDoCartao(foto, largura, sobra, raio)
-        : { table: { widths: [largura], heights: [Math.max(0, sobra)], body: [[{ text: '' }]] }, layout: semBordas([0, 0, 0, 0]) },
-      // o contorno por cima de tudo (a foto vai até a borda): do pé do cartão, volta `total`
-      { canvas: [{ type: 'rect', x: 0, y: 0, w: largura, h: total, r: raio, lineColor: COR.borda, lineWidth: 0.75 }], relativePosition: { x: 0, y: -total } },
+        : // sem foto: espaço em branco da altura EXATA (texto vazio numa célula ocuparia uma linha
+          // inteira, ~15 pt, e empurraria o "contempla" para a folha seguinte)
+          sobra > 0
+          ? { canvas: [{ type: 'rect', x: 1, y: 0, w: largura - 2, h: sobra, color: COR.branco }] }
+          : { text: '', fontSize: 0.1, lineHeight: 0.1 },
     ],
   };
 }
@@ -478,8 +485,10 @@ function blocoContempla(): { peca: Peca; altura: number } {
     },
     { largura: LARGURA, altura: alturaFaixa, fundo: COR.marinho, raio: 8, padding: [12, 7.5, 12, 4] },
   );
+  // tabela de altura fixa: o desenho (canvas fora do fluxo) não ocupa espaço, e só a altura das
+  // colunas faria a linha de condições subir até encostar na borda de baixo da caixa
   const caixaDasEtapas: Peca = {
-    stack: [
+    table: { widths: [LARGURA], heights: [alturaCaixa], body: [[{ stack: [
       {
         canvas: [
           { type: 'rect', x: 0, y: 0, w: LARGURA, h: alturaCaixa, r: 9, color: COR.branco, lineColor: COR.borda, lineWidth: 0.75 },
@@ -507,8 +516,8 @@ function blocoContempla(): { peca: Peca; altura: number } {
         })),
         columnGap: 0,
       },
-    ],
-    height: alturaCaixa,
+    ] }]] },
+    layout: semBordas([0, 0, 0, 0]),
   };
   // a linha de condições (PAGINA_2_NOVA.contempla.condicoes), medida: entra na altura do bloco
   const condicoes = C.condicoes.trim();
@@ -618,7 +627,7 @@ function alturaDaSecaoEmLista(cartao: Cartao): number {
     const alta = Math.max(...daLinha.map((i) => alturaDoTexto(textoDoItem(i), larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha)));
     linhas += alta + (l === 0 ? 10 : 3) + (l === quantas - 1 ? 10 : 3);
   }
-  return cabecalho + linhas;
+  return cabecalho + linhas + 0.75; // + a linha de baixo da tabela
 }
 
 /** Formato de reserva: a seção como tabela de três colunas de itens, que quebra de página. */

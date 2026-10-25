@@ -398,6 +398,18 @@ const folhasSchema = z.object({
   itens: z.array(z.object({ produtoId: z.string().uuid(), apareceNaProposta: z.boolean().optional() })).max(500),
 });
 
+const CLIENTE_DE_MEDIDA = {
+  nome: 'Nome do Cliente',
+  whatsapp: '11999999999',
+  logradouro: 'Rua do Cliente',
+  numero: '100',
+  complemento: 'casa 2',
+  bairro: 'Bairro',
+  cidade: 'Guarulhos',
+  uf: 'SP',
+  cep: '07000000',
+};
+
 rotasOrcamentos.post(
   '/folhas-da-proposta',
   rota(async (req, res) => {
@@ -416,7 +428,9 @@ rotasOrcamentos.post(
     const o = {
       ...(copia ? salvo : {}),
       clienteNome: copia ? salvo!.clienteNome : null,
-      cliente: cliente ?? { nome: '', whatsapp: '' },
+      // sem cliente escolhido ainda: mede com um cartão completo (nome, telefone e endereço em duas
+      // linhas), o caso comum, para o aviso não chegar atrasado quando o cliente entrar
+      cliente: cliente ?? CLIENTE_DE_MEDIDA,
       vendedor: salvo?.vendedor ?? vendedor!,
       itens: itens.map((i) => ({ ...i, id: i.produtoId, orcamentoId: '', produto: { categoria: 'OUTROS' } })),
     } as unknown as OrcamentoParaPdf;

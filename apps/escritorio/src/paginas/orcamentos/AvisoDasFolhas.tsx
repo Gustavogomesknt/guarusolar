@@ -56,7 +56,8 @@ export function AvisoDasFolhas({ orcamentoId }: { orcamentoId?: string }) {
     // é só um aviso: se a consulta falhar, ele não aparece (sem o aviso global de erro)
     meta: { erroNaTela: true },
   });
-  const texto = pedido.itens.length > 0 ? textoDoAvisoDasFolhas(consulta.data) : null;
+  // falhou: sem aviso (nem o da resposta anterior, que o React Query manteria em `data`)
+  const texto = pedido.itens.length > 0 && !consulta.isError ? textoDoAvisoDasFolhas(consulta.data) : null;
   if (!texto) return null;
   return (
     <p role="status" className="flex items-start gap-2 rounded-[10px] bg-muted/60 px-3 py-2 text-[13px] text-muted-foreground">
