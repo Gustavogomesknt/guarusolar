@@ -7,9 +7,9 @@ Coloque aqui os arquivos com estes nomes exatos (os caminhos ficam em
 | --- | --- | --- |
 | `capas/<tipo-de-servico>.jpg` | a capa (página 1), uma por tipo de serviço: ver `capas/LEIA-ME.md` | 2480 x 3508 px (A4 a 300 dpi) |
 | `pagina-3.jpg` | fundo inteiro da página 3 | 2480 x 3508 px |
-| `foto-documentacao.jpg` | pé do cartão "Documentação de engenharia" | retrato 3:4 |
-| `foto-bombeiros.jpg` | pé do cartão "Adequação Corpo de Bombeiros · IT 41" | retrato 3:4 |
-| `foto-infraestrutura.jpg` | pé do cartão "Infraestrutura da instalação" (os materiais) | retrato 3:4 |
+| `foto-documentacao.jpg` | pé do cartão "Documentação de engenharia" | retrato, ~800 x 1600 px |
+| `foto-bombeiros.jpg` | pé do cartão "Adequação Corpo de Bombeiros · IT 41" | retrato, ~800 x 1600 px |
+| `foto-infraestrutura.jpg` | pé do cartão "Infraestrutura da instalação" (os materiais) | retrato, ~800 x 1600 px |
 | `logo-byd.png` | faixa de logos das montadoras (página 3) | 480 x 220 px, fundo transparente |
 | `logo-weg.png` | idem | idem |
 | `logo-geely.png` | idem | idem |
@@ -17,12 +17,13 @@ Coloque aqui os arquivos com estes nomes exatos (os caminhos ficam em
 | `logo-jeep.png` | idem | idem |
 | `logo-bmw.png` | idem | idem |
 
-**Fotos dos cartões:** as três saem do MESMO tamanho, em 3:4 (retrato), centradas no pé do
-cartão, com 40 mm de largura (`FOTO_DO_CARTAO` em `src/conteudo/proposta.ts`). Menores só quando
-o cartão não tem altura para elas (muitos itens), sempre em 3:4. Mande sempre em 3:4: o sistema
-não força proporção, e o que passar dela é cortado. As de 23/10/2026 têm uns 225 px de largura
-(a de infraestrutura, 178 px): não aumente os 40 mm, ou a foto borra. Sem o arquivo, o cartão sai
-sem foto e o PDF é gerado assim mesmo.
+**Fotos dos cartões:** cada uma preenche o pé do seu cartão na página 2, na LARGURA INTEIRA
+do cartão e na altura que sobra abaixo dos itens (de uns 70 a 360 pt, conforme os itens e
+quantos grupos a proposta tem). A foto é recortada para caber, centrada, nunca esticada nem
+achatada: mande em retrato alto, uns **800 x 1600 px** (1:2), com o assunto no centro. As de
+23/10/2026 têm uns 225 px de largura e saem a 80-95 dpi (borradas na impressão). Troque o arquivo
+mantendo o nome: o PDF melhora sozinho, sem mexer em código (em produção, depois de publicar).
+Sem o arquivo, o cartão sai sem foto e o PDF é gerado assim mesmo.
 
 **Logos das montadoras:** todas vêm recortadas e centradas na mesma caixa de 480 x 220 px, com
 fundo transparente, e saem todas do mesmo tamanho (24 mm de largura, na proporção do arquivo;

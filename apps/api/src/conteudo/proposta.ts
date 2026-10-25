@@ -113,19 +113,13 @@ export const CAPAS_DA_PROPOSTA = {
   textoDaCapaPadrao: 'Instalação de Carregador Veicular',
 };
 
-/** Tamanho da foto dos cartões (3:4, retrato). Menor só se o cartão não tiver altura para ela. */
-export const FOTO_DO_CARTAO = {
-  /** 40 mm: com os arquivos de ~225 px, uns 145 dpi; acima disso a foto borra no PDF */
-  larguraMm: 40,
-  proporcao: 3 / 4,
-};
-
 export const ARTES_DA_PROPOSTA_NOVA = {
   /** fundo de página inteira (A4 em retrato, 2480 x 3508 px = 300 dpi); a capa está acima */
   fundoPagina3: 'assets/proposta/pagina-3.jpg',
   /**
-   * foto no pé de cada cartão do escopo: RETRATO 3:4, as três no mesmo tamanho (FOTO_DO_CARTAO,
-   * abaixo). Os arquivos de 23/10/2026 têm uns 225 px de largura: não passe de 40 mm
+   * foto no pé de cada cartão do escopo, na LARGURA INTEIRA do cartão e na altura que sobra
+   * abaixo dos itens (recortada, nunca esticada). Retrato alto, uns 800 x 1600 px: os arquivos
+   * de 23/10/2026 (~225 px) saem a 80-95 dpi. Arquivo maior com o MESMO nome melhora sozinho
    */
   fotoDocumentacao: 'assets/proposta/foto-documentacao.jpg',
   fotoBombeiros: 'assets/proposta/foto-bombeiros.jpg',

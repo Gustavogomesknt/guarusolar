@@ -289,7 +289,7 @@ export function GeradorOrcamento({
             <legend className="sr-only">Cliente e itens</legend>
             <CartaoTipoDeServico />
             <CartaoCliente gravado={salvo} somenteLeitura={somenteLeitura} />
-            <CartaoItens subtotal={totais.subtotalItens} />
+            <CartaoItens subtotal={totais.subtotalItens} orcamentoId={salvo?.id} />
           </fieldset>
           <ResumoOrcamento
             totais={totais}

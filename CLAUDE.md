@@ -171,10 +171,14 @@ apps/api/                      API (Express + Prisma)
                                valores GRAVADOS (proposta*) e o contato, em posições de
                                PAGINA_3_NOVA (conteudo/proposta.ts), e, SÓ SEM A ARTE (ela já traz as logos), a faixa das logos das
                                montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
-                               Fotos dos cartões: 3:4, 40 mm (FOTO_DO_CARTAO; os arquivos têm
-                               ~225 px, não aumente), centradas no pé; sem arquivo, cartão sem
-                               foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
-                               antes do "contempla", que segue no pé da folha. Página 3 (arte de
+                               Página 2 (25/10/2026, igual à do cliente): cartão do cliente com
+                               rótulos (CLIENTE, TELEFONE, ENDEREÇO; linha sem dado some inteira);
+                               os cartões ESTICAM até o "contempla" com a mesma altura, e a foto de
+                               cada um preenche a largura inteira no que sobra abaixo dos itens
+                               (`cover`: recorte proporcional, sem distorcer). Sobra menor que
+                               FOTO_MINIMA = sem foto; itens que não cabem nem assim = reserva.
+                               O arranjo sai de `planoDaPagina2` (o PDF e o aviso do gerador,
+                               POST /api/orcamentos/folhas-da-proposta, AvisoDasFolhas.tsx). Página 3 (arte de
                                25/10/2026, 1055 x 1491 px): SETE campos em PAGINA_3_NOVA (pontos do PDF; px x 0,5643):
                                selos de prazo e garantia, investimento, à vista, parcelas, total no cartão e
                                consultora + telefone DA EMPRESA (EMPRESA.telefone; nunca o celular do vendedor; nome longo
@@ -184,8 +188,9 @@ apps/api/                      API (Express + Prisma)
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".
-                               Itens demais para a foto mínima: seções empilhadas em tabela que
-                               quebra de página (cartão de altura fixa não passa de uma folha)
+                               Itens que não cabem nem sem foto (reserva): seções empilhadas em
+                               tabela que quebra de página (cartão de altura fixa não passa de uma
+                               folha); o rodapé "Página X de N" usa o total real de páginas.
   src/conteudo/proposta.ts     EDITÁVEL: dados da empresa, textos fixos da página 1 e a página
                                institucional inteira. Orçamento: descricaoServico (título).
                                Itens = lista de ESCOPO (só o nome; sem quantidade nem preço:

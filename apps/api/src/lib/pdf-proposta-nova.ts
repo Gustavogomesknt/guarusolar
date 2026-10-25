@@ -3,7 +3,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { formatarBRL, formatarQuantidade, GARANTIA_PADRAO, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
-import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, FOTO_DO_CARTAO, PAGINA_1, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
+import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, PAGINA_1, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
@@ -103,12 +103,20 @@ const ICONE = {
 const TIQUE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="${COR.laranja}"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 /** Ícone branco num quadrado laranja arredondado (cartão do cliente). */
-function iconeQuadrado(desenho: string, lado = 18): Peca {
+/** Ícone num quadrado laranja: cheio (ícone branco) ou só com o contorno (ícone laranja). */
+function iconeQuadrado(desenho: string, lado = 18, contorno = false): Peca {
   return {
     width: lado,
     stack: [
-      { canvas: [{ type: 'rect', x: 0, y: 0, w: lado, h: lado, r: 4, color: COR.laranja }], relativePosition: { x: 0, y: 0 } },
-      { svg: svgIcone(desenho, COR.branco, 2.2), width: lado * 0.6, height: lado * 0.6, margin: [lado * 0.2, lado * 0.2, 0, 0] },
+      {
+        canvas: [
+          contorno
+            ? { type: 'rect', x: 0.6, y: 0.6, w: lado - 1.2, h: lado - 1.2, r: 5, lineColor: COR.laranja, lineWidth: 1.2 }
+            : { type: 'rect', x: 0, y: 0, w: lado, h: lado, r: 5, color: COR.laranja },
+        ],
+        relativePosition: { x: 0, y: 0 },
+      },
+      { svg: svgIcone(desenho, contorno ? COR.laranja : COR.branco, 2.2), width: lado * 0.56, height: lado * 0.56, margin: [lado * 0.22, lado * 0.22, 0, 0] },
     ],
   };
 }
@@ -135,67 +143,85 @@ const ESPACO = { aposCliente: 16, aposTitulo: 12, aposCartoes: 14, aposFaixa: 7 
 const FOLGA = 4;
 const FOTO_MINIMA = 70;
 
+/**
+ * Cartão do cliente, como a página 2 da proposta da Guarusolar: à esquerda nome, telefone e
+ * endereço, cada um com rótulo pequeno (CLIENTE, TELEFONE, ENDEREÇO) e ícone laranja; divisória;
+ * à direita a consultora. Sem CPF/CNPJ. Linha sem dado SOME inteira (rótulo, ícone e texto).
+ */
+const CLIENTE = { padding: [16, 13, 16, 13] as const, icone: 26, gapIcone: 12, entreLinhas: 9, rotulo: 9, nome: 18, valor: 11, larguraConsultora: 160, gapColunas: 18 };
+
 function cartaoDoCliente(o: OrcamentoParaPdf): { peca: Peca; altura: number } {
+  const C = CLIENTE;
   const c = clienteDoDocumento(o);
-  const linha1 = [[c.logradouro, c.numero].filter(Boolean).join(', '), c.complemento, c.bairro].filter(Boolean).join(' — ');
-  const linha2 = [[c.cidade, c.uf].filter(Boolean).join('/'), c.cep ? `CEP ${mascararCep(c.cep)}` : null].filter(Boolean).join(' · ');
-  const telefone = mascararTelefone(c.whatsapp) || '—';
+  const endereco1 = [[c.logradouro, c.numero].filter(Boolean).join(', '), c.complemento, c.bairro].filter(Boolean).join(' — ');
+  const endereco2 = [[c.cidade, c.uf].filter(Boolean).join('/'), c.cep ? `CEP ${mascararCep(c.cep)}` : null].filter(Boolean).join(' — ');
+  const telefone = c.whatsapp ? mascararTelefone(c.whatsapp) : '';
 
-  const padding = [16, 12, 16, 12] as const;
-  const larguraConsultor = 150;
-  const gapColunas = 16;
-  const larguraEsquerda = LARGURA - padding[0] - padding[2] - larguraConsultor - 1 - 2 * gapColunas;
-  const larguraTexto = larguraEsquerda - 18 - 9;
-  const ICONE_LADO = 18;
-  const espacoLinhas = 7;
+  const larguraEsquerda = LARGURA - C.padding[0] - C.padding[2] - C.larguraConsultora - 1 - 2 * C.gapColunas;
+  const larguraTexto = larguraEsquerda - C.icone - C.gapIcone;
+  const alturaRotulo = alturaDoTexto('X', 200, C.rotulo, 1.15);
+  const rotulo = (texto: string): Peca => ({ text: texto, fontSize: C.rotulo, color: COR.secundario, characterSpacing: 0.6, lineHeight: 1.15 });
 
-  const altNome = Math.max(ICONE_LADO, alturaDoTexto(c.nome, larguraTexto, 12, 1.15, true));
-  const altEndereco = Math.max(ICONE_LADO, (linha1 ? alturaDoTexto(linha1, larguraTexto, 9.5) : 0) + (linha2 ? alturaDoTexto(linha2, larguraTexto, 9.5) : 0));
-  const altura = padding[1] + padding[3] + altNome + ICONE_LADO + altEndereco + 2 * espacoLinhas + 2;
-
-  // texto de uma linha só fica centrado na altura do ícone
-  const linhaComIcone = (desenho: string, conteudo: Peca, alturaTexto: number, margem: number): Peca => ({
-    columns: [iconeQuadrado(desenho, ICONE_LADO), { width: '*', margin: [0, Math.max(0, (ICONE_LADO - alturaTexto) / 2), 0, 0], ...conteudo }],
-    columnGap: 9,
-    margin: [0, margem, 0, 0],
-  });
+  type Linha = { desenho: string; contorno: boolean; rotulo: string; valores: Peca[]; altura: number };
+  const linhas: Linha[] = [
+    {
+      desenho: ICONE.pessoa,
+      contorno: false,
+      rotulo: 'CLIENTE',
+      valores: [{ text: c.nome, fontSize: C.nome, bold: true, color: COR.marinho, lineHeight: 1.1 }],
+      altura: alturaDoTexto(c.nome, larguraTexto, C.nome, 1.1, true),
+    },
+    ...(telefone
+      ? [{ desenho: ICONE.telefone, contorno: true, rotulo: 'TELEFONE', valores: [{ text: telefone, fontSize: C.valor, bold: true, color: COR.marinho }], altura: alturaDoTexto(telefone, larguraTexto, C.valor, 1.15, true) }]
+      : []),
+    ...(endereco1 || endereco2
+      ? [
+          {
+            desenho: ICONE.local,
+            contorno: true,
+            rotulo: 'ENDEREÇO',
+            valores: [endereco1, endereco2].filter(Boolean).map((t) => ({ text: t, fontSize: C.valor, color: COR.textoMedio })),
+            altura: [endereco1, endereco2].filter(Boolean).reduce((t, l) => t + alturaDoTexto(l, larguraTexto, C.valor), 0),
+          },
+        ]
+      : []),
+  ];
+  const alturaDaLinha = (l: Linha) => Math.max(C.icone, alturaRotulo + 1 + l.altura);
+  const alturaInterna = linhas.reduce((t, l, i) => t + (i ? C.entreLinhas : 0) + alturaDaLinha(l), 0);
+  const altura = C.padding[1] + C.padding[3] + alturaInterna;
 
   const esquerda: Peca = {
     width: larguraEsquerda,
-    stack: [
-      linhaComIcone(ICONE.pessoa, { text: c.nome, fontSize: 12, bold: true, lineHeight: 1.15 }, altNome, 0),
-      linhaComIcone(ICONE.telefone, { text: telefone, fontSize: 10, color: COR.textoMedio }, alturaDoTexto(telefone, larguraTexto, 10), espacoLinhas),
-      linhaComIcone(
-        ICONE.local,
-        { stack: [linha1, linha2].filter(Boolean).map((t) => ({ text: t, fontSize: 9.5, color: COR.textoMedio })) },
-        altEndereco === ICONE_LADO ? alturaDoTexto(linha1 || linha2 || ' ', larguraTexto, 9.5) : altEndereco,
-        espacoLinhas,
-      ),
-    ],
+    stack: linhas.map((l, i) => ({
+      columns: [
+        // o ícone fica na altura do rótulo e da primeira linha do valor
+        { ...iconeQuadrado(l.desenho, C.icone, l.contorno), margin: [0, 0, 0, 0] },
+        { width: '*', stack: [rotulo(l.rotulo), { stack: l.valores, margin: [0, 1, 0, 0] }] },
+      ],
+      columnGap: C.gapIcone,
+      margin: [0, i ? C.entreLinhas : 0, 0, 0],
+    })),
   };
-  const alturaInterna = altura - padding[1] - padding[3];
-  const altConsultor = 14 + alturaDoTexto(o.vendedor.nome, larguraConsultor, 11, 1.15, true);
+
+  const cargo = (o.vendedor.cargoNaProposta?.trim() || 'Consultor').toUpperCase();
+  const larguraNomeConsultora = C.larguraConsultora - 22 - 10;
+  const altConsultora = Math.max(22, alturaRotulo + 1 + alturaDoTexto(o.vendedor.nome, larguraNomeConsultora, 11.5, 1.15, true));
   const direita: Peca = {
-    width: larguraConsultor,
-    margin: [0, Math.max(0, (alturaInterna - altConsultor) / 2), 0, 0],
-    stack: [
-      {
-        columns: [
-          { width: 11, svg: svgIcone(ICONE.pessoa, COR.laranja, 2.4), height: 11 },
-          { width: '*', text: (o.vendedor.cargoNaProposta?.trim() || 'Consultor').toUpperCase(), fontSize: 7.5, bold: true, characterSpacing: 1.1, color: COR.secundario, margin: [0, 1.5, 0, 0] },
-        ],
-        columnGap: 5,
-      },
-      { text: o.vendedor.nome, fontSize: 11, bold: true, color: COR.marinho, margin: [0, 3, 0, 0] },
+    width: C.larguraConsultora,
+    margin: [0, Math.max(0, (alturaInterna - altConsultora) / 2), 0, 0],
+    columns: [
+      iconeQuadrado(ICONE.pessoa, 22, true),
+      { width: '*', stack: [rotulo(cargo), { text: o.vendedor.nome, fontSize: 11.5, bold: true, color: COR.marinho, margin: [0, 1, 0, 0] }] },
     ],
+    columnGap: 10,
   };
   const divisoria: Peca = { width: 1, canvas: [{ type: 'line', x1: 0, y1: 0, x2: 0, y2: alturaInterna, lineWidth: 0.75, lineColor: COR.laranjaBorda }] };
 
   return {
     altura,
     peca: caixa(
-      { columns: [esquerda, divisoria, direita], columnGap: gapColunas },
-      { largura: LARGURA, altura, borda: COR.laranja, raio: 10, padding: [...padding] },
+      { columns: [esquerda, divisoria, direita], columnGap: C.gapColunas },
+      { largura: LARGURA, altura, borda: COR.laranja, raio: 12, padding: [...C.padding] },
     ),
   };
 }
@@ -317,52 +343,35 @@ function alturaDoCabecalho(cartoes: Cartao[], larguraDoCartao: number) {
 }
 
 const MM = 72 / 25.4;
-/** Margem da foto até as bordas do cartão e até os itens. */
-const RESPIRO_DA_FOTO = 11;
 
 /**
- * Tamanho da foto: 3:4 (retrato), FOTO_DO_CARTAO.larguraMm de largura (o mesmo nos três cartões,
- * em qualquer arranjo); menor, mantendo os 3:4, só se a altura que sobra no cartão não couber.
- * Largura e altura saem SEMPRE na proporção: o pdfmake distorce se receber outra.
+ * Foto no pé do cartão, na LARGURA INTEIRA e na altura que sobra abaixo dos itens (proporção
+ * variável). Não distorce: `cover` escala a imagem PROPORCIONALMENTE até cobrir o box e corta o
+ * que passa (o pdfmake recorta no próprio box), centrada; sem borda branca. Os cantos de baixo
+ * acompanham o cartão (máscaras brancas; o contorno é redesenhado por cima em cartaoDoEscopo).
+ * Sem o arquivo, a área fica em branco e o PDF segue.
  */
-function tamanhoDaFoto(larguraDoCartao: number, alturaDaArea: number) {
-  const larguraMaxima = Math.min(FOTO_DO_CARTAO.larguraMm * MM, larguraDoCartao - 2 * RESPIRO_DA_FOTO);
-  const alturaMaxima = alturaDaArea - 2 * RESPIRO_DA_FOTO;
-  const largura = Math.min(larguraMaxima, alturaMaxima * FOTO_DO_CARTAO.proporcao);
-  return { largura, altura: largura / FOTO_DO_CARTAO.proporcao };
-}
-
-/**
- * Foto no pé do cartão, centrada, com os cantos arredondados (máscaras brancas por cima: o cartão
- * é branco). Sem o arquivo, o cartão sai sem foto (a área fica em branco) e o PDF segue.
- */
-function fotoDoCartao(foto: Arte, larguraDoCartao: number, alturaDaArea: number): Peca {
-  // a área tem altura fixa (o cartão inteiro foi medido com ela), com ou sem foto
+function fotoDoCartao(foto: Arte, largura: number, altura: number, raio: number): Peca {
   const area = (conteudo: Peca[]): Peca => ({
-    table: { widths: [larguraDoCartao], heights: [alturaDaArea], body: [[{ stack: conteudo }]] },
+    table: { widths: [largura], heights: [altura], body: [[{ stack: conteudo }]] },
     layout: semBordas([0, 0, 0, 0]),
   });
   if (!foto.arquivo) return area([]);
-  const { largura: w, altura: h } = tamanhoDaFoto(larguraDoCartao, alturaDaArea);
-  const r = 6;
-  const canto = (x: number, y: number, sx: number, sy: number) =>
-    `<path d="M${x} ${y + sy * r} L${x} ${y} L${x + sx * r} ${y} A${r} ${r} 0 0 ${sx * sy > 0 ? 0 : 1} ${x} ${y + sy * r} Z" fill="#FFFFFF"/>`;
-  const mascaras =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
-    canto(0, 0, 1, 1) + canto(w, 0, -1, 1) + canto(0, h, 1, -1) + canto(w, h, -1, -1) +
-    `</svg>`;
-  const x = (larguraDoCartao - w) / 2;
-  const y = alturaDaArea - RESPIRO_DA_FOTO - h; // no pé, com o respiro embaixo
+  const canto = (x: number, sx: number) =>
+    `<path d="M${x} ${altura - raio} L${x} ${altura} L${x + sx * raio} ${altura} A${raio} ${raio} 0 0 ${sx > 0 ? 1 : 0} ${x} ${altura - raio} Z" fill="#FFFFFF"/>`;
+  const mascaras = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}">${canto(0, 1)}${canto(largura, -1)}</svg>`;
   return area([
-    // cover na MESMA proporção do arquivo (3:4): não distorce; a sobra de um arquivo que não seja
-    // 3:4 exato (o de materiais tem 178 x 237) é cortada, menos de 1 px
-    // as duas no mesmo ponto, fora do fluxo (a altura da área é a da tabela)
-    { image: foto.arquivo, cover: { width: w, height: h, align: 'center', valign: 'center' }, relativePosition: { x, y } },
-    { svg: mascaras, width: w, height: h, relativePosition: { x, y } },
+    { image: foto.arquivo, cover: { width: largura, height: altura, align: 'center', valign: 'center' }, relativePosition: { x: 0, y: 0 } },
+    { svg: mascaras, width: largura, height: altura, relativePosition: { x: 0, y: 0 } },
   ]);
 }
 
-function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: number; itens: number; foto: number }, colunasDeItens: number, foto: Arte): Peca {
+/**
+ * Um cartão do escopo com a altura `total` (a mesma nos cartões lado a lado): cabeçalho, os itens
+ * (altura deles, medida) e, no que sobra embaixo, a foto na largura inteira; sobra menor que
+ * FOTO_MINIMA (ou sem o arquivo) fica em branco.
+ */
+function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: number; itens: number; total: number }, colunasDeItens: number, foto: Arte): Peca {
   const raio = 9;
   const config = PAGINA_2_NOVA.cartoes[cartao.grupo];
   const laranja = cartao.grupo === 'BOMBEIROS';
@@ -371,7 +380,9 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
   const fundo = laranja ? COR.laranja : COR.marinho;
   const corIcone = laranja ? COR.branco : COR.laranja;
   const desenho = { DOCUMENTACAO: ICONE.documento, BOMBEIROS: ICONE.chama, MATERIAL: ICONE.chave }[cartao.grupo];
-  const total = alturas.cabecalho + alturas.itens + alturas.foto;
+  const total = alturas.total;
+  const sobra = total - alturas.cabecalho - alturas.itens;
+  const comFoto = sobra >= FOTO_MINIMA && foto.arquivo !== null;
   const itens = colunasDosItens(cartao.itens, largura - 2 * ITENS_CARTAO.paddingX, colunasDeItens);
   const { tamanho: tamanhoTitulo, espacamento } = tituloDoCartao(cartao.grupo, largura);
   const linhaTitulo = alturaDoTexto('X', 200, tamanhoTitulo, CABECALHO_CARTAO.entrelinha, true);
@@ -431,7 +442,11 @@ function cartaoDoEscopo(cartao: Cartao, largura: number, alturas: { cabecalho: n
         },
         layout: semBordas([ITENS_CARTAO.paddingX, ITENS_CARTAO.paddingTop, ITENS_CARTAO.paddingX, ITENS_CARTAO.paddingBottom]),
       },
-      ...(alturas.foto > 0 ? [fotoDoCartao(foto, largura, alturas.foto)] : []),
+      comFoto
+        ? fotoDoCartao(foto, largura, sobra, raio)
+        : { table: { widths: [largura], heights: [Math.max(0, sobra)], body: [[{ text: '' }]] }, layout: semBordas([0, 0, 0, 0]) },
+      // o contorno por cima de tudo (a foto vai até a borda): do pé do cartão, volta `total`
+      { canvas: [{ type: 'rect', x: 0, y: 0, w: largura, h: total, r: raio, lineColor: COR.borda, lineWidth: 0.75 }], relativePosition: { x: 0, y: -total } },
     ],
   };
 }
@@ -514,59 +529,73 @@ function blocoContempla(): { peca: Peca; altura: number } {
   };
 }
 
-/** Página 2 inteira, e quanto sobrou para as fotos (para conferir no pdf:exemplo). */
-export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; foto: number; itens: number; cartoes: number } {
-  const A = artes();
+/**
+ * O arranjo da página 2, decidido SÓ por medida (o PDF e o aviso do gerador usam esta função):
+ * - 'cartoes': os grupos lado a lado, esticados até o "contempla"; `semFoto` = grupos cuja sobra
+ *   abaixo dos itens é menor que FOTO_MINIMA (a foto sai, o cartão fica só com os itens);
+ * - 'reserva': os itens não cabem nem sem foto: grupos um embaixo do outro, na largura toda, sem
+ *   foto, quebrando de folha; `folhas` = quantas folhas a página 2 ocupa (estimativa medida).
+ */
+export type PlanoDaPagina2 = { modo: 'cartoes' | 'reserva'; semFoto: GrupoNaProposta[]; folhas: number };
+
+function medidasDaPagina2(o: OrcamentoParaPdf) {
   const cliente = cartaoDoCliente(o);
   const titulo = tituloDoEscopo();
   const contempla = blocoContempla();
-
   const cartoes = cartoesDoOrcamento(o);
   const gap = 10;
   const largura = (LARGURA - (cartoes.length - 1) * gap) / cartoes.length;
   const colunasDeItens = cartoes.length === 1 ? 2 : 1;
   const cabecalho = alturaDoCabecalho(cartoes, largura);
-  const itensMedidos = Math.max(
-    ...cartoes.map((c) => colunasDosItens(c.itens, largura - 2 * ITENS_CARTAO.paddingX, colunasDeItens).altura),
+  const itens = cartoes.map(
+    (c) => colunasDosItens(c.itens, largura - 2 * ITENS_CARTAO.paddingX, colunasDeItens).altura + ITENS_CARTAO.paddingTop + ITENS_CARTAO.paddingBottom,
   );
-  const itens = itensMedidos + ITENS_CARTAO.paddingTop + ITENS_CARTAO.paddingBottom;
-  // os cartões ficam com a altura que sobra na folha; a foto, com o que sobra dentro deles
-  const disponivel =
-    ALTURA_UTIL - cliente.altura - ESPACO.aposCliente - titulo.altura - ESPACO.aposTitulo - ESPACO.aposCartoes - contempla.altura - FOLGA;
-  // o que sobra na folha para a foto; o cartão NÃO estica até ele: a área da foto tem a altura da
-  // própria foto (40 mm em 3:4) e a sobra vai para antes do "contempla", que fica no pé da folha
-  const sobra = disponivel - cabecalho - itens;
-  const algumaFoto = cartoes.some((c) => A.fotos[c.grupo].arquivo !== null);
-  const fotoInteira = algumaFoto ? tamanhoDaFoto(largura, Infinity).altura + 2 * RESPIRO_DA_FOTO : 0;
-  const foto = Math.min(sobra, fotoInteira);
-  const topo: Content[] = [cliente.peca, { ...titulo.peca, margin: [0, ESPACO.aposCliente, 0, 0] }];
-  const fim: Content = { ...contempla.peca, margin: [0, ESPACO.aposCartoes + Math.max(0, sobra - foto), 0, 0], unbreakable: true };
+  // os cartões vão do título do escopo até o "contempla" (que fica no pé da folha)
+  const total = ALTURA_UTIL - cliente.altura - ESPACO.aposCliente - titulo.altura - ESPACO.aposTitulo - ESPACO.aposCartoes - contempla.altura - FOLGA;
+  return { cliente, titulo, contempla, cartoes, gap, largura, colunasDeItens, cabecalho, itens, total };
+}
 
-  // Itens demais para caber com a foto mínima: formato de reserva, as seções uma embaixo da
-  // outra, na largura toda, sem foto, podendo seguir na folha seguinte (o título da seção se
-  // repete no alto da folha nova). Cartão de altura fixa não passa de uma folha.
-  if (sobra < FOTO_MINIMA) {
+export function planoDaPagina2(o: OrcamentoParaPdf): PlanoDaPagina2 {
+  const m = medidasDaPagina2(o);
+  if (m.cabecalho + Math.max(...m.itens) > m.total) {
+    const secoes = m.cartoes.reduce((t, c, i) => t + (i ? 10 : 0) + alturaDaSecaoEmLista(c), 0);
+    const altura = m.cliente.altura + ESPACO.aposCliente + m.titulo.altura + ESPACO.aposTitulo + secoes + ESPACO.aposCartoes + m.contempla.altura + FOLGA;
+    return { modo: 'reserva', semFoto: m.cartoes.map((c) => c.grupo), folhas: Math.max(1, Math.ceil(altura / ALTURA_UTIL)) };
+  }
+  const semFoto = m.cartoes.filter((_, i) => m.total - m.cabecalho - m.itens[i] < FOTO_MINIMA).map((c) => c.grupo);
+  return { modo: 'cartoes', semFoto, folhas: 1 };
+}
+
+/** Página 2 inteira (o arranjo vem de planoDaPagina2) e as medidas, para conferir no pdf:exemplo. */
+export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; plano: PlanoDaPagina2; itens: number[]; total: number } {
+  const A = artes();
+  const m = medidasDaPagina2(o);
+  const plano = planoDaPagina2(o);
+  const topo: Content[] = [m.cliente.peca, { ...m.titulo.peca, margin: [0, ESPACO.aposCliente, 0, 0] }];
+  const fim: Content = { ...m.contempla.peca, margin: [0, ESPACO.aposCartoes, 0, 0], unbreakable: true };
+
+  // Itens demais até sem foto: formato de reserva, as seções uma embaixo da outra, na largura
+  // toda, sem foto, podendo seguir na folha seguinte (o título da seção se repete no alto da
+  // folha nova). Cartão de altura fixa não passa de uma folha.
+  if (plano.modo === 'reserva') {
     return {
-      foto: 0,
-      itens: itensMedidos,
-      cartoes: cartoes.length,
-      conteudo: [
-        ...topo,
-        ...cartoes.map((c, i) => ({ ...secaoEmLista(c), margin: [0, i ? 10 : ESPACO.aposTitulo, 0, 0] }) as Content),
-        { ...contempla.peca, margin: [0, ESPACO.aposCartoes, 0, 0], unbreakable: true },
-      ],
+      plano,
+      itens: m.itens,
+      total: m.total,
+      conteudo: [...topo, ...m.cartoes.map((c, i) => ({ ...secaoEmLista(c), margin: [0, i ? 10 : ESPACO.aposTitulo, 0, 0] }) as Content), fim],
     };
   }
-  const alturas = { cabecalho, itens, foto };
   return {
-    foto,
-    itens: itensMedidos,
-    cartoes: cartoes.length,
+    plano,
+    itens: m.itens,
+    total: m.total,
     conteudo: [
       ...topo,
       {
-        columns: cartoes.map((c) => cartaoDoEscopo(c, largura, alturas, colunasDeItens, A.fotos[c.grupo])),
-        columnGap: gap,
+        columns: m.cartoes.map((c, i) =>
+          cartaoDoEscopo(c, m.largura, { cabecalho: m.cabecalho, itens: m.itens[i], total: m.total }, m.colunasDeItens, A.fotos[c.grupo]),
+        ),
+        columnGap: m.gap,
         margin: [0, ESPACO.aposTitulo, 0, 0],
       },
       fim,
@@ -574,14 +603,32 @@ export function paginaDoEscopo(o: OrcamentoParaPdf): { conteudo: Content[]; foto
   };
 }
 
+const COLUNAS_DA_RESERVA = 3;
+const larguraColunaDaReserva = () => (LARGURA - 2 * ITENS_CARTAO.paddingX - (COLUNAS_DA_RESERVA - 1) * 2 * 4) / COLUNAS_DA_RESERVA;
+
+/** Altura da seção em lista, medida como secaoEmLista desenha (cabeçalho e linhas de 3 itens). */
+function alturaDaSecaoEmLista(cartao: Cartao): number {
+  const config = PAGINA_2_NOVA.cartoes[cartao.grupo];
+  const larguraTexto = larguraColunaDaReserva() - ITENS_CARTAO.marcador - ITENS_CARTAO.gap;
+  const cabecalho = 8 + 2 + alturaDoTexto(config.linhas.join(' '), LARGURA, tituloDoCartao(cartao.grupo, LARGURA).tamanho, 1.15, true) + 2 + 8;
+  let linhas = 0;
+  const quantas = Math.ceil(cartao.itens.length / COLUNAS_DA_RESERVA);
+  for (let l = 0; l < quantas; l++) {
+    const daLinha = cartao.itens.slice(l * COLUNAS_DA_RESERVA, (l + 1) * COLUNAS_DA_RESERVA);
+    const alta = Math.max(...daLinha.map((i) => alturaDoTexto(textoDoItem(i), larguraTexto, ITENS_CARTAO.tamanho, ITENS_CARTAO.entrelinha)));
+    linhas += alta + (l === 0 ? 10 : 3) + (l === quantas - 1 ? 10 : 3);
+  }
+  return cabecalho + linhas;
+}
+
 /** Formato de reserva: a seção como tabela de três colunas de itens, que quebra de página. */
 function secaoEmLista(cartao: Cartao): Peca {
   const config = PAGINA_2_NOVA.cartoes[cartao.grupo];
   const laranja = cartao.grupo === 'BOMBEIROS';
   const fundo = laranja ? COR.laranja : COR.marinho; // exceção consciente: ver cartaoDoEscopo
-  const COLUNAS = 3;
+  const COLUNAS = COLUNAS_DA_RESERVA;
   // a soma das colunas e dos espaçamentos (11 nas bordas, 4 de cada lado entre colunas) fecha com a largura
-  const larguraColuna = (LARGURA - 2 * ITENS_CARTAO.paddingX - (COLUNAS - 1) * 2 * 4) / COLUNAS;
+  const larguraColuna = larguraColunaDaReserva();
   const celula = (item?: ItemDoEscopo): Peca =>
     item
       ? {

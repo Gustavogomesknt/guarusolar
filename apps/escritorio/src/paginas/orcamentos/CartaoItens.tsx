@@ -8,12 +8,14 @@ import type { Produto } from '@/lib/tipos';
 import { formatarBRL, formatarQuantidade } from '@/lib/formatar';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
 import { CampoBusca } from '@/components/CampoBusca';
+import { AvisoDasFolhas } from './AvisoDasFolhas';
 import { LinhaItem, COLUNAS_ITENS } from './LinhaItem';
 import { itemDoProduto, numeroOuZero, type FormularioOrcamento } from './formulario';
 
 const MINIMO_BUSCA = 2;
 
-export function CartaoItens({ subtotal }: { subtotal: number }) {
+/** `orcamentoId`: o orçamento já salvo (o aviso das folhas usa a cópia gravada dos itens). */
+export function CartaoItens({ subtotal, orcamentoId }: { subtotal: number; orcamentoId?: string }) {
   const {
     control,
     getValues,
@@ -148,6 +150,8 @@ export function CartaoItens({ subtotal }: { subtotal: number }) {
           </div>
         </div>
       )}
+
+      <AvisoDasFolhas orcamentoId={orcamentoId} />
 
       <div className="flex items-center justify-between border-t pt-3.5 text-sm">
         <span className="text-muted-foreground">Subtotal dos itens</span>

@@ -23,12 +23,12 @@ import {
   type ResultadoCalculo,
   problemaNasParcelas,
 } from '@guarusolar/compartilhado';
-import { cabeNoSelo } from '../lib/pdf-proposta-nova';
+import { cabeNoSelo, planoDaPagina2 } from '../lib/pdf-proposta-nova';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
 import { tipoTemCapa } from '../lib/capaDaProposta';
 import { CAPAS_DA_PROPOSTA } from '../conteudo/proposta';
-import { modeloDaProposta } from '../lib/pdf-orcamento';
+import { modeloDaProposta, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
 
 export const rotasOrcamentos = Router();
 rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -384,6 +384,44 @@ rotasOrcamentos.get(
       textoDaCapaPadrao: CAPAS_DA_PROPOSTA.textoDaCapaPadrao,
       tipos: tipos.map((t) => ({ ...t, temCapa: tipoTemCapa(t.nome) })),
     });
+  }),
+);
+
+// --------------------------------------------------------------------------
+// Aviso do gerador: com os itens marcados AGORA (antes de salvar), a página 2 da proposta (modelo
+// novo) perde alguma foto ou passa de uma folha? A MESMA medida do PDF (planoDaPagina2), com a
+// cópia dos itens como o salvar faria (prepararItens): só aviso, nunca bloqueia.
+// --------------------------------------------------------------------------
+const folhasSchema = z.object({
+  orcamentoId: z.string().uuid().optional(),
+  clienteId: z.string().uuid().optional(),
+  itens: z.array(z.object({ produtoId: z.string().uuid(), apareceNaProposta: z.boolean().optional() })).max(500),
+});
+
+rotasOrcamentos.post(
+  '/folhas-da-proposta',
+  rota(async (req, res) => {
+    if (modeloDaProposta() !== 'nova') return res.json({ ativa: false });
+    const dados = folhasSchema.parse(req.body);
+    const [salvo, cliente, vendedor] = await Promise.all([
+      dados.orcamentoId
+        ? prisma.orcamento.findUnique({ where: { id: dados.orcamentoId }, include: { itens: { orderBy: { ordem: 'asc' } }, vendedor: { select: { nome: true, telefone: true, cargoNaProposta: true } } } })
+        : null,
+      dados.clienteId ? prisma.cliente.findUnique({ where: { id: dados.clienteId } }) : null,
+      prisma.usuario.findUnique({ where: { id: req.usuario!.id }, select: { nome: true, telefone: true, cargoNaProposta: true } }),
+    ]);
+    const itens = dados.itens.length > 0 ? await prepararItens(dados.itens.map((i) => ({ ...i, quantidade: 1 })), salvo?.itens ?? []) : [];
+    // o cliente: a cópia gravada do orçamento ou, sem ela, o cadastro (o que o PDF usaria)
+    const copia = salvo?.clienteNome != null && (!dados.clienteId || dados.clienteId === salvo.clienteId);
+    const o = {
+      ...(copia ? salvo : {}),
+      clienteNome: copia ? salvo!.clienteNome : null,
+      cliente: cliente ?? { nome: '', whatsapp: '' },
+      vendedor: salvo?.vendedor ?? vendedor!,
+      itens: itens.map((i) => ({ ...i, id: i.produtoId, orcamentoId: '', produto: { categoria: 'OUTROS' } })),
+    } as unknown as OrcamentoParaPdf;
+    const plano = planoDaPagina2(o);
+    res.json({ ativa: true, ...plano });
   }),
 );
 
