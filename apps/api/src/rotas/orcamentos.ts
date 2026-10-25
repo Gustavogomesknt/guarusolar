@@ -96,6 +96,7 @@ function condicoesGravadas(entrada: EntradaCalculo) {
     propostaCartaoEntrada: c.cartao?.entrada ?? null,
     propostaCartaoParcela: c.cartao?.detalhe.valorParcela ?? null,
     propostaCartaoPrimeira: c.cartao?.detalhe.valorPrimeiraParcela ?? null,
+    propostaCartaoUltima: c.cartao?.detalhe.valorUltimaParcela ?? null,
     propostaCartaoTotal: c.cartao?.total ?? null,
     propostaCartaoTaxaPct: c.cartao?.detalhe.taxaPct ?? null,
   };
@@ -117,6 +118,7 @@ function pagamentoGravado(condicao: CondicaoPagamento, totais: ResultadoCalculo)
     absorverTaxaCartao: c?.absorvida ?? false,
     taxaCartaoPct: c ? c.taxaPct : null,
     valorPrimeiraParcela: c ? c.valorPrimeiraParcela : null,
+    valorUltimaParcela: c ? c.valorUltimaParcela : null,
     valorTotalCliente: c ? totais.valorTotalCliente : null,
     valorTaxaAbsorvida: c ? c.valorAbsorvido : null,
   };

@@ -300,6 +300,7 @@ export type OrcamentoSalvo = {
   valorEntrada?: string | null;
   valorParcela?: string | null;
   valorPrimeiraParcela?: string | null;
+  valorUltimaParcela?: string | null;
   valorTotalCliente?: string | null;
   valorTaxaAbsorvida?: string | null;
   clienteId?: string;
@@ -376,6 +377,7 @@ export function cartaoDoSalvo(s: OrcamentoSalvo): PagamentoCartao | null {
     valorCobrado: Math.round((Number(s.valorTotalCliente) - entrada) * 100) / 100,
     valorParcela: Number(s.valorParcela ?? 0),
     valorPrimeiraParcela: Number(s.valorPrimeiraParcela ?? s.valorParcela ?? 0),
+    valorUltimaParcela: Number(s.valorUltimaParcela ?? s.valorParcela ?? 0),
     valorRecebido: Math.round((saldo - absorvido) * 100) / 100,
     valorAbsorvido: absorvido,
   };
@@ -460,6 +462,7 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   valorEntrada: o.valorEntrada,
   valorParcela: o.valorParcela,
   valorPrimeiraParcela: o.valorPrimeiraParcela,
+  valorUltimaParcela: o.valorUltimaParcela,
   valorTotalCliente: o.valorTotalCliente,
   valorTaxaAbsorvida: o.valorTaxaAbsorvida,
   clienteId: o.cliente.id,

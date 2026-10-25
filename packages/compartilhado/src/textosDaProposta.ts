@@ -19,7 +19,7 @@ export const GARANTIA_PADRAO =
  */
 export const SUGESTOES_DE_PRAZO = [
   '5 dias úteis após a aprovação',
-  '15 dias úteis após a aprovação e o pagamento da entrada',
+  '15 dias úteis após a aprovação da proposta',
   '25 dias úteis após a aprovação e liberação do acesso ao local',
   '45 dias após a aprovação, conforme a homologação na concessionária',
 ];

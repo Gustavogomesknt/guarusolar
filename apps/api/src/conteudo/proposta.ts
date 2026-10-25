@@ -189,6 +189,13 @@ export const PAGINA_3_NOVA = {
    * larguraMm de cada logo: até 25 mm (a 24 mm a WEG, a de menor resolução, passa de 300 dpi)
    */
   montadoras: { x: 36, y: 618, largura: 523, larguraMm: 24 },
+  /**
+   * prazo de execução do orçamento (prazoExecucao), na caixa "Prazo de execução:" da arte, logo
+   * abaixo do rótulo, até a barra que separa da garantia. Mesmo estilo do "12 MESES" da arte:
+   * negrito laranja, de tamanhoMaximo para baixo até caber (mínimo tamanhoMinimo; não cabendo
+   * nem assim, as últimas palavras viram "…"). Sem prazo: PAGINA_1.prazo.semPrazo
+   */
+  prazo: { x: 73, y: 516, largura: 95, altura: 25, tamanhoMaximo: 11, tamanhoMinimo: 6, cor: '#F7941D' },
 };
 
 /** Página 2 do modelo novo: textos fixos. */

@@ -314,7 +314,8 @@ model Orcamento {
   pagamentoDebito      Boolean  @default(false)
   absorverTaxaCartao   Boolean  @default(false)
   taxaCartaoPct        Decimal? @db.Decimal(5, 2)
-  valorPrimeiraParcela Decimal? @db.Decimal(12, 2)
+  valorPrimeiraParcela Decimal? @db.Decimal(12, 2) // regra antiga (a 1ª levava a sobra); nova: = valorParcela
+  valorUltimaParcela   Decimal? @db.Decimal(12, 2) // desde 25/10/2026 a última leva a diferença (nula: antigo)
   valorTotalCliente    Decimal? @db.Decimal(12, 2)
   valorTaxaAbsorvida   Decimal? @db.Decimal(12, 2) // quanto a empresa deixa de receber (absorvida)
 
@@ -328,8 +329,9 @@ model Orcamento {
   propostaCartaoParcelas     Int?
   propostaCartaoDebito       Boolean?
   propostaCartaoEntrada      Decimal? @db.Decimal(12, 2)
-  propostaCartaoParcela      Decimal? @db.Decimal(12, 2) // da 2ª em diante
-  propostaCartaoPrimeira     Decimal? @db.Decimal(12, 2)
+  propostaCartaoParcela      Decimal? @db.Decimal(12, 2) // o valor em destaque
+  propostaCartaoPrimeira     Decimal? @db.Decimal(12, 2) // regra antiga; nova: = parcela
+  propostaCartaoUltima       Decimal? @db.Decimal(12, 2) // nova regra: a última leva a diferença
   propostaCartaoTotal        Decimal? @db.Decimal(12, 2) // entrada + o cobrado no cartão
   propostaCartaoTaxaPct      Decimal? @db.Decimal(5, 2)
 

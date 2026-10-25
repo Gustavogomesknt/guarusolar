@@ -399,6 +399,8 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
   const parcelas = c.debito
     ? `Débito de ${formatarBRL(c.valorCobrado)}`
     : `${c.parcelas}x de ${formatarBRL(c.valorParcela)}` +
+      (c.valorUltimaParcela !== c.valorParcela ? ` (última de ${formatarBRL(c.valorUltimaParcela)})` : '') +
+      // orçamento salvo antes de 25/10/2026: a 1ª levava a sobra
       (c.valorPrimeiraParcela !== c.valorParcela ? ` (1ª de ${formatarBRL(c.valorPrimeiraParcela)})` : '');
   const linhas: [string, string][] = [
     ['No cartão', parcelas],
@@ -435,12 +437,6 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
             </div>
           )}
         />
-      )}
-      {c.absorvida && (
-        <p role="status" className="rounded-[10px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
-          A Guarusolar deixa de receber <strong>{formatarBRL(c.valorAbsorvido)}</strong>: recebe {formatarBRL(recebe)} em vez de{' '}
-          {formatarBRL(totais.valorTotal)}.
-        </p>
       )}
       <p className="text-xs text-muted-foreground">
         Taxas do Mercado Pago atualizadas em {TAXAS_CARTAO.atualizadoEm}.

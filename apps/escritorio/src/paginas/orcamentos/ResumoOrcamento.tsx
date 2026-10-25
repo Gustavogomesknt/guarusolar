@@ -20,7 +20,7 @@ export type Totais = {
   valorTotal: number;
   resumoPagamento: string;
   entrada: number;
-  /** o que o cliente paga (com a taxa do cartão repassada) */
+  /** o que o cliente paga (com a taxa do cartão, se repassada) */
   valorTotalCliente: number;
   cartao: PagamentoCartao | null;
 };
@@ -81,6 +81,10 @@ export function ResumoOrcamento({
           {formatarBRL(totais.valorTotal)}
         </p>
         <p className="text-[13px] leading-snug text-destaque-claro">{totais.resumoPagamento}</p>
+        {/* informação, não aviso: com a taxa sempre absorvida, aparece em todo orçamento de cartão */}
+        {totais.cartao && totais.cartao.valorAbsorvido > 0 && (
+          <p className="text-[13px] leading-snug text-[#CBDBF0]">Taxa do cartão absorvida: {formatarBRL(totais.cartao.valorAbsorvido)}</p>
+        )}
         <p className="pt-1 text-xs text-[#9DB6D6]">
           {confirmado ? 'Valores confirmados pelo sistema.' : 'Prévia. O valor final é confirmado pelo sistema ao salvar.'}
         </p>

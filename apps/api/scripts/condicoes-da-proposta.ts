@@ -45,6 +45,7 @@ type Condicoes = {
   propostaCartaoEntrada: number | null;
   propostaCartaoParcela: number | null;
   propostaCartaoPrimeira: number | null;
+  propostaCartaoUltima: number | null;
   propostaCartaoTotal: number | null;
   propostaCartaoTaxaPct: number | null;
 };
@@ -57,6 +58,7 @@ const CAMPOS = [
   'propostaCartaoEntrada',
   'propostaCartaoParcela',
   'propostaCartaoPrimeira',
+  'propostaCartaoUltima',
   'propostaCartaoTotal',
   'propostaCartaoTaxaPct',
 ] as const;
@@ -114,6 +116,7 @@ async function main() {
       propostaCartaoEntrada: c.cartao?.entrada ?? null,
       propostaCartaoParcela: c.cartao?.detalhe.valorParcela ?? null,
       propostaCartaoPrimeira: c.cartao?.detalhe.valorPrimeiraParcela ?? null,
+      propostaCartaoUltima: c.cartao?.detalhe.valorUltimaParcela ?? null,
       propostaCartaoTotal: c.cartao?.total ?? null,
       propostaCartaoTaxaPct: c.cartao?.detalhe.taxaPct ?? null,
     };
@@ -129,6 +132,8 @@ async function main() {
       dados.propostaCartaoEntrada = num(o.valorEntrada) ?? 0;
       dados.propostaCartaoParcela = parcela;
       dados.propostaCartaoPrimeira = num(o.valorPrimeiraParcela) ?? parcela;
+      // nula em orçamento salvo antes da regra da última parcela (25/10/2026)
+      dados.propostaCartaoUltima = num(o.valorUltimaParcela);
       dados.propostaCartaoTotal = num(o.valorTotalCliente) ?? Number(o.valorTotal);
       dados.propostaCartaoTaxaPct = num(o.taxaCartaoPct);
     }
@@ -170,6 +175,7 @@ async function main() {
         "propostaAVistaValor" = ${d.propostaAVistaValor}, "propostaCartaoParcelas" = ${d.propostaCartaoParcelas},
         "propostaCartaoDebito" = ${d.propostaCartaoDebito}, "propostaCartaoEntrada" = ${d.propostaCartaoEntrada},
         "propostaCartaoParcela" = ${d.propostaCartaoParcela}, "propostaCartaoPrimeira" = ${d.propostaCartaoPrimeira},
+        "propostaCartaoUltima" = ${d.propostaCartaoUltima},
         "propostaCartaoTotal" = ${d.propostaCartaoTotal}, "propostaCartaoTaxaPct" = ${d.propostaCartaoTaxaPct}
       WHERE "id" = ${t.id}`;
   }

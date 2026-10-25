@@ -122,6 +122,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     absorverTaxaCartao: c.absorvida,
     taxaCartaoPct: D(c.taxaPct),
     valorPrimeiraParcela: D(c.valorPrimeiraParcela),
+    valorUltimaParcela: D(c.valorUltimaParcela),
     valorTotalCliente: D(t.valorTotalCliente),
     valorTaxaAbsorvida: D(c.valorAbsorvido),
     propostaInvestimento: D(cp.investimento),
@@ -132,6 +133,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     propostaCartaoEntrada: Dn(cp.cartao?.entrada),
     propostaCartaoParcela: Dn(cp.cartao?.detalhe.valorParcela),
     propostaCartaoPrimeira: Dn(cp.cartao?.detalhe.valorPrimeiraParcela),
+    propostaCartaoUltima: Dn(cp.cartao?.detalhe.valorUltimaParcela),
     propostaCartaoTotal: Dn(cp.cartao?.total),
     propostaCartaoTaxaPct: Dn(cp.cartao?.detalhe.taxaPct),
     tokenPdf: 'exemplo',
@@ -215,7 +217,7 @@ Contas de ${o.codigo} (${parcelas}x, taxa ${taxa}%):
   Itens + margem ${formatarBRL(n(o.subtotal))} (margem ${formatarBRL(n(o.margem))}) - desconto ${formatarBRL(n(o.descontoAplicado))} = proposta ${formatarBRL(n(o.valorTotal))}
   Entrada 30% (Pix/transferência, sem taxa): ${formatarBRL(entrada)}
   Saldo no cartão: ${formatarBRL(saldo)} / (1 - ${taxa / 100}) = ${formatarBRL(saldo / (1 - taxa / 100))} -> cobrado ${formatarBRL(cobrado)} (para cima)
-  Parcelas: 1a ${formatarBRL(n(o.valorPrimeiraParcela))} + ${parcelas - 1} x ${formatarBRL(n(o.valorParcela))} = ${formatarBRL(n(o.valorPrimeiraParcela) + (parcelas - 1) * n(o.valorParcela))}
+  Parcelas: ${parcelas - 1} x ${formatarBRL(n(o.valorParcela))} + última ${formatarBRL(n(o.valorUltimaParcela))} = ${formatarBRL((parcelas - 1) * n(o.valorParcela) + n(o.valorUltimaParcela))}
   Cliente paga: ${formatarBRL(entrada)} + ${formatarBRL(cobrado)} = ${formatarBRL(n(o.valorTotalCliente))}
   Operadora desconta ${taxa}% de ${formatarBRL(cobrado)} = R$ ${(cobrado * taxa / 100).toFixed(4)}
   Do cartão sobra R$ ${(cobrado * (1 - taxa / 100)).toFixed(4)} (o saldo era ${formatarBRL(saldo)}: nunca menos)

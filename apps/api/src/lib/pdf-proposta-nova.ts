@@ -3,7 +3,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { formatarBRL, formatarQuantidade, mascararCep, mascararTelefone, ORDEM_DOS_GRUPOS_NA_PROPOSTA, type GrupoNaProposta } from '@guarusolar/compartilhado';
-import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, FOTO_DO_CARTAO, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
+import { ARTES_DA_PROPOSTA_NOVA, EMPRESA, FOTO_DO_CARTAO, PAGINA_1, PAGINA_2_NOVA, PAGINA_3_NOVA, RODAPE_DA_PROPOSTA_NOVA } from '../conteudo/proposta';
 import { capaDoOrcamento } from './capaDaProposta';
 import {
   alturaDoTexto,
@@ -671,6 +671,7 @@ function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista'
   const parcelas = o.propostaCartaoParcelas;
   const parcela = n(o.propostaCartaoParcela);
   const primeira = n(o.propostaCartaoPrimeira);
+  const ultima = n(o.propostaCartaoUltima);
   const entrada = n(o.propostaCartaoEntrada) ?? 0;
   const total = n(o.propostaCartaoTotal);
   const temCartao = parcelas != null && parcela != null && total != null;
@@ -680,19 +681,29 @@ function textosDosValores(o: OrcamentoParaPdf): Record<'investimento' | 'aVista'
       valores: [aVista == null ? A_DEFINIR : formatarBRL(aVista)],
       detalhes: aVista == null ? [] : [pct > 0 ? `${formatarQuantidade(pct)}% de desconto` : 'sem desconto'],
     },
-    cartao: !temCartao ? { valores: [A_DEFINIR], detalhes: [] } : textoDoCartao(o, { parcelas, parcela, primeira, entrada, total }),
+    cartao: !temCartao ? { valores: [A_DEFINIR], detalhes: [] } : textoDoCartao(o, { parcelas, parcela, primeira, ultima, entrada, total }),
   };
 }
 
 /** O bloco do cartão. Sem entrada: como sempre (parcelas em destaque). Com entrada: ela no mesmo peso. */
 function textoDoCartao(
   o: OrcamentoParaPdf,
-  c: { parcelas: number; parcela: number; primeira: number | null; entrada: number; total: number },
+  c: { parcelas: number; parcela: number; primeira: number | null; ultima: number | null; entrada: number; total: number },
 ): TextoDoBloco {
   const debito = Boolean(o.propostaCartaoDebito);
   const noCartao = debito ? `${formatarBRL(c.total - c.entrada)} no débito` : `${c.parcelas} × ${formatarBRL(c.parcela)}`;
-  const primeira = !debito && c.primeira != null && c.primeira !== c.parcela ? [`1ª parcela de ${formatarBRL(c.primeira)}`] : [];
-  if (c.entrada <= 0) return { valores: [noCartao], detalhes: [...primeira, `total de ${formatarBRL(c.total)}`] };
+  // a parcela diferente: a última (regra de 25/10/2026) ou, em orçamento salvo antes, a 1ª
+  const outraParcela =
+    debito || c.parcelas < 2
+      ? []
+      : c.ultima != null
+        ? c.ultima !== c.parcela
+          ? [`última parcela de ${formatarBRL(c.ultima)}`]
+          : []
+        : c.primeira != null && c.primeira !== c.parcela
+          ? [`1ª parcela de ${formatarBRL(c.primeira)}`]
+          : [];
+  if (c.entrada <= 0) return { valores: [noCartao], detalhes: [...outraParcela, `total de ${formatarBRL(c.total)}`] };
   if (PAGINA_3_NOVA.entradaNoCartao === 'lado-a-lado') {
     return {
       valores: [],
@@ -700,14 +711,14 @@ function textoDoCartao(
         { rotulo: 'Entrada via Pix', valor: formatarBRL(c.entrada) },
         { rotulo: debito ? '+ no débito' : `+ ${c.parcelas}× no cartão`, valor: debito ? formatarBRL(c.total - c.entrada) : formatarBRL(c.parcela) },
       ],
-      detalhes: [...primeira, `total de ${formatarBRL(c.total)}`],
+      detalhes: [...outraParcela, `total de ${formatarBRL(c.total)}`],
     };
   }
   // 'empilhado': as duas linhas grandes, na ordem em que o cliente paga, cada uma com a legenda
   return {
     valores: [formatarBRL(c.entrada), `+ ${noCartao}`],
     sufixos: [' de entrada', null],
-    detalhes: [['entrada via Pix', ...(primeira.length ? [`1ª de ${formatarBRL(c.primeira!)}`] : [])].join(' · '), `total de ${formatarBRL(c.total)}`],
+    detalhes: [['entrada via Pix', ...outraParcela].join(' · '), `total de ${formatarBRL(c.total)}`],
   };
 }
 
@@ -809,7 +820,32 @@ function valoresEContato(o: OrcamentoParaPdf, comArte: boolean): Content[] {
       columnGap: 16,
     } as Content,
   ];
-  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), ...contato];
+  return [...bloco('investimento'), ...bloco('aVista'), ...bloco('cartao'), ...faixaDasMontadoras(), prazoNaArte(o), ...contato];
+}
+
+const ENTRELINHA_DO_PRAZO = 1.05;
+
+/**
+ * O prazo de execução na caixa da arte (PAGINA_3_NOVA.prazo): o maior tamanho em que o texto
+ * inteiro cabe, medido com o pdfkit. Abaixo do mínimo não diminui: corta as últimas palavras.
+ */
+function prazoNaArte(o: OrcamentoParaPdf): Content {
+  const P = PAGINA_3_NOVA.prazo;
+  const cabe = (texto: string, t: number) => alturaDoTexto(texto, P.largura, t, ENTRELINHA_DO_PRAZO, true) <= P.altura;
+  let texto = o.prazoExecucao?.trim() || PAGINA_1.prazo.semPrazo;
+  let tamanho = P.tamanhoMaximo;
+  while (tamanho > P.tamanhoMinimo && !cabe(texto, tamanho)) tamanho -= 0.5;
+  if (!cabe(texto, tamanho)) {
+    const palavras = texto.split(/\s+/);
+    while (palavras.length > 1 && !cabe(`${palavras.join(' ')}…`, tamanho)) palavras.pop();
+    texto = `${palavras.join(' ')}…`;
+  }
+  return {
+    absolutePosition: { x: P.x, y: P.y },
+    // tabela de uma célula: em posição absoluta é ela que limita a largura do texto à caixa
+    table: { widths: [P.largura], body: [[{ text: texto, fontSize: tamanho, bold: true, color: P.cor, lineHeight: ENTRELINHA_DO_PRAZO }]] },
+    layout: semBordas([0, 0, 0, 0]),
+  } as Content;
 }
 
 /**

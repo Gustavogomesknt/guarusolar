@@ -176,7 +176,8 @@ apps/api/                      API (Express + Prisma)
                                foto. O cartão tem a altura do conteúdo (não estica): a sobra fica
                                antes do "contempla", que segue no pé da folha. Cartão de crédito com
                                entrada, só orçamento salvo antes de 25/10/2026 (PAGINA_3_NOVA.entradaNoCartao): entrada e parcelas no mesmo
-                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Arte faltando (artesQueFaltam): aviso no log ao subir e em
+                               tamanho, 'empilhado' (padrão) ou 'lado-a-lado'. Prazo de execução na caixa da arte
+                               (PAGINA_3_NOVA.prazo): reduz até 6 pt; cabem ~90 caracteres, o resto vira "…". Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
@@ -388,8 +389,10 @@ O `.env` da API fica em `apps/api/.env`.
    em orçamentos antigos, que saem como foram enviados). A taxa da operadora (MDR) é ABSORVIDA
    (`REPASSAR_TAXA_DO_CARTAO = false`): o cliente paga o valor da proposta e `valorTaxaAbsorvida`
    grava quanto a empresa deixa de receber. Com repasse ligado: cobrado = valor ÷ (1 − taxa),
-   arredondado para cima (nunca valor × (1 + taxa)). Parcelas em centavos inteiros; a 1ª leva a
-   sobra e a soma fecha com o cobrado. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
+   arredondado para cima (nunca valor × (1 + taxa)). Parcelas em centavos inteiros (25/10/2026):
+   parcela = cobrado ÷ n arredondado PARA CIMA e a ÚLTIMA leva a diferença (`valorUltimaParcela`,
+   `propostaCartaoUltima`), nunca acima do valor em destaque; a soma fecha com o cobrado. Salvos
+   antes têm a 1ª com a sobra (`valorPrimeiraParcela`) e saem assim. `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
    fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
    (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.

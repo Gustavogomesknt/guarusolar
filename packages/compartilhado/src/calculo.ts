@@ -42,10 +42,15 @@ export type PagamentoCartao = {
   saldo: number;
   /** o que o cliente paga no cartão: saldo ÷ (1 − taxa), arredondado PARA CIMA; absorvida = saldo */
   valorCobrado: number;
-  /** parcelas 2 em diante */
+  /** o valor em destaque: cobrado ÷ parcelas, arredondado PARA CIMA no centavo */
   valorParcela: number;
-  /** a primeira leva os centavos que sobram: soma das parcelas = valorCobrado */
+  /**
+   * Regra antiga (orçamento salvo antes de 25/10/2026): a 1ª levava a sobra. Na conta de hoje é
+   * sempre igual a valorParcela; fica para os salvos continuarem saindo como foram enviados.
+   */
   valorPrimeiraParcela: number;
+  /** a ÚLTIMA leva a diferença (nunca acima de valorParcela): soma das parcelas = valorCobrado */
+  valorUltimaParcela: number;
   /** o que a Guarusolar recebe do cartão depois da taxa (arredondado para baixo) */
   valorRecebido: number;
   /** quanto a Guarusolar deixa de receber (só com a taxa absorvida; senão 0) */
@@ -77,8 +82,9 @@ const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /**
- * Cartão com a taxa repassada: cobrado = saldo ÷ (1 − taxa). Contas em centavos inteiros.
- * Cobrado arredondado para cima: depois da taxa, a empresa recebe pelo menos o saldo.
+ * Cartão com a taxa repassada: cobrado = saldo ÷ (1 − taxa); absorvida: cobrado = saldo. Contas
+ * em centavos inteiros. Cobrado arredondado para cima: com repasse, a empresa recebe pelo menos o
+ * saldo. Parcelas: cobrado ÷ n arredondado para cima; a última leva a diferença (25/10/2026).
  */
 export function calcularCartao(saldo: number, parcelas: number, debito: boolean, absorverNoOrcamento: boolean): PagamentoCartao {
   // sem repasse (REPASSAR_TAXA_DO_CARTAO = false, taxasCartao.ts) a taxa é sempre absorvida
@@ -89,8 +95,9 @@ export function calcularCartao(saldo: number, parcelas: number, debito: boolean,
   const saldoC = Math.round(saldo * 100);
   // tolerância para o ruído do ponto flutuante não subir um centavo à toa
   const cobradoC = absorver ? saldoC : Math.ceil(saldoC / (1 - taxa) - 1e-6);
-  const parcelaC = Math.floor(cobradoC / n);
-  const primeiraC = cobradoC - parcelaC * (n - 1);
+  // parcela arredondada para cima e a última com a diferença: nenhuma passa do valor em destaque
+  const parcelaC = Math.ceil(cobradoC / n);
+  const ultimaC = cobradoC - parcelaC * (n - 1);
   const recebidoC = Math.floor(cobradoC * (1 - taxa) + 1e-6);
   return {
     debito,
@@ -100,7 +107,8 @@ export function calcularCartao(saldo: number, parcelas: number, debito: boolean,
     saldo: saldoC / 100,
     valorCobrado: cobradoC / 100,
     valorParcela: parcelaC / 100,
-    valorPrimeiraParcela: primeiraC / 100,
+    valorPrimeiraParcela: parcelaC / 100,
+    valorUltimaParcela: ultimaC / 100,
     valorRecebido: recebidoC / 100,
     valorAbsorvido: absorver ? (saldoC - recebidoC) / 100 : 0,
   };
@@ -171,7 +179,7 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
       resumoPagamento = cartao.debito
         ? `Débito de ${brl(cartao.valorCobrado)}`
         : `${cartao.parcelas}x de ${brl(cartao.valorParcela)}` +
-          (cartao.valorPrimeiraParcela !== cartao.valorParcela ? ` (1ª de ${brl(cartao.valorPrimeiraParcela)})` : '');
+          (cartao.valorUltimaParcela !== cartao.valorParcela ? ` (última de ${brl(cartao.valorUltimaParcela)})` : '');
       break;
     }
     case 'FINANCIAMENTO': {

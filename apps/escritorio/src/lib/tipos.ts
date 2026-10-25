@@ -195,6 +195,8 @@ export type OrcamentoCompleto = {
   valorEntrada: string | null;
   valorParcela: string | null;
   valorPrimeiraParcela: string | null;
+  /** nula em orçamento salvo antes de 25/10/2026 (a 1ª levava a sobra) */
+  valorUltimaParcela?: string | null;
   valorTotalCliente: string | null;
   valorTaxaAbsorvida: string | null;
   subtotal: string;

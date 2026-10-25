@@ -81,7 +81,7 @@ export function CondicoesDaProposta() {
               <>
                 <span>{cartao.debito ? `${formatarBRL(cartao.valorCobrado)} no débito` : `${cartao.parcelas} × ${formatarBRL(cartao.valorParcela)}`}</span>
                 <span className="text-[11px] font-normal text-muted-foreground">
-                  {!cartao.debito && cartao.valorPrimeiraParcela !== cartao.valorParcela ? `1ª de ${formatarBRL(cartao.valorPrimeiraParcela)} · ` : ''}
+                  {!cartao.debito && cartao.valorUltimaParcela !== cartao.valorParcela ? `última de ${formatarBRL(cartao.valorUltimaParcela)} · ` : ''}
                   total {formatarBRL(c.cartao.total)}
                 </span>
               </>
