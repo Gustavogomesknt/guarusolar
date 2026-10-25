@@ -495,9 +495,22 @@ function blocoContempla(): { peca: Peca; altura: number } {
     ],
     height: alturaCaixa,
   };
+  // a linha de condições (PAGINA_2_NOVA.contempla.condicoes), medida: entra na altura do bloco
+  const condicoes = C.condicoes.trim();
+  const TAMANHO_CONDICOES = 8;
+  const ANTES_CONDICOES = 7;
+  const alturaCondicoes = condicoes ? ANTES_CONDICOES + alturaDoTexto(condicoes, LARGURA, TAMANHO_CONDICOES) : 0;
   return {
-    altura: alturaFaixa + ESPACO.aposFaixa + alturaCaixa,
-    peca: { stack: [faixa, { ...caixaDasEtapas, margin: [0, ESPACO.aposFaixa, 0, 0] }] },
+    altura: alturaFaixa + ESPACO.aposFaixa + alturaCaixa + alturaCondicoes,
+    peca: {
+      stack: [
+        faixa,
+        { ...caixaDasEtapas, margin: [0, ESPACO.aposFaixa, 0, 0] },
+        ...(condicoes
+          ? [{ text: condicoes, fontSize: TAMANHO_CONDICOES, lineHeight: 1.15, color: COR.textoMedio, alignment: 'center', margin: [0, ANTES_CONDICOES, 0, 0] } as Peca]
+          : []),
+      ],
+    },
   };
 }
 

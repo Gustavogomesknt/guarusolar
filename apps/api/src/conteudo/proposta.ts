@@ -225,5 +225,12 @@ export const PAGINA_2_NOVA = {
       { icone: 'teste', linhas: ['Instalação, testes', 'e comissionamento'] },
       { icone: 'suporte', linhas: ['Entrega técnica', 'com suporte'] },
     ],
+    /**
+     * LINHA DE CONDIÇÕES, abaixo do bloco: a qualificação que saiu dos selos de prazo e garantia
+     * (25/10/2026; os selos têm só a duração). Igual em toda proposta e neutra quanto ao tipo de
+     * serviço. PROVISÓRIA: aguarda a Guarusolar; troque o texto aqui (a altura é medida, cabe
+     * em mais de uma linha). Vazia = a linha some.
+     */
+    condicoes: 'Prazo de execução contado a partir da aprovação da proposta. Garantia a contar da data de conclusão do serviço.',
   },
 };
