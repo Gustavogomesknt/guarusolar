@@ -706,10 +706,14 @@ const valorGrande = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string): Li
   negrito: true,
 });
 
-/** Linha de apoio (cor de detalhe), sempre numa linha só: de `maximo` até 7 pt. */
-const linhaDeApoio = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string, maximo: number, acima = 0): Linha => ({
+/**
+ * Linha de apoio (cor de detalhe) no tamanho dado, SEM encolher. Só as duas linhas do orçamento
+ * antigo com entrada (anterior a 25/10/2026) saem a 7,5 pt e podem descer até 7 para caber numa
+ * linha (`encolheAte`); nada novo usa isso.
+ */
+const linhaDeApoio = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string, maximo: number, acima = 0, encolheAte = maximo): Linha => ({
   texto,
-  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura, maximo, 7) ?? 7,
+  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura, maximo, encolheAte) ?? maximo,
   cor: PAGINA_3_NOVA.cores.detalhe,
   acima,
 });
@@ -758,28 +762,45 @@ function camposDosValores(o: OrcamentoParaPdf): Content[] {
     campo('cartaoParcelas', [
       linhaDeApoio('cartaoParcelas', acima, 10),
       { ...valorGrande('cartaoParcelas', valor), acima: 1 },
-      ...abaixo.map((t, i) => ({ ...linhaDeApoio('cartaoParcelas', t, tamanhoAbaixo, i === 0 ? (abaixo.length > 1 ? 1 : 2) : 0), entrelinha: abaixo.length > 1 ? 0.95 : 1.05 })),
+      ...abaixo.map((t, i) => ({
+        ...linhaDeApoio('cartaoParcelas', t, tamanhoAbaixo, i === 0 ? (abaixo.length > 1 ? 1 : 2) : 0, abaixo.length > 1 ? 7 : tamanhoAbaixo),
+        entrelinha: abaixo.length > 1 ? 0.95 : 1.05,
+      })),
     ]),
     campo('cartaoTotal', [linhaDeApoio('cartaoTotal', `total de ${formatarBRL(total)}`, 9)]),
   ];
 }
 
+/** Primeiro nome + último sobrenome ("Maria Aparecida dos Santos Ferreira" -> "Maria Ferreira"). */
+function nomeAbreviado(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  return partes.length > 2 ? `${partes[0]} ${partes[partes.length - 1]}` : partes.join(' ');
+}
+
 /**
- * Nome da consultora e o WhatsApp dela na faixa "PRONTO PARA APROVAR?": numa linha (10,5 a 8,5
- * pt); nome longo demais para isso, em duas linhas de 7,5 pt (a faixa tem altura para as duas).
+ * Nome da consultora e o telefone DA EMPRESA (EMPRESA.telefone; nunca o celular do vendedor) na
+ * faixa "PRONTO PARA APROVAR?", numa linha, nome e telefone no mesmo tamanho (10,5 pt). Nome que
+ * não cabe se resolve ABREVIANDO, não encolhendo: primeiro nome + último sobrenome a 10,5 pt; só
+ * depois disso a letra desce, até 9 pt (piso, como nos selos); por fim, só o primeiro nome. O
+ * telefone sai sempre inteiro.
  */
 function campoDoContato(o: OrcamentoParaPdf): Content {
   const largura = PAGINA_3_NOVA.campos.contato.largura;
-  const fone = o.vendedor.telefone?.replace(/\D/g, '') ?? '';
-  const whatsapp = fone ? `WhatsApp ${mascararTelefone(fone)}` : null;
-  const umaLinha = [o.vendedor.nome, ...(whatsapp ? [whatsapp] : [])].join('  ·  ');
-  const tamanho = tamanhoQueCabe(umaLinha, largura, 10.5, 8.5);
-  if (tamanho !== null) return campo('contato', [{ texto: umaLinha, tamanho, negrito: true }]);
-  // duas linhas a 7,5 pt, entrelinha justa: cabem entre o título e a borda de baixo da faixa
-  return campo('contato', [
-    { texto: o.vendedor.nome, tamanho: tamanhoQueCabe(o.vendedor.nome, largura, 7.5, 6.5) ?? 6.5, negrito: true, entrelinha: 0.95 },
-    ...(whatsapp ? [{ texto: whatsapp, tamanho: 7.5, negrito: true, entrelinha: 0.95 }] : []),
-  ]);
+  const completo = o.vendedor.nome.trim();
+  const primeiro = completo.split(/\s+/)[0];
+  const tentativas: [string, number][] = [
+    [completo, 10.5],
+    [nomeAbreviado(completo), 10.5],
+    [nomeAbreviado(completo), 9],
+    [primeiro, 9],
+  ];
+  for (const [nome, minimo] of tentativas) {
+    const linha = `${nome}  ·  ${EMPRESA.telefone}`;
+    const tamanho = tamanhoQueCabe(linha, largura, 10.5, minimo);
+    if (tamanho !== null) return campo('contato', [{ texto: linha, tamanho, negrito: true }]);
+  }
+  // só um primeiro nome de mais de ~30 letras chega aqui: sai a 9 pt, inteiro (quebra a linha)
+  return campo('contato', [{ texto: `${primeiro}  ·  ${EMPRESA.telefone}`, tamanho: 9, negrito: true }]);
 }
 
 /** Os sete campos da página 3 (posições em conteudo/proposta.ts); as logos, só sem a arte. */

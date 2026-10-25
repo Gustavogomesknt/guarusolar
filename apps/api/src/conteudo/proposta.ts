@@ -181,8 +181,8 @@ export const PAGINA_3_NOVA = {
     cartaoParcelas: { x: 409, y: 634, largura: 152, altura: 56 },
     /** cartão da direita, embaixo (o quadro escuro acaba em y 705, o cartão em 709) */
     cartaoTotal: { x: 409, y: 692, largura: 152, altura: 11 },
-    /** faixa "PRONTO PARA APROVAR?": abaixo do título, até a diagonal laranja (x ~ 400) */
-    contato: { x: 104, y: 741, largura: 285, altura: 19 },
+    /** faixa "PRONTO PARA APROVAR?": consultora + telefone da empresa, abaixo do título, até a diagonal laranja (x ~ 400) */
+    contato: { x: 104, y: 742, largura: 285, altura: 14 },
   },
   /**
    * faixa das logos das montadoras (ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras): SÓ SEM A ARTE

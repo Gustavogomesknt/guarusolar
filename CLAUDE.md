@@ -177,7 +177,8 @@ apps/api/                      API (Express + Prisma)
                                antes do "contempla", que segue no pé da folha. Página 3 (arte de
                                25/10/2026, 1055 x 1491 px): SETE campos em PAGINA_3_NOVA (pontos do PDF; px x 0,5643):
                                selos de prazo e garantia, investimento, à vista, parcelas, total no cartão e
-                               consultora + WhatsApp; rótulos e logos são da arte. Prazo e garantia nos SELOS da arte
+                               consultora + telefone DA EMPRESA (EMPRESA.telefone; nunca o celular do vendedor; nome longo
+                               é abreviado, nunca abaixo de 9 pt); rótulos e logos são da arte. Prazo e garantia nos SELOS da arte
                                (PAGINA_3_NOVA.selos): 11 pt a 9 pt, nunca cortados (a API barra o que não cabe). Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
