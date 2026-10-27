@@ -118,8 +118,8 @@ function condicaoPorExtenso(o: OrcamentoParaPdf): string {
         ? `À vista, via Pix ou transferência bancária, com ${pct(o.descontoAVistaPct)} de desconto já aplicado no valor total.`
         : 'À vista, via Pix ou transferência bancária.';
     case 'ENTRADA_PARCELAS': {
-      // "Cartão de crédito em 4 parcelas de R$ 1.443,73, sem juros (última de R$ 1.443,72)."
-      // A entrada só existe em orçamento salvo antes de 25/10/2026 (sai como foi enviado)
+      // a redação do resumoPagamento (calculo.ts): "sem juros" só com a taxa absorvida, e o total
+      // do cartão nos dois casos. A entrada só existe em orçamento salvo antes de 25/10/2026
       const entrada = numero(o.valorEntrada);
       const parcelas = o.parcelas ?? 1;
       const parcela = numero(o.valorParcela);
@@ -133,11 +133,12 @@ function condicaoPorExtenso(o: OrcamentoParaPdf): string {
             : ultima == null && primeira != null && primeira !== parcela
               ? ` (1ª de ${formatarBRL(primeira)})`
               : '';
+      const noCartao = numero(o.valorTotalCliente ?? o.valorTotal) - entrada;
       const cartao = o.pagamentoDebito
-        ? `cartão de débito: ${formatarBRL(numero(o.valorTotalCliente ?? o.valorTotal) - entrada)}`
+        ? `cartão de débito: ${formatarBRL(noCartao)}`
         : parcelas === 1
           ? `cartão de crédito em 1 parcela de ${formatarBRL(parcela)}`
-          : `cartão de crédito em ${parcelas} parcelas de ${formatarBRL(parcela)}, sem juros${diferente}`;
+          : `cartão de crédito em ${parcelas} parcelas de ${formatarBRL(parcela)}${o.absorverTaxaCartao ? ', sem juros' : ''}${diferente}, total de ${formatarBRL(noCartao)}`;
       return entrada > 0
         ? `Entrada de ${formatarBRL(entrada)} (${pct(o.entradaPct)} do total) e o saldo no ${cartao}.`
         : `${cartao.charAt(0).toUpperCase()}${cartao.slice(1)}.`;
@@ -173,6 +174,11 @@ export function alturaDoTexto(texto: string, largura: number, tamanho: number, e
   const linha = medidor.currentLineHeight(true);
   const quantas = Math.max(1, Math.round(medidor.heightOfString(texto, { width: largura, lineGap: 0 }) / linha));
   return quantas * linha * entrelinha;
+}
+
+/** Largura do texto numa linha só, com as fontes do PDF (o mesmo medidor). */
+export function larguraDoTexto(texto: string, tamanho: number, negrito = false) {
+  return medidor.font(negrito ? 'negrito' : 'normal').fontSize(tamanho).widthOfString(texto);
 }
 
 const semBordas = (padding: Margem) => ({
@@ -422,6 +428,9 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
       ? `${o.resumoPagamento} (${o.bancoFinanciamento})`
       : o.resumoPagamento
     : condicaoPorExtenso(o);
+  // "sem juros" só quando a taxa foi absorvida nesta proposta, num parcelamento (27/10/2026)
+  const semJuros = o.condicaoPagamento === 'ENTRADA_PARCELAS' && o.absorverTaxaCartao && !o.pagamentoDebito && (o.parcelas ?? 1) > 1;
+  const notaDoPagamento = semJuros ? PAGINA_1.notaDoPagamento.taxaAbsorvida : PAGINA_1.notaDoPagamento.padrao;
   const desconto = numero(o.descontoAplicado);
   // O cliente vê o total JÁ com a taxa do cartão (se repassada), sem linha de "taxa da operadora".
   const totalCliente = numero(o.valorTotalCliente ?? o.valorTotal);
@@ -436,7 +445,7 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
   // com uma linha ou nenhuma, a altura é a de sempre
   const alturaPagamento = Math.max(
     76 + 20 * Math.max(0, linhasDoTotal.length - 1),
-    35 + alturaDoTexto(textoPagamento, larguraPagamento - 28, 10.5, 1.3, true) + (PAGINA_1.notaDoPagamento ? 4 + alturaDoTexto(PAGINA_1.notaDoPagamento, larguraPagamento - 28, 9, 1.3) : 0),
+    35 + alturaDoTexto(textoPagamento, larguraPagamento - 28, 10.5, 1.3, true) + (notaDoPagamento ? 4 + alturaDoTexto(notaDoPagamento, larguraPagamento - 28, 9, 1.3) : 0),
   );
   const blocoPagamento: Peca = {
     columns: [
@@ -447,8 +456,8 @@ function paginaDaProposta(o: OrcamentoParaPdf): Content[] {
             stack: [
               rotulo('CONDIÇÕES DE PAGAMENTO'),
               { text: textoPagamento, fontSize: 10.5, bold: true, lineHeight: 1.3 },
-              ...(PAGINA_1.notaDoPagamento
-                ? [{ text: PAGINA_1.notaDoPagamento, fontSize: 9, color: COR.textoMedio, lineHeight: 1.3, margin: [0, 4, 0, 0] }]
+              ...(notaDoPagamento
+                ? [{ text: notaDoPagamento, fontSize: 9, color: COR.textoMedio, lineHeight: 1.3, margin: [0, 4, 0, 0] }]
                 : []),
             ],
           },

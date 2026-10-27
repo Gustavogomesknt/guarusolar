@@ -188,6 +188,18 @@ apps/api/                      API (Express + Prisma)
                                (`sobreAArte`, vazio até as artes chegarem). Página 2: cliente,
                                escopo em cartões por seção (seção sem item some; Infraestrutura
                                sempre), foto no pé com a altura que sobra, bloco fixo "contempla".
+                               Abaixo dele, a LINHA DE CONDIÇÕES (PAGINA_2_NOVA.contempla.condicoes
+                               e, com a taxa do cartão da página 3 REPASSADA, a frase de
+                               `taxaRepassada`, crédito ou débito; 27/10/2026): TEM DE CABER EM UMA
+                               LINHA a 8 pt no caso mais largo (hoje 497 de 523 pt). Em duas, o
+                               "contempla" cresce e o arranjo muda em parte dos orçamentos (14 de
+                               192 combinações medidas: foto sai ou a lista vai a mais uma folha).
+                               linhaDeCondicoesQuePassa confere ao subir: aviso no log e em
+                               /saude → proposta.linhaDeCondicoesLonga (quanto passou); nunca trava,
+                               o PDF sai certo (a altura é medida). Taxa repassada ou absorvida na
+                               página 3 = o cartão soma mais que o investimento ou não
+                               (taxaDoCartaoDaProposta; sem coluna própria); absorvida, o cartão
+                               diz "N parcelas sem juros de".
                                Itens que não cabem nem sem foto (reserva): seções empilhadas em
                                tabela que quebra de página (cartão de altura fixa não passa de uma
                                folha); o rodapé "Página X de N" usa o total real de páginas.
@@ -393,9 +405,9 @@ O `.env` da API fica em `apps/api/.env`.
    Nunca aceitar total vindo do front. O front usa a mesma função só para a prévia em tela.
    **Cartão (condição ENTRADA_PARCELAS, na tela "Cartão"):** desde 25/10/2026 NÃO há entrada: o
    valor inteiro vai ao cartão (a conta ignora `entradaPct`; a coluna e o `valorEntrada` ficam só
-   em orçamentos antigos, que saem como foram enviados). A taxa da operadora (MDR) é ABSORVIDA
-   (`REPASSAR_TAXA_DO_CARTAO = false`): o cliente paga o valor da proposta e `valorTaxaAbsorvida`
-   grava quanto a empresa deixa de receber. Com repasse ligado: cobrado = valor ÷ (1 − taxa),
+   em orçamentos antigos, que saem como foram enviados; a entrada NÃO volta: a arte da página 3
+   não tem lugar para ela). A taxa da operadora (MDR) é REPASSADA por padrão (27/10/2026,
+   `REPASSAR_TAXA_DO_CARTAO = true`): cobrado = valor ÷ (1 − taxa),
    arredondado para cima (nunca valor × (1 + taxa)). Parcelas em centavos inteiros (25/10/2026):
    parcela = cobrado ÷ n arredondado PARA CIMA e a ÚLTIMA leva a diferença (`valorUltimaParcela`,
    `propostaCartaoUltima`), nunca acima do valor em destaque; a soma fecha com o cobrado. Salvos
@@ -403,11 +415,21 @@ O `.env` da API fica em `apps/api/.env`.
    (condicoesDaProposta.ts) recusa, na API e no gerador, valor tão baixo para o número de parcelas
    que a última sairia zerada ou negativa (os dois cartões: o escolhido e o das três condições). `valorTotal` = o que a Guarusolar recebe (indicadores, lista, pipeline);
    `valorTotalCliente` = o que o cliente paga (PDF e WhatsApp, sem linha de "taxa"). A taxa usada
-   fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa"
-   (negociação) cobra o saldo e grava em `valorTaxaAbsorvida` quanto a empresa deixa de receber.
-   **Repasse da taxa:** `REPASSAR_TAXA_DO_CARTAO` (taxasCartao.ts), usado em `calcularCartao`;
-   `false` (definido em 25/10/2026, pela proposta real do cliente) faz a empresa absorver a taxa
-   em todo orçamento, e o interruptor "Absorver a taxa" some da tela.
+   fica GRAVADA (`taxaCartaoPct`): renegociar a tabela não muda proposta salva. "Absorver a taxa
+   nesta proposta" (interruptor por orçamento, desmarcado por padrão; o vendedor decide caso a
+   caso) cobra o valor da proposta e grava em `valorTaxaAbsorvida` quanto a empresa deixa de
+   receber; só então o quadro do valor total mostra "Taxa do cartão absorvida: R$ X".
+   **Repasse da taxa:** `REPASSAR_TAXA_DO_CARTAO` (taxasCartao.ts), usado em `calcularCartao`.
+   Em 25/10/2026 virou `false` (taxa sempre absorvida) por uma proposta do cliente com as parcelas
+   somando o valor cheio; em 27/10/2026 a Guarusolar esclareceu que foi engano deles e voltou a
+   `true` (nenhum cartão foi salvo no intervalo: a base tinha só o GS-2026-0001, à vista).
+   **Textos acompanham o interruptor** (27/10/2026): "sem juros" SÓ com a taxa absorvida naquela
+   proposta. Linha de pagamento (resumoPagamento, PDF e WhatsApp), com o total nos dois casos:
+   "Cartão de crédito em 4 parcelas de R$ 1.443,73, sem juros (última de R$ 1.443,72), total de
+   R$ 5.774,91" (absorvida) / "... de R$ 1.535,07 (última de R$ 1.535,05), total de R$ 6.140,26"
+   (repassada). Nota da página 1 (PAGINA_1.notaDoPagamento): `taxaAbsorvida` ou `padrao`. Modelo
+   novo: "N parcelas sem juros de" na página 3 e, repassada, a frase da taxa na linha de
+   condições da página 2.
    **Três condições na proposta (modelo novo, 23/10/2026):** ao salvar, a API grava também
    `proposta*` (investimento = sem desconto à vista nem taxa; à vista via Pix; cartão) com
    `calcularCondicoesDaProposta`: a condição escolhida usa o que o vendedor informou (o cartão

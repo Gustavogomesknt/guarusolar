@@ -445,7 +445,8 @@ function QuadroDoCartao({ totais }: { totais: Totais }) {
         ))}
       </dl>
 
-      {/* com a taxa sempre absorvida (REPASSAR_TAXA_DO_CARTAO = false) não há o que escolher */}
+      {/* desmarcado por padrão: a taxa é repassada; o vendedor absorve caso a caso. Só some com
+          REPASSAR_TAXA_DO_CARTAO = false (taxa sempre absorvida, nada a escolher) */}
       {REPASSAR_TAXA_DO_CARTAO && (
         <Controller
           control={control}

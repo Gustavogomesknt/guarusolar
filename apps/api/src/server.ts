@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
 import { modeloDaProposta } from './lib/pdf-orcamento';
-import { artesQueFaltam } from './lib/pdf-proposta-nova';
+import { artesQueFaltam, linhaDeCondicoesQuePassa } from './lib/pdf-proposta-nova';
 import express from 'express';
 import cors from 'cors';
 import { tratadorDeErros } from './lib/erros';
@@ -68,9 +68,15 @@ app.get('/saude', async (req, res) => {
     // armazenamento persistente). Responde "por que o app de campo não aceita fotos?" sem abrir o painel.
     const fotos = { destino: destinoAtual(), recebendo: appTecnicoLiberado() };
     // modelo da proposta em uso (PROPOSTA_MODELO); `artesFaltando`: só os arquivos do modelo novo
-    // que faltam na pasta (aviso; o PDF sai igual)
+    // que faltam na pasta; `linhaDeCondicoesLonga`: a linha de condições da página 2 passa de uma
+    // linha (avisos; o PDF sai igual)
     const artesFaltando = artesQueFaltam();
-    const proposta = { modelo: modeloDaProposta(), ...(artesFaltando.length > 0 ? { artesFaltando } : {}) };
+    const linhaDeCondicoesLonga = linhaDeCondicoesQuePassa();
+    const proposta = {
+      modelo: modeloDaProposta(),
+      ...(artesFaltando.length > 0 ? { artesFaltando } : {}),
+      ...(linhaDeCondicoesLonga ? { linhaDeCondicoesLonga } : {}),
+    };
     res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, proposta, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
@@ -112,6 +118,11 @@ app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localho
   const faltando = artesQueFaltam();
   if (faltando.length > 0) {
     console.warn(`[proposta] Faltam ${faltando.length} arte(s) do modelo novo em apps/api/assets/proposta/: ${faltando.join(', ')}. O PDF sai sem elas (cartão sem foto, logo pulada, lugar reservado da arte).`);
+  }
+  // linha de condições da página 2 (conteudo/proposta.ts, PAGINA_2_NOVA.contempla): só avisa
+  const longa = linhaDeCondicoesQuePassa();
+  if (longa) {
+    console.warn(`[proposta] A linha de condições da página 2 passa de uma linha: ${longa.larguraPt} pt de ${longa.limitePt} (${longa.passaPt} pt a mais), no caso mais largo: "${longa.texto}". O PDF sai certo, mas em duas linhas o arranjo da página 2 muda em parte dos orçamentos. Encurte em PAGINA_2_NOVA.contempla (condicoes e taxaRepassada).`);
   }
 }
 

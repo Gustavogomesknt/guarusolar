@@ -35,9 +35,14 @@ export const EMPRESA = {
 export const PAGINA_1 = {
   /** rodapé da tabela de itens */
   notaDosItens: 'Todos os equipamentos e serviços seguem rigorosamente as normas ABNT NBR.',
-  /** abaixo da condição de pagamento escolhida no orçamento */
-  // "sem juros": desde 25/10/2026 a taxa do cartão é da Guarusolar (REPASSAR_TAXA_DO_CARTAO)
-  notaDoPagamento: 'Parcelamos em até 18x no cartão, sem juros. À vista no Pix ou transferência, com desconto.',
+  /**
+   * Abaixo da condição de pagamento escolhida no orçamento. "Sem juros" SÓ quando o vendedor
+   * absorveu a taxa nesta proposta, parcelando (27/10/2026); em branco, a nota não sai.
+   */
+  notaDoPagamento: {
+    padrao: 'Parcelamos em até 18x no cartão, com taxa da operadora. À vista no Pix ou transferência, com desconto.',
+    taxaAbsorvida: 'Parcelamento sem juros nesta proposta. À vista no Pix ou transferência, com desconto.',
+  },
   /** o texto vem do orçamento (prazoExecucao); semPrazo só em proposta enviada antes de o campo existir */
   prazo: { titulo: 'PRAZO DE EXECUÇÃO', semPrazo: 'A combinar' },
   /** o texto vem do orçamento (garantia); sem ele, GARANTIA_PADRAO (compartilhado/textosDaProposta.ts) */
@@ -225,6 +230,12 @@ export const PAGINA_2_NOVA = {
      * serviço. PROVISÓRIA: aguarda a Guarusolar; troque o texto aqui (a altura é medida, cabe
      * em mais de uma linha). Vazia = a linha some.
      */
-    condicoes: 'Prazo de execução contado a partir da aprovação da proposta. Garantia a contar da data de conclusão do serviço.',
+    condicoes: 'Prazo contado da aprovação da proposta. Garantia a partir da conclusão do serviço.',
+    /**
+     * Acrescentada à linha de condições quando o cartão da página 3 tem a taxa REPASSADA (soma
+     * mais que o investimento; 27/10/2026). Taxa absorvida: nada a explicar. As duas frases juntas
+     * cabem numa linha a 8 pt (497 de 523 pt): a altura do bloco não muda com a taxa.
+     */
+    taxaRepassada: { credito: 'No cartão, o valor parcelado inclui a taxa da operadora.', debito: 'No débito, o valor inclui a taxa da operadora.' },
   },
 };

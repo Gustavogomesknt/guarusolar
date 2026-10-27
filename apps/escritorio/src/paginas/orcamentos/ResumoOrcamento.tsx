@@ -103,7 +103,7 @@ export function ResumoOrcamento({
           {formatarBRL(totais.valorTotal)}
         </p>
         <p className="text-[13px] leading-snug text-destaque-claro">{totais.resumoPagamento}</p>
-        {/* informação, não aviso: com a taxa sempre absorvida, aparece em todo orçamento de cartão */}
+        {/* informação, não aviso: só quando o vendedor marca "Absorver a taxa nesta proposta" */}
         {totais.cartao && totais.cartao.valorAbsorvido > 0 && (
           <p className="text-[13px] leading-snug text-[#CBDBF0]">Taxa do cartão absorvida: {formatarBRL(totais.cartao.valorAbsorvido)}</p>
         )}

@@ -12,6 +12,7 @@ import {
   clienteDoDocumento,
   COR,
   LARGURA,
+  larguraDoTexto,
   LATERAL,
   PAGINA,
   svgIcone,
@@ -467,7 +468,40 @@ const semBordas = (p: [number, number, number, number]) => ({
   paddingBottom: () => p[3],
 });
 
-function blocoContempla(): { peca: Peca; altura: number } {
+/**
+ * A taxa do cartão da página 3 (o das três condições gravadas): absorvida = o cartão soma o
+ * investimento; repassada = soma mais. Não há coluna própria: o total gravado diz. null = sem cartão.
+ */
+function taxaDoCartaoDaProposta(o: OrcamentoParaPdf): 'repassada' | 'absorvida' | null {
+  const total = n(o.propostaCartaoTotal);
+  const investimento = n(o.propostaInvestimento);
+  if (total == null || investimento == null || o.propostaCartaoParcelas == null) return null;
+  return Math.round(total * 100) > Math.round(investimento * 100) ? 'repassada' : 'absorvida';
+}
+
+const TAMANHO_CONDICOES = 8;
+/** A linha de condições da página 2: a qualificação fixa e, com a taxa repassada, a frase do cartão. */
+function linhaDeCondicoes(taxa: 'credito' | 'debito' | null): string {
+  const C = PAGINA_2_NOVA.contempla;
+  return [C.condicoes.trim(), taxa ? C.taxaRepassada[taxa].trim() : ''].filter(Boolean).join(' ');
+}
+
+/**
+ * A linha de condições tem de caber em UMA linha a 8 pt, no caso mais largo (com a frase da taxa
+ * repassada). Passando, ela quebra em duas, o "contempla" cresce e o arranjo da página 2 muda em
+ * parte dos orçamentos (perde foto, ou a lista vai a mais uma folha). Só AVISO, como
+ * artesQueFaltam: no log ao subir e em /saude; o PDF sai certo (a altura é medida). null = cabe.
+ */
+export function linhaDeCondicoesQuePassa(): { texto: string; larguraPt: number; limitePt: number; passaPt: number } | null {
+  const texto = [linhaDeCondicoes(null), linhaDeCondicoes('credito'), linhaDeCondicoes('debito')]
+    .map((t) => ({ t, largura: larguraDoTexto(t, TAMANHO_CONDICOES) }))
+    .sort((a, b) => b.largura - a.largura)[0];
+  if (!texto.t || alturaDoTexto(texto.t, LARGURA, TAMANHO_CONDICOES) <= alturaDoTexto('x', LARGURA, TAMANHO_CONDICOES)) return null;
+  const arredondar = (v: number) => Math.round(v * 10) / 10;
+  return { texto: texto.t, larguraPt: arredondar(texto.largura), limitePt: arredondar(LARGURA), passaPt: arredondar(texto.largura - LARGURA) };
+}
+
+function blocoContempla(o: OrcamentoParaPdf): { peca: Peca; altura: number } {
   const C = PAGINA_2_NOVA.contempla;
   const alturaFaixa = 27;
   const alturaCaixa = 66;
@@ -520,8 +554,9 @@ function blocoContempla(): { peca: Peca; altura: number } {
     layout: semBordas([0, 0, 0, 0]),
   };
   // a linha de condições (PAGINA_2_NOVA.contempla.condicoes), medida: entra na altura do bloco
-  const condicoes = C.condicoes.trim();
-  const TAMANHO_CONDICOES = 8;
+  // taxa repassada: a frase que explica o cartão somar mais que o investimento (na mesma linha)
+  // (cabe em uma linha: linhaDeCondicoesQuePassa confere ao subir)
+  const condicoes = linhaDeCondicoes(taxaDoCartaoDaProposta(o) === 'repassada' ? (o.propostaCartaoDebito ? 'debito' : 'credito') : null);
   const ANTES_CONDICOES = 7;
   const alturaCondicoes = condicoes ? ANTES_CONDICOES + alturaDoTexto(condicoes, LARGURA, TAMANHO_CONDICOES) : 0;
   return {
@@ -550,7 +585,7 @@ export type PlanoDaPagina2 = { modo: 'cartoes' | 'reserva'; semFoto: GrupoNaProp
 function medidasDaPagina2(o: OrcamentoParaPdf) {
   const cliente = cartaoDoCliente(o);
   const titulo = tituloDoEscopo();
-  const contempla = blocoContempla();
+  const contempla = blocoContempla(o);
   const cartoes = cartoesDoOrcamento(o);
   const gap = 10;
   const largura = (LARGURA - (cartoes.length - 1) * gap) / cartoes.length;
@@ -765,7 +800,7 @@ const valorGrande = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string): Li
 /**
  * Linha de apoio (cor de detalhe) no tamanho dado, SEM encolher. Só as duas linhas do orçamento
  * antigo com entrada (anterior a 25/10/2026) saem a 7,5 pt e podem descer até 7 para caber numa
- * linha (`encolheAte`); nada novo usa isso.
+ * linha (`encolheAte`); fora isso, só a linha "N parcelas sem juros de" desce, até o piso de 9.
  */
 const linhaDeApoio = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string, maximo: number, acima = 0, encolheAte = maximo): Linha => ({
   texto,
@@ -808,7 +843,9 @@ function camposDosValores(o: OrcamentoParaPdf): Content[] {
           ? `1ª parcela de ${formatarBRL(primeira)}`
           : null;
   // entrada: só orçamento salvo antes de 25/10/2026 (sai como foi enviado), na linha de baixo
-  const acima = debito ? 'no débito' : `${parcelas} ${parcelas === 1 ? 'parcela' : 'parcelas'} de`;
+  // "sem juros" só com a taxa absorvida (27/10/2026; taxaDoCartaoDaProposta)
+  const semJuros = !debito && parcelas > 1 && taxaDoCartaoDaProposta(o) === 'absorvida';
+  const acima = debito ? 'no débito' : `${parcelas} ${parcelas === 1 ? 'parcela' : 'parcelas'}${semJuros ? ' sem juros' : ''} de`;
   const valor = debito ? formatarBRL(total - entrada) : formatarBRL(parcela);
   const abaixo = [...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []), ...(outra ? [outra] : [])];
   // duas linhas de apoio (só orçamento antigo com entrada): menores, para caber antes do total
@@ -816,7 +853,8 @@ function camposDosValores(o: OrcamentoParaPdf): Content[] {
   return [
     ...campos,
     campo('cartaoParcelas', [
-      linhaDeApoio('cartaoParcelas', acima, 10),
+      // 10 pt; desce até o piso de 9 se "18 parcelas sem juros de" não couber
+      linhaDeApoio('cartaoParcelas', acima, 10, 0, 9),
       { ...valorGrande('cartaoParcelas', valor), acima: 1 },
       ...abaixo.map((t, i) => ({
         ...linhaDeApoio('cartaoParcelas', t, tamanhoAbaixo, i === 0 ? (abaixo.length > 1 ? 1 : 2) : 0, abaixo.length > 1 ? 7 : tamanhoAbaixo),

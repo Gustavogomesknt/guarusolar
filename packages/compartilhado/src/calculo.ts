@@ -176,14 +176,17 @@ export function calcularOrcamento(entrada: EntradaCalculo): ResultadoCalculo {
       const n = Math.max(1, Math.trunc(Number(entrada.parcelas || 1)));
       cartao = calcularCartao(valorTotal, n, Boolean(entrada.debito), Boolean(entrada.absorverTaxaCartao));
       valorParcela = cartao.valorParcela;
-      // a mesma redação do PDF (condicaoPorExtenso): "Cartão de crédito em 4 parcelas de
-      // R$ 1.443,73, sem juros (última de R$ 1.443,72)"; vai também no WhatsApp
+      // a mesma redação do PDF (condicaoPorExtenso), vai também no WhatsApp. "Sem juros" SÓ com a
+      // taxa absorvida nesta proposta (27/10/2026); o total sai nos dois casos:
+      //   absorvida: "Cartão de crédito em 4 parcelas de R$ 1.443,73, sem juros (última de R$ 1.443,72), total de R$ 5.774,91"
+      //   repassada: "Cartão de crédito em 4 parcelas de R$ 1.535,07 (última de R$ 1.535,05), total de R$ 6.140,26"
       resumoPagamento = cartao.debito
         ? `Cartão de débito: ${brl(cartao.valorCobrado)}`
         : cartao.parcelas === 1
           ? `Cartão de crédito em 1 parcela de ${brl(cartao.valorParcela)}`
-          : `Cartão de crédito em ${cartao.parcelas} parcelas de ${brl(cartao.valorParcela)}, sem juros` +
-            (cartao.valorUltimaParcela !== cartao.valorParcela ? ` (última de ${brl(cartao.valorUltimaParcela)})` : '');
+          : `Cartão de crédito em ${cartao.parcelas} parcelas de ${brl(cartao.valorParcela)}${cartao.absorvida ? ', sem juros' : ''}` +
+            (cartao.valorUltimaParcela !== cartao.valorParcela ? ` (última de ${brl(cartao.valorUltimaParcela)})` : '') +
+            `, total de ${brl(cartao.valorCobrado)}`;
       break;
     }
     case 'FINANCIAMENTO': {

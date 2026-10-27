@@ -121,12 +121,15 @@ packages/web/               o que os dois fronts usam no navegador
 - **Valores calculados no servidor.** O front manda itens e descontos; quem soma é a API.
   Assim ninguém consegue gravar um total diferente do que as regras permitem. A regra fica em
   `packages/compartilhado`, e o front usa a mesma função só para mostrar a prévia em tela.
-- **Taxa do cartão absorvida pela Guarusolar (25/10/2026).** Na condição "Cartão" não há entrada:
-  o valor inteiro vai para o cartão (débito ou 1x a 18x) e o cliente paga o valor da proposta. A
-  taxa do Mercado Pago é da empresa, e o resumo do orçamento mostra quanto ela deixa de receber.
-  Parcelas: o total ÷ parcelas arredondado para cima, e a última leva a diferença. Ex.: R$ 5.774,91
-  em 4x (5,95%): 3x de R$ 1.443,73 + a última de R$ 1.443,72; a empresa recebe R$ 5.431,30
-  (absorve R$ 343,61). O repasse ao cliente continua possível: `REPASSAR_TAXA_DO_CARTAO`. A tabela fica em `packages/compartilhado/src/taxasCartao.ts`;
+- **Taxa do cartão repassada ao cliente (27/10/2026).** Na condição "Cartão" não há entrada: o
+  valor inteiro vai para o cartão (débito ou 1x a 18x). Parcelando, o cliente paga mais que à
+  vista: valor ÷ (1 − taxa da linha do número de parcelas), arredondado para cima. O interruptor
+  "Absorver a taxa nesta proposta" (desmarcado por padrão) faz a Guarusolar ficar com a taxa
+  naquela proposta: o cliente paga o valor da proposta e o resumo mostra quanto a empresa deixa
+  de receber. Parcelas, nos dois casos: o total ÷ parcelas arredondado para cima, e a última leva
+  a diferença. Ex.: R$ 5.774,91 em 4x (5,95%), absorvida: 3x de R$ 1.443,73 + a última de
+  R$ 1.443,72; a empresa recebe R$ 5.431,30 (absorve R$ 343,61). A chave geral é
+  `REPASSAR_TAXA_DO_CARTAO`. A tabela fica em `packages/compartilhado/src/taxasCartao.ts`;
   cada orçamento grava a taxa que usou, então renegociar não muda proposta já enviada.
   Indicadores e listas usam o valor da proposta (o que a empresa recebe); PDF e WhatsApp, o total
   com a taxa.

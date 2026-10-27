@@ -1,9 +1,10 @@
 /*
  * TAXAS DO CARTÃO (Mercado Pago) — edite aqui quando forem renegociadas.
  *
- * É o desconto que a operadora faz no recebimento (MDR), em %. Desde 25/10/2026 a Guarusolar
- * ABSORVE a taxa (REPASSAR_TAXA_DO_CARTAO, abaixo): o cliente paga no cartão o valor da proposta
- * e a tabela serve para gravar quanto a empresa deixa de receber (valorTaxaAbsorvida).
+ * É o desconto que a operadora faz no recebimento (MDR), em %. A taxa é REPASSADA ao cliente
+ * (REPASSAR_TAXA_DO_CARTAO, abaixo): parcelando, ele paga mais que à vista, com a taxa da linha
+ * do número de parcelas. O vendedor pode absorvê-la numa proposta ("Absorver a taxa nesta
+ * proposta"); aí a tabela grava quanto a empresa deixa de receber (valorTaxaAbsorvida).
  * Pix e transferência: sem taxa (o pagamento à vista).
  *
  * Orçamento salvo GRAVA a taxa que usou: renegociar a tabela não muda proposta já enviada.
@@ -38,12 +39,12 @@ export const TAXAS_CARTAO = {
 
 /**
  * REPASSE DA TAXA AO CLIENTE: true = o cliente paga  valor ÷ (1 − taxa)  no cartão.
- * false = o cliente paga o valor da proposta e a Guarusolar absorve a taxa em TODO orçamento
- * (como o "absorver a taxa" de negociação, que grava quanto a empresa deixa de receber).
- * DEFINIDO (25/10/2026): false. Na proposta real do cliente as parcelas somam o investimento.
- * A conta está em calcularCartao (calculo.ts).
+ * false = o cliente paga o valor da proposta e a Guarusolar absorve a taxa em TODO orçamento.
+ * DEFINIDO (27/10/2026): true, com o interruptor por orçamento para absorver caso a caso. (Em
+ * 25/10/2026 tinha virado false por uma proposta do cliente com as parcelas somando o valor
+ * cheio; foi engano deles, não a regra.) A conta está em calcularCartao (calculo.ts).
  */
-export const REPASSAR_TAXA_DO_CARTAO = false;
+export const REPASSAR_TAXA_DO_CARTAO = true;
 
 /** Maior número de parcelas da tabela (18). */
 export const MAXIMO_PARCELAS = Math.max(...Object.keys(TAXAS_CARTAO.credito).map(Number));
