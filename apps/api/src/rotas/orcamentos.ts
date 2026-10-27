@@ -12,6 +12,7 @@ import {
   type EntradaCalculo,
   AVISO_SEM_PRAZO,
   avisoSemCondicoes,
+  faltaNasCondicoes,
   GARANTIA_MAXIMO_DE_CARACTERES,
   MAXIMO_PARCELAS,
   PRAZO_MAXIMO_DE_CARACTERES,
@@ -29,7 +30,7 @@ import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
 import { tipoTemCapa } from '../lib/capaDaProposta';
 import { CAPAS_DA_PROPOSTA } from '../conteudo/proposta';
-import { faltaNasCondicoesGravadas, modeloDaProposta, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
+import { faltaNasCondicoesGravadas, modeloDaProposta, modeloDoOrcamento, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
 
 export const rotasOrcamentos = Router();
 rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -176,12 +177,25 @@ function conferirSelos(dados: { prazoExecucao?: string; garantia?: string }, gra
 
 /**
  * Modelo novo: a proposta imprime as três condições juntas; sem alguma, não vai ao cliente (o
- * gerador barra antes; aqui é a garantia, para WhatsApp e "Enviado"). No modelo atual não conta.
+ * gerador barra antes; aqui é a garantia, para WhatsApp e "Enviado"). Confere pelo modelo em uso
+ * AGORA, que é o que o envio grava (modeloEnviado). No modelo atual não conta.
  */
-function conferirCondicoes(orcamento: Parameters<typeof faltaNasCondicoesGravadas>[0]) {
+function conferirCondicoes(
+  orcamento: Parameters<typeof faltaNasCondicoesGravadas>[0] & { prazoExecucao: string | null; garantia: string | null },
+) {
   if (modeloDaProposta() !== 'nova') return;
   const faltam = faltaNasCondicoesGravadas(orcamento);
   if (faltam.length > 0) throw new ErroHttp(409, avisoSemCondicoes(faltam));
+  // texto de antes da regra dos selos (orçamento antigo reenviado): no modelo novo não caberia
+  const selos = [
+    { selo: 'prazo', texto: orcamento.prazoExecucao, nome: 'O prazo de execução' },
+    { selo: 'garantia', texto: orcamento.garantia, nome: 'A garantia' },
+  ] as const;
+  for (const s of selos) {
+    if (s.texto?.trim() && !cabeNoSelo(s.selo, s.texto)) {
+      throw new ErroHttp(409, `${s.nome} "${s.texto.trim()}" não cabe na proposta nova: deixe só a duração, como "15 dias úteis", e salve.`);
+    }
+  }
 }
 
 function conferirPrazo(orcamento: { prazoExecucao: string | null }) {
@@ -608,6 +622,12 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   };
   const parcelasRuins = problemaNasParcelas(entradaDoCalculo);
   if (parcelasRuins) throw new ErroHttp(400, parcelasRuins);
+  // já com o cliente no modelo novo: o link reabre a cada pedido, então a edição não pode tirar
+  // uma das três condições (como o prazo, que não pode ser apagado depois de enviado)
+  if (atual.status !== 'RASCUNHO' && modeloDoOrcamento(atual) === 'nova') {
+    const faltam = faltaNasCondicoes(calcularCondicoesDaProposta(entradaDoCalculo));
+    if (faltam.length > 0) throw new ErroHttp(400, avisoSemCondicoes(faltam));
+  }
   const totais = calcularOrcamento(entradaDoCalculo);
 
   // troca os itens em bloco: se algo falhar, nada é gravado
@@ -738,6 +758,8 @@ async function mudarStatus(
     data: {
       status,
       enviadoEm: status === 'ENVIADO' ? agora : orcamento.enviadoEm,
+      // enviar grava o modelo com que o cliente recebe (modeloDoOrcamento); aprovar não mexe nele
+      ...(status === 'ENVIADO' ? { modeloEnviado: modeloDaProposta() } : {}),
       aprovadoEm: status === 'APROVADO' ? agora : orcamento.aprovadoEm,
       recusadoEm: status === 'RECUSADO' ? agora : orcamento.recusadoEm,
       motivoRecusa: status === 'RECUSADO' ? observacao : orcamento.motivoRecusa,
@@ -814,11 +836,20 @@ rotasOrcamentos.post(
     ].join('\n');
 
     let status = orcamento.status;
+    let modeloEnviado = orcamento.modeloEnviado;
     if (orcamento.status === 'RASCUNHO' && podeMudarStatus('RASCUNHO', 'ENVIADO')) {
+      // a passagem para "Enviado" grava também o modeloEnviado
       const atualizado = await prisma.$transaction((tx) =>
         mudarStatus(tx, orcamento, 'ENVIADO', req.usuario!.id, 'Enviado pelo WhatsApp'),
       );
       status = atualizado.status;
+      modeloEnviado = atualizado.modeloEnviado;
+    } else if (orcamento.status !== 'APROVADO') {
+      // reenvio: o cliente recebe o link de novo, no modelo em uso agora. APROVADO nunca muda
+      // (documento fechado: o PDF pedido daqui a meses tem de ser o que ele aprovou). SQL direto:
+      // reenviar não é editar (o update do Prisma mexeria no editadoEm)
+      modeloEnviado = modeloDaProposta();
+      await prisma.$executeRaw`UPDATE "Orcamento" SET "modeloEnviado" = ${modeloEnviado} WHERE "id" = ${orcamento.id}`;
     }
 
     // o envio vai para o WhatsApp ATUAL do cadastro: se o cliente trocou de número, chega no novo
@@ -827,6 +858,7 @@ rotasOrcamentos.post(
       mensagem,
       link: `https://wa.me/${telefone}?text=${encodeURIComponent(mensagem)}`,
       status,
+      modeloEnviado,
     });
   }),
 );

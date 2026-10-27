@@ -134,6 +134,7 @@ function exemplo(opcoes: { secoes: Secoes; longo?: boolean; parcelas: number; pa
     propostaCartaoParcela: Dn(cp.cartao?.detalhe.valorParcela),
     propostaCartaoPrimeira: Dn(cp.cartao?.detalhe.valorPrimeiraParcela),
     propostaCartaoUltima: Dn(cp.cartao?.detalhe.valorUltimaParcela),
+    modeloEnviado: null,
     propostaCartaoTotal: Dn(cp.cartao?.total),
     propostaCartaoTaxaPct: Dn(cp.cartao?.detalhe.taxaPct),
     tokenPdf: 'exemplo',

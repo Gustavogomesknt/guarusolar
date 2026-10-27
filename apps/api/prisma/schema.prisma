@@ -337,6 +337,11 @@ model Orcamento {
 
   // chave do link público do PDF (/api/orcamentos/:id/pdf?token=...), enviado ao cliente
   // pelo WhatsApp; 64 caracteres hexadecimais aleatórios gerados pelo próprio Postgres
+  // modelo da proposta ("atual" | "nova") com que o cliente a RECEBEU: gravado a cada envio
+  // (WhatsApp ou passagem para "Enviado"), nunca depois de APROVADA (documento fechado). Nula:
+  // rascunho (configuração atual) ou enviada antes da coluna (modelo atual). Ver modeloDoOrcamento
+  modeloEnviado String?
+
   tokenPdf String @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)"))
 
   validade            DateTime

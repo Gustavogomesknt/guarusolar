@@ -37,6 +37,7 @@ export function ResumoOrcamento({
   alteradoDepoisDeSalvar,
   semPrazo,
   faltaNasCondicoes = [],
+  modeloDoSalvo = null,
   enviandoWhatsApp,
   avisoDaCapa = null,
   onWhatsApp,
@@ -51,6 +52,11 @@ export function ResumoOrcamento({
   semPrazo: boolean;
   /** das três condições da proposta, o que falta (desconto à vista, parcelas); só no modelo novo */
   faltaNasCondicoes?: string[];
+  /**
+   * o modelo em que o PDF deste orçamento abre (o que o cliente recebeu, modeloDoOrcamento na
+   * API); null = rascunho, segue a configuração atual
+   */
+  modeloDoSalvo?: 'atual' | 'nova' | null;
   enviandoWhatsApp: boolean;
   /** o tipo do orçamento não tem capa própria (capa.tsx): avisa aqui e confirma no clique */
   avisoDaCapa?: string | null;
@@ -60,14 +66,22 @@ export function ResumoOrcamento({
   const modeloNovo = useCapas().data?.ativa ?? false;
   // PDF e WhatsApp mostram o que está gravado: só com o orçamento salvo e sem alterações
   // e só com o prazo de execução preenchido (o rascunho pode ficar sem; a proposta, não). No
-  // modelo novo, também com as três condições (o PDF imprime as três juntas)
-  const semCondicoes = modeloNovo && faltaNasCondicoes.length > 0;
+  // modelo novo, também com as três condições (o PDF imprime as três juntas). O PDF abre no
+  // modelo que o cliente recebeu; um envio (o primeiro ou um reenvio) sai no modelo em uso agora
+  const faltaCondicao = faltaNasCondicoes.length > 0;
+  const semCondicoesNoPdf = (modeloDoSalvo ?? (modeloNovo ? 'nova' : 'atual')) === 'nova' && faltaCondicao;
+  const semCondicoesNoEnvio = modeloNovo && faltaCondicao;
+  const semCondicoes = semCondicoesNoPdf || semCondicoesNoEnvio;
   const falta = semPrazo || semCondicoes;
-  const podeEnviar = salvo && !alteradoDepoisDeSalvar && !falta;
+  const pronto = salvo && !alteradoDepoisDeSalvar && !semPrazo;
+  const podeGerarPdf = pronto && !semCondicoesNoPdf;
+  const podeEnviar = pronto && !semCondicoesNoEnvio;
   const dicaAcoes = semPrazo
     ? AVISO_SEM_PRAZO
     : semCondicoes
-      ? avisoSemCondicoes(faltaNasCondicoes)
+      ? semCondicoesNoPdf
+        ? avisoSemCondicoes(faltaNasCondicoes)
+        : `O PDF abre como o cliente recebeu. Para reenviar na proposta nova: ${avisoSemCondicoes(faltaNasCondicoes).replace(/^P/, 'p')}`
       : !salvo
       ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
       : alteradoDepoisDeSalvar
@@ -98,8 +112,8 @@ export function ResumoOrcamento({
         </p>
       </section>
 
-      {/* SEMPRE à vista: antes da virada para o modelo novo, é aqui que o vendedor completa as três
-          condições dos orçamentos já salvos (orcamentos:condicoes lista quais) */}
+      {/* SEMPRE à vista: as três condições valem para quem sair no modelo novo (rascunho e reenvio);
+          antes da virada o vendedor já vê e preenche aqui */}
       <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
         <legend className="sr-only">Três condições da proposta</legend>
         <CondicoesDaProposta modeloNovo={modeloNovo} />
@@ -120,7 +134,7 @@ export function ResumoOrcamento({
           type="button"
           variant="outline"
           onClick={onPdf}
-          disabled={!podeEnviar}
+          disabled={!podeGerarPdf}
           aria-describedby="dica-acoes"
           className="h-12 rounded-xl bg-card text-[15px]"
         >

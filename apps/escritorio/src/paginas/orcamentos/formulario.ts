@@ -307,6 +307,8 @@ export type OrcamentoSalvo = {
   resumoPagamento: string;
   /** chave do link público do PDF */
   tokenPdf: string;
+  /** modelo com que o cliente recebeu a proposta (null: rascunho ou enviada antes do campo) */
+  modeloEnviado?: string | null;
   // cartão, como a API gravou (nulos sem cartão ou em orçamento antigo)
   parcelas?: number | null;
   pagamentoDebito?: boolean;
@@ -470,6 +472,7 @@ export const salvoDoOrcamento = (o: OrcamentoCompleto, resumoPagamento: string):
   valorTotal: o.valorTotal,
   resumoPagamento,
   tokenPdf: o.tokenPdf,
+  modeloEnviado: o.modeloEnviado ?? null,
   parcelas: o.parcelas,
   pagamentoDebito: o.pagamentoDebito,
   absorverTaxaCartao: o.absorverTaxaCartao,

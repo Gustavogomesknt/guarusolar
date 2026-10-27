@@ -556,7 +556,10 @@ pasta de armazenamento não são removidos.
   `apps/api/assets/proposta/` (o LEIA-ME de lá tem os nomes); textos fixos em
   `src/conteudo/proposta.ts` (`PAGINA_2_NOVA`).
 - **Virada para o modelo novo, nesta ordem** (os comandos com a `DATABASE_URL` de produção na
-  sua janela; todos podem rodar de novo sem estragar o que já está certo):
+  sua janela; todos podem rodar de novo sem estragar o que já está certo). Proposta que já está
+  com o cliente continua abrindo como ele a recebeu, no modelo atual: cada orçamento guarda o
+  modelo com que foi enviado (`modeloEnviado`), e aprovado nunca muda. Só rascunhos e reenvios
+  saem no modelo novo.
   1. (Opcional) Se a Guarusolar quiser um número de parcelas SUGERIDO, ponha em `parcelas` de
      `packages/compartilhado/src/condicoesDaProposta.ts`. O desconto à vista fica em branco
      sempre: varia a cada venda, e o vendedor informa.
@@ -564,21 +567,14 @@ pasta de armazenamento não são removidos.
   3. `npm run orcamentos:prazo-garantia`: só lê. Mostra quantos textos de prazo e garantia ele
      converteria e a lista dos que ele não sabe converter.
   4. `npm run orcamentos:prazo-garantia -- --executar`: grava as conversões.
-  5. Revise no gerador, um por um, os orçamentos da lista: deixe só a duração ("15 dias úteis",
-     "12 meses") e salve. Rode o passo 3 de novo até sair **"Para REVISAR …: 0"**. Não ligue o
-     modelo novo com a lista cheia: texto longo não cabe no selo da página 3.
-  6. `npm run orcamentos:condicoes`: só mostra quantos orçamentos ganhariam as três condições e
-     a lista dos que o vendedor precisa completar (o desconto à vista de quem escolheu cartão ou
-     financiamento; as parcelas, sem sugestão, de quem escolheu à vista ou financiamento).
-  7. `npm run orcamentos:condicoes -- --executar`: grava o que dá para calcular.
-  8. Complete no gerador, um por um, os orçamentos da lista do passo 6 (preencha o que falta no
-     quadro "Na proposta saem as três condições" e salve). Rode o passo 6 de novo até sair
-     **"Para COMPLETAR …: 0"** e **"Pulados: 0"** (ou sem a linha). Não ligue o modelo novo com a
-     lista cheia: com ele ligado, proposta sem as três condições não abre (o link mostra "ainda
-     não está pronta" com o que falta), inclusive as que já estão com o cliente.
-  9. Ligue `PROPOSTA_MODELO: nova` no `render.yaml` (o valor do arquivo é reaplicado pela
+  5. Revise no gerador os orçamentos da lista que ainda podem SAIR no modelo novo (rascunhos e
+     os que serão reenviados): deixe só a duração ("15 dias úteis", "12 meses") e salve. Os já
+     enviados que ninguém vai reenviar podem ficar: abrem no modelo atual, onde o texto longo
+     cabe, e um reenvio no modelo novo é recusado com o motivo até o texto ser encurtado.
+  6. Ligue `PROPOSTA_MODELO: nova` no `render.yaml` (o valor do arquivo é reaplicado pela
      Render; só no painel não dura) e publique.
-  10. Confira o `/saude` de produção: `"proposta":{"modelo":"nova"}`, sem `artesFaltando`.
+  7. Confira o `/saude` de produção: `"proposta":{"modelo":"nova"}`, sem `artesFaltando`; e abra
+     o link de uma proposta já enviada: tem de sair igual ao que o cliente recebeu.
 - **Capa por tipo de serviço:** a página 1 do modelo novo é uma imagem fixa com o serviço
   impresso, em `apps/api/assets/proposta/capas/`, com o nome do tipo sem acento, em minúsculas e
   com hífens (`instalacao-de-carregador-veicular.jpg`). Para outro tipo, basta pôr o arquivo dele

@@ -791,12 +791,27 @@ export type ModeloDaProposta = 'atual' | 'nova';
 export const modeloDaProposta = (): ModeloDaProposta => (process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual');
 
 /**
+ * O modelo de UM orçamento, decidido pelo que o cliente JÁ RECEBEU (27/10/2026): ligar o modelo
+ * novo nunca muda link que já está com o cliente.
+ * - gravado (`modeloEnviado`, a cada envio, nunca depois de aprovado): esse, sempre;
+ * - rascunho (nunca enviado): a configuração atual (PROPOSTA_MODELO);
+ * - enviado antes da coluna existir: o modelo atual, o único que a produção já mandou.
+ */
+export function modeloDoOrcamento(o: { status: string; modeloEnviado: string | null }): ModeloDaProposta {
+  if (o.modeloEnviado === 'nova' || o.modeloEnviado === 'atual') return o.modeloEnviado;
+  return o.status === 'RASCUNHO' ? modeloDaProposta() : 'atual';
+}
+
+/**
  * O que falta das três condições GRAVADAS (o modelo novo imprime as três juntas). Vazio = pode
  * gerar. A mesma conferência do gerador, que barra antes (faltaNasCondicoes, compartilhado).
  */
-export const faltaNasCondicoesGravadas = (o: Pick<OrcamentoParaPdf, 'propostaInvestimento' | 'propostaAVistaValor' | 'propostaCartaoTotal'>) =>
+export const faltaNasCondicoesGravadas = (
+  o: Pick<OrcamentoParaPdf, 'condicaoPagamento' | 'propostaInvestimento' | 'propostaAVistaValor' | 'propostaCartaoTotal'>,
+) =>
   o.propostaInvestimento == null
-    ? ['o desconto à vista (%)', 'o número de parcelas no cartão'] // nunca recalculado: salvo antes das três condições
+    ? // salvo antes das três condições: a escolhida já tem o número (salvar grava as três); falta a outra
+      faltaNasCondicoes({ aVista: o.condicaoPagamento === 'A_VISTA' ? true : null, cartao: o.condicaoPagamento === 'ENTRADA_PARCELAS' ? true : null })
     : faltaNasCondicoes({ aVista: o.propostaAVistaValor, cartao: o.propostaCartaoTotal });
 
 /** Proposta do modelo novo sem as três condições: NÃO é gerada (nunca troca de modelo por isso). */
@@ -809,7 +824,7 @@ export class PropostaSemCondicoes extends Error {
 /** Gera o PDF em memória (Buffer). */
 export async function gerarPdfOrcamento(
   o: OrcamentoParaPdf,
-  modelo: ModeloDaProposta = modeloDaProposta(),
+  modelo: ModeloDaProposta = modeloDoOrcamento(o),
   opcoes: { forcar?: boolean } = {},
 ): Promise<Buffer> {
   // sem as três condições gravadas o modelo novo NÃO sai (nem troca para o atual: duas

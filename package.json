@@ -35,7 +35,6 @@
     "storage:relatorio": "npm run storage:relatorio -w @guarusolar/api --",
     "fotos:migrar": "npm run fotos:migrar -w @guarusolar/api --",
     "pdf:exemplo": "npm run pdf:exemplo -w @guarusolar/api --",
-    "orcamentos:condicoes": "npm run orcamentos:condicoes -w @guarusolar/api --",
     "orcamentos:prazo-garantia": "npm run orcamentos:prazo-garantia -w @guarusolar/api --",
     "produtos:importar": "npm run produtos:importar -w @guarusolar/api --",
     "videos:tutorial": "npm install --prefix scripts/video-tutorial --no-audit --no-fund --loglevel=error && node scripts/video-tutorial/gerar.mjs"

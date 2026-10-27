@@ -426,11 +426,19 @@ O `.env` da API fica em `apps/api/.env`.
    recusa o WhatsApp e o "Enviado" (`conferirCondicoes`, orcamentos.ts) e o PDF
    (`PropostaSemCondicoes` em `gerarPdfOrcamento`; o link mostra a página "ainda não está pronta"
    com o que falta). Nunca cair no modelo atual por isso (duas identidades visuais, decisão de
-   27/10/2026). No modelo atual as três condições não contam. Antes da virada:
-   `npm run orcamentos:condicoes` (só mostra) e `-- --executar` grava as três nos já salvos,
-   copiando a condição escolhida do que está gravado (nunca recalcula o que o cliente recebeu);
-   o que os padrões não resolvem (o à vista, sempre) é LISTADO para o vendedor completar no
-   gerador; roda de novo sem estragar (não mexe no editadoEm).
+   27/10/2026). No modelo atual as três condições não contam.
+   **O modelo de cada orçamento é o que o cliente JÁ RECEBEU** (`modeloDoOrcamento`,
+   pdf-orcamento.ts; 27/10/2026): `Orcamento.modeloEnviado` é gravado a cada envio (WhatsApp ou
+   passagem para "Enviado") com o modelo em uso, NUNCA depois de APROVADO (documento fechado: o
+   PDF pedido meses depois é o que ele aprovou); o PDF abre nesse modelo, sempre. Rascunho (nulo)
+   segue PROPOSTA_MODELO; enviado antes da coluna (nulo, não rascunho) abre no modelo ATUAL, o
+   único que a produção já mandou. Ligar o modelo novo nunca quebra link que já está com o
+   cliente. As três condições (e os selos de prazo e garantia) só são exigidas de quem vai SAIR no
+   modelo novo: rascunho e reenvio com ele ligado (`conferirCondicoes`), e edição de quem já foi
+   enviado no novo. O gerador: "Gerar PDF" segue o modelo do orçamento; "Enviar via WhatsApp", o
+   modelo em uso agora. O antigo `orcamentos:condicoes` (backfill das três condições) foi
+   APAGADO: os já enviados não precisam delas; as colunas proposta* continuam, gravadas a cada
+   salvar.
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
    percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
    (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista

@@ -165,8 +165,8 @@ export function GeradorOrcamento({
     setEnviandoWhatsApp(true);
     try {
       // a API também passa o rascunho para ENVIADO; o selo do cabeçalho acompanha
-      const status = await enviarPeloWhatsApp(salvo.id);
-      setSalvo((atual) => (atual ? { ...atual, status } : atual));
+      const { status, modeloEnviado } = await enviarPeloWhatsApp(salvo.id);
+      setSalvo((atual) => (atual ? { ...atual, status, modeloEnviado } : atual));
       void clienteConsultas.invalidateQueries({ queryKey: ['orcamentos'] });
     } catch (erro) {
       if (!(erro instanceof ErroApi && erro.status === 401)) {
@@ -303,6 +303,14 @@ export function GeradorOrcamento({
             semPrazo={!somenteLeitura && !valores.prazoExecucao?.trim()}
             // o que falta das três condições da proposta (modelo novo); aprovado só abre o PDF
             faltaNasCondicoes={somenteLeitura ? [] : faltam}
+            // o PDF abre no modelo que o cliente recebeu (modeloDoOrcamento na API)
+            modeloDoSalvo={
+              !salvo || salvo.status === 'RASCUNHO'
+                ? null
+                : salvo.modeloEnviado === 'nova' || salvo.modeloEnviado === 'atual'
+                  ? salvo.modeloEnviado
+                  : 'atual'
+            }
             enviandoWhatsApp={enviandoWhatsApp}
             avisoDaCapa={capa.aviso(valores.tipoDeServicoId)}
             onWhatsApp={() => capa.confirmar(valores.tipoDeServicoId, 'Enviar assim mesmo', aoEnviarWhatsApp)}
