@@ -546,7 +546,7 @@ pasta de armazenamento não são removidos.
   é obrigatório para gerar o PDF e enviar (o rascunho pode ficar sem), e a garantia já vem com o
   padrão "12 meses". As sugestões de prazo e o texto padrão da garantia ficam num lugar
   só: `packages/compartilhado/src/textosDaProposta.ts`. Os dois são só a duração (até 24
-  caracteres: viram selos na proposta); `npm run orcamentos:prazo-garantia` converte os antigos. Depois de editar, `npm run pdf:exemplo` gera quatro PDFs de exemplo, sem banco
+  caracteres: viram selos na proposta); `npm run orcamentos:prazo-garantia` converte os antigos dos rascunhos. Depois de editar, `npm run pdf:exemplo` gera quatro PDFs de exemplo, sem banco
   (padrão em três seções, duas seções, uma seção só e muitos itens), para conferir. No gerador de orçamentos,
   "Serviço" vira o título da proposta.
 - **Modelo novo da proposta (em construção):** três páginas no formato enviado pelo cliente,
@@ -564,13 +564,14 @@ pasta de armazenamento não são removidos.
      `packages/compartilhado/src/condicoesDaProposta.ts`. O desconto à vista fica em branco
      sempre: varia a cada venda, e o vendedor informa.
   2. Publique (as migrations entram e o gerador passa a pedir prazo e garantia curtos).
-  3. `npm run orcamentos:prazo-garantia`: só lê. Mostra quantos textos de prazo e garantia ele
-     converteria e a lista dos que ele não sabe converter.
-  4. `npm run orcamentos:prazo-garantia -- --executar`: grava as conversões.
-  5. Revise no gerador os orçamentos da lista que ainda podem SAIR no modelo novo (rascunhos e
-     os que serão reenviados): deixe só a duração ("15 dias úteis", "12 meses") e salve. Os já
-     enviados que ninguém vai reenviar podem ficar: abrem no modelo atual, onde o texto longo
-     cabe, e um reenvio no modelo novo é recusado com o motivo até o texto ser encurtado.
+  3. `npm run orcamentos:prazo-garantia`: só lê, e só olha RASCUNHOS (proposta que já saiu do
+     rascunho está com o cliente e não se reescreve; o relatório só conta quantas são, por
+     status). Mostra quantos textos de prazo e garantia ele converteria e a lista dos que ele
+     não sabe converter.
+  4. `npm run orcamentos:prazo-garantia -- --executar`: grava as conversões (só nos rascunhos).
+  5. Revise no gerador os rascunhos da lista: deixe só a duração ("15 dias úteis", "12 meses") e
+     salve. Proposta já enviada fica como está: abre no modelo atual, onde o texto longo cabe, e
+     um reenvio no modelo novo é recusado com o motivo até o vendedor encurtar o texto.
   6. Ligue `PROPOSTA_MODELO: nova` no `render.yaml` (o valor do arquivo é reaplicado pela
      Render; só no painel não dura) e publique.
   7. Confira o `/saude` de produção: `"proposta":{"modelo":"nova"}`, sem `artesFaltando`; e abra

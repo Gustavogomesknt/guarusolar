@@ -605,8 +605,10 @@ O `.env` da API fica em `apps/api/.env`.
   página 3. Desde 25/10/2026 são SÓ A DURAÇÃO ("15 dias úteis", "12 meses"): até 24 caracteres
   e cabendo no selo a 9 pt (`conferirSelos` em orcamentos.ts, com `cabeNoSelo`); a qualificação
   é texto fixo da proposta. Texto igual ao gravado passa (orçamento antigo abre e salva sem
-  travar); `npm run orcamentos:prazo-garantia` (só lê; `-- --executar` grava) converte os textos
-  que o sistema oferecia e lista o resto para revisão. Nunca cortar nem trocar de modelo por isso. O PRAZO não tem padrão e é obrigatório
+  travar); `npm run orcamentos:prazo-garantia` (só lê; `-- --executar` grava) converte, SÓ NOS
+  RASCUNHOS, os textos que o sistema oferecia e lista o resto para revisão. Proposta fora do
+  rascunho já está com o cliente e não se reescreve (a regra do modeloEnviado): o comando só a
+  conta; se for reenviada no modelo novo com texto longo, o envio é recusado com o motivo. Nunca cortar nem trocar de modelo por isso. O PRAZO não tem padrão e é obrigatório
   para a proposta sair: o rascunho salva sem, mas sem prazo o gerador desabilita "Gerar PDF" e
   "Enviar via WhatsApp" com o motivo, e a API recusa o envio pelo WhatsApp, a passagem para
   "Enviado" e o PDF do rascunho (`conferirPrazo` em orcamentos.ts; orcamentoPdf.ts). Orçamento

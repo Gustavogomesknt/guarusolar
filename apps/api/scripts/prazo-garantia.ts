@@ -9,7 +9,10 @@
  * garantia padrão antiga vira "12 meses" e cada sugestão antiga de prazo vira a forma curta
  * (CONVERSOES, abaixo). Nada mais é tocado: o resto que passa de 24 caracteres é LISTADO para
  * revisão um por um, no gerador (o orçamento abre e salva com o texto antigo até alguém mudá-lo).
- * Vale para qualquer status: o link do PDF já enviado passa a mostrar a forma curta.
+ * SÓ RASCUNHO (27/10/2026): proposta que já saiu do rascunho está com o cliente e não se
+ * reescreve (a mesma regra do modeloEnviado). Elas são só contadas, por status. Se uma delas for
+ * reenviada no modelo novo com o texto longo, o envio é recusado com o motivo (conferirCondicoes)
+ * e o vendedor encurta de propósito.
  *
  * PODE RODAR DUAS VEZES (ou mais): o convertido não casa mais com o texto antigo e não é tocado.
  * Grava por SQL direto: o update do Prisma mexeria no editadoEm (@updatedAt).
@@ -46,22 +49,30 @@ async function main() {
     select: { id: true, codigo: true, status: true, prazoExecucao: true, garantia: true },
     orderBy: { codigo: 'asc' },
   });
+  const rascunhos = orcamentos.filter((o) => o.status === 'RASCUNHO');
+  const porStatus = new Map<string, number>();
+  for (const o of orcamentos) if (o.status !== 'RASCUNHO') porStatus.set(o.status, (porStatus.get(o.status) ?? 0) + 1);
 
   const converter: { id: string; codigo: string; campo: Campo; de: string; para: string }[] = [];
-  const revisar: { codigo: string; status: string; campo: Campo; texto: string }[] = [];
+  const revisar: { codigo: string; campo: Campo; texto: string }[] = [];
   let curtos = 0;
-  for (const o of orcamentos) {
+  for (const o of rascunhos) {
     for (const campo of Object.keys(CONVERSOES) as Campo[]) {
       const texto = o[campo];
       if (!texto?.trim()) continue; // em branco: o PDF usa "A combinar" / o padrão novo
       const para = (CONVERSOES[campo] as Record<string, string>)[normalizar(texto)];
       if (para) converter.push({ id: o.id, codigo: o.codigo, campo, de: texto, para });
-      else if (texto.trim().length > LIMITE[campo]) revisar.push({ codigo: o.codigo, status: o.status, campo, texto: texto.trim() });
+      else if (texto.trim().length > LIMITE[campo]) revisar.push({ codigo: o.codigo, campo, texto: texto.trim() });
       else curtos++;
     }
   }
 
-  console.log(`Orçamentos no banco: ${orcamentos.length}`);
+  console.log(`Orçamentos no banco: ${orcamentos.length} · rascunhos: ${rascunhos.length}`);
+  console.log(
+    `Fora do rascunho, NÃO mexidos (já estão com o cliente): ${orcamentos.length - rascunhos.length}` +
+      (porStatus.size ? ` (${[...porStatus].map(([s, n]) => `${s} ${n}`).join(', ')})` : ''),
+  );
+  console.log(`\nNos rascunhos:`);
   console.log(`Campos já curtos (não mudam): ${curtos}`);
   console.log(`${executar ? 'Convertidos' : 'Converteria'}: ${converter.length}`);
   for (const campo of Object.keys(CONVERSOES) as Campo[]) {
@@ -71,12 +82,12 @@ async function main() {
     }
   }
   console.log(`\nPara REVISAR um por um (não casam com nenhum texto conhecido e passam do limite): ${revisar.length}`);
-  for (const r of revisar) console.log(`  ${r.codigo} (${r.status}) · ${NOME[r.campo]} (${r.texto.length} caracteres): "${r.texto}"`);
+  for (const r of revisar) console.log(`  ${r.codigo} · ${NOME[r.campo]} (${r.texto.length} caracteres): "${r.texto}"`);
 
   if (!executar) return;
   for (const c of converter) {
-    if (c.campo === 'garantia') await prisma.$executeRaw`UPDATE "Orcamento" SET "garantia" = ${c.para} WHERE "id" = ${c.id} AND "garantia" = ${c.de}`;
-    else await prisma.$executeRaw`UPDATE "Orcamento" SET "prazoExecucao" = ${c.para} WHERE "id" = ${c.id} AND "prazoExecucao" = ${c.de}`;
+    if (c.campo === 'garantia') await prisma.$executeRaw`UPDATE "Orcamento" SET "garantia" = ${c.para} WHERE "id" = ${c.id} AND "garantia" = ${c.de} AND "status" = 'RASCUNHO'`;
+    else await prisma.$executeRaw`UPDATE "Orcamento" SET "prazoExecucao" = ${c.para} WHERE "id" = ${c.id} AND "prazoExecucao" = ${c.de} AND "status" = 'RASCUNHO'`;
   }
   console.log(`\nRESULTADO: convertidos ${converter.length} · para revisar ${revisar.length}`);
 }

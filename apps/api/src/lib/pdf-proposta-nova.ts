@@ -885,7 +885,7 @@ export function cabeNoSelo(selo: Selo, texto: string): boolean {
 /**
  * Prazo e garantia nos selos da arte (PAGINA_3_NOVA.selos), medidos com o pdfkit. Nunca corta nem
  * passa abaixo do mínimo: o que não cabe é barrado na entrada (cabeNoSelo); orçamento antigo com
- * texto maior sai no mínimo, inteiro (o comando orcamentos:prazo-garantia lista esses).
+ * texto maior sai no mínimo, inteiro (o comando orcamentos:prazo-garantia lista os rascunhos assim).
  */
 function selosNaArte(o: OrcamentoParaPdf): Content[] {
   const textos: Record<Selo, string> = {
