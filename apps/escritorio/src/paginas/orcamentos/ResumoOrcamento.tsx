@@ -1,7 +1,7 @@
 import { FileText, Loader2, MessageCircle, TriangleAlert } from 'lucide-react';
 import { CondicoesDaProposta } from './CondicoesDaProposta';
 import { useCapas } from './capa';
-import { AVISO_SEM_PRAZO, type PagamentoCartao } from '@guarusolar/compartilhado';
+import { AVISO_SEM_PRAZO, avisoSemCondicoes, type PagamentoCartao } from '@guarusolar/compartilhado';
 import { formatarBRL } from '@/lib/formatar';
 import { Button } from '@/components/ui/button';
 import { CartaoCondicoes } from './CartaoCondicoes';
@@ -36,6 +36,7 @@ export function ResumoOrcamento({
   somenteLeitura = false,
   alteradoDepoisDeSalvar,
   semPrazo,
+  faltaNasCondicoes = [],
   enviandoWhatsApp,
   avisoDaCapa = null,
   onWhatsApp,
@@ -48,6 +49,8 @@ export function ResumoOrcamento({
   alteradoDepoisDeSalvar: boolean;
   /** o prazo de execução está em branco: a proposta não é gerada nem enviada */
   semPrazo: boolean;
+  /** das três condições da proposta, o que falta (desconto à vista, parcelas); só no modelo novo */
+  faltaNasCondicoes?: string[];
   enviandoWhatsApp: boolean;
   /** o tipo do orçamento não tem capa própria (capa.tsx): avisa aqui e confirma no clique */
   avisoDaCapa?: string | null;
@@ -56,11 +59,16 @@ export function ResumoOrcamento({
 }) {
   const modeloNovo = useCapas().data?.ativa ?? false;
   // PDF e WhatsApp mostram o que está gravado: só com o orçamento salvo e sem alterações
-  // e só com o prazo de execução preenchido (o rascunho pode ficar sem; a proposta, não)
-  const podeEnviar = salvo && !alteradoDepoisDeSalvar && !semPrazo;
+  // e só com o prazo de execução preenchido (o rascunho pode ficar sem; a proposta, não). No
+  // modelo novo, também com as três condições (o PDF imprime as três juntas)
+  const semCondicoes = modeloNovo && faltaNasCondicoes.length > 0;
+  const falta = semPrazo || semCondicoes;
+  const podeEnviar = salvo && !alteradoDepoisDeSalvar && !falta;
   const dicaAcoes = semPrazo
     ? AVISO_SEM_PRAZO
-    : !salvo
+    : semCondicoes
+      ? avisoSemCondicoes(faltaNasCondicoes)
+      : !salvo
       ? 'Salve o orçamento para gerar o PDF e enviar pelo WhatsApp.'
       : alteradoDepoisDeSalvar
         ? 'Há alterações não salvas. Salve antes, para o PDF e o cliente terem a versão atual.'
@@ -90,13 +98,12 @@ export function ResumoOrcamento({
         </p>
       </section>
 
-      {/* só com o modelo novo da proposta ligado: é ele que mostra as três condições no PDF */}
-      {modeloNovo && (
-        <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
-          <legend className="sr-only">Três condições da proposta</legend>
-          <CondicoesDaProposta />
-        </fieldset>
-      )}
+      {/* SEMPRE à vista: antes da virada para o modelo novo, é aqui que o vendedor completa as três
+          condições dos orçamentos já salvos (orcamentos:condicoes lista quais) */}
+      <fieldset disabled={somenteLeitura} className={`min-w-0 ${ESTILO_SOMENTE_LEITURA}`}>
+        <legend className="sr-only">Três condições da proposta</legend>
+        <CondicoesDaProposta modeloNovo={modeloNovo} />
+      </fieldset>
 
       <div className="flex flex-col gap-2.5">
         <Button
@@ -120,7 +127,7 @@ export function ResumoOrcamento({
           <FileText aria-hidden />
           Gerar PDF
         </Button>
-        <p id="dica-acoes" className={`text-center text-[13px] ${semPrazo ? 'text-destaque-texto' : 'text-muted-foreground'}`}>
+        <p id="dica-acoes" className={`text-center text-[13px] ${falta ? 'text-destaque-texto' : 'text-muted-foreground'}`}>
           {dicaAcoes}
         </p>
         {avisoDaCapa && (

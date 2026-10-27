@@ -15,7 +15,8 @@ import { DEBITO, entradaDoCalculo, OPCOES_PARCELAS, type FormularioOrcamento } f
 const PARCELAS_NO_CREDITO = OPCOES_PARCELAS.filter((o) => o.valor !== DEBITO);
 const CLASSE_CAMPO = 'h-8 rounded-[8px] border border-input bg-card px-2 font-mono text-[13px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
-export function CondicoesDaProposta() {
+/** `modeloNovo`: o PDF em uso já imprime as três; senão, elas valem a partir da proposta nova. */
+export function CondicoesDaProposta({ modeloNovo }: { modeloNovo: boolean }) {
   const { control, register } = useFormContext<FormularioOrcamento>();
   const valores = useWatch({ control }) as FormularioOrcamento;
   const c = useMemo(() => calcularCondicoesDaProposta(entradaDoCalculo(valores)), [valores]);
@@ -28,7 +29,11 @@ export function CondicoesDaProposta() {
         <h3 id="titulo-tres-condicoes" className="text-[13px] font-semibold">
           Na proposta saem as três condições
         </h3>
-        <p className="text-xs text-muted-foreground">É o que o cliente vê no PDF, além da condição escolhida.</p>
+        <p className="text-xs text-muted-foreground">
+          {modeloNovo
+            ? 'É o que o cliente vê no PDF, além da condição escolhida.'
+            : 'Valem a partir da proposta nova; o PDF de hoje mostra só a condição escolhida.'}
+        </p>
       </div>
 
       <dl className="flex flex-col divide-y text-[13px]">
@@ -95,7 +100,7 @@ export function CondicoesDaProposta() {
   );
 }
 
-/** Sem o número e sem padrão: a API não deixa o modelo novo ligar assim, mas a tela não esconde. */
+/** Sem o número (e sem sugestão): com o modelo novo, a proposta não sai até o vendedor informar. */
 function SemValor() {
   return <span className="font-sans text-xs font-normal text-destaque-texto">informe ao lado</span>;
 }

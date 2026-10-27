@@ -52,9 +52,9 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
     clearErrors,
     formState: { errors },
   } = useFormContext<FormularioOrcamento>();
-  const [descontoTipo, descontoValor, condicao, garantia, impostoPct, prazo] = useWatch({
+  const [descontoTipo, descontoValor, condicao, garantia, impostoPct, prazo, parcelas] = useWatch({
     control,
-    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia', 'impostoPct', 'prazoExecucao'],
+    name: ['descontoTipo', 'descontoValor', 'condicaoPagamento', 'garantia', 'impostoPct', 'prazoExecucao', 'parcelas'],
   });
   const preencher = (campo: 'prazoExecucao' | 'garantia', texto: string) => {
     setValue(campo, texto, { shouldDirty: true });
@@ -267,6 +267,7 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
                 {...register('descontoAVistaPct', { onChange: () => clearErrors('descontoAVistaPct') })}
                 inputMode="decimal"
                 autoComplete="off"
+                placeholder="%"
                 className="h-10 w-[90px] rounded-[10px] font-mono"
               />
             </div>
@@ -282,6 +283,8 @@ export function CartaoCondicoes({ totais }: { totais: Totais }) {
           <div className="grid grid-cols-2 gap-2.5">
             <Campo id="parcelas" rotulo="Parcelas" erro={errors.parcelas?.message}>
               <select {...ariaDoCampo('parcelas', errors.parcelas?.message)} {...register('parcelas', { onChange: () => clearErrors('parcelas') })} className={CLASSE_SELECT}>
+                {/* sem sugestão de parcelas (condicoesDaProposta.ts), começa sem escolha: nada inventado */}
+                {parcelas === '' && <option value="">Escolha</option>}
                 {OPCOES_PARCELAS.map(({ valor, rotulo }) => (
                   <option key={valor} value={valor}>
                     {rotulo}

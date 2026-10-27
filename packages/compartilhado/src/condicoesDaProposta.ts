@@ -7,11 +7,12 @@
  *
  * As entradas são do vendedor: o % de desconto à vista e o número de parcelas, que o gerador
  * mostra e deixa ajustar junto das três condições (o cartão da condição "Cartão" sai como ele
- * montou: parcelas ou débito). Campo em branco usa o padrão abaixo, que
- * também é o valor inicial dos dois campos num orçamento novo.
+ * montou: parcelas ou débito).
  *
- * PENDENTE (23/10/2026): os valores dependem de confirmação com a Guarusolar. Com algum padrão
- * em branco o MODELO NOVO NÃO LIGA (a API continua no atual e diz qual falta: faltaNosPadroes).
+ * Os padrões abaixo são VALOR SUGERIDO (27/10/2026): o valor inicial do campo num orçamento
+ * novo, que o vendedor vê e muda. Padrão em branco = o campo começa VAZIO e o vendedor preenche;
+ * nenhum número é inventado. Sem o número, a condição fica sem valor, e a proposta (modelo novo)
+ * NÃO é gerada nem enviada: o gerador e a API dizem o que falta (faltaNasCondicoes).
  * Depois de editar: `npm run build` (confere) e publicar. Orçamento já salvo só muda ao ser salvo
  * de novo (a condição fica gravada, como a taxa do cartão).
  */
@@ -19,21 +20,30 @@ import { calcularOrcamento, type EntradaCalculo, type PagamentoCartao } from './
 import { MAXIMO_PARCELAS } from './taxasCartao.js';
 
 export const CONDICOES_PADRAO_DA_PROPOSTA: {
-  /** % de desconto à vista via Pix quando o vendedor escolheu outra condição */
+  /**
+   * % de desconto à vista via Pix sugerido. EM BRANCO DE PROPÓSITO (regra, não pendência,
+   * 27/10/2026): a Guarusolar não tem percentual padrão, varia a cada venda; o vendedor informa.
+   */
   descontoAVistaPct: number | null;
-  /** parcelas no cartão quando o vendedor escolheu outra condição */
+  /** parcelas no cartão sugeridas (opcional: em branco, o vendedor escolhe em cada orçamento) */
   parcelas: number | null;
 } = {
   descontoAVistaPct: null,
   parcelas: null,
 };
 
-/** O que falta nos padrões para o modelo novo poder ser ligado (vazio = pode). */
-export function faltaNosPadroes(padroes: typeof CONDICOES_PADRAO_DA_PROPOSTA = CONDICOES_PADRAO_DA_PROPOSTA): string[] {
-  return [
-    ...(padroes.descontoAVistaPct == null ? ['desconto à vista (descontoAVistaPct)'] : []),
-    ...(padroes.parcelas == null ? ['número de parcelas (parcelas)'] : []),
-  ];
+/**
+ * O que falta para a proposta (modelo novo) ter as TRÊS condições, nas palavras do vendedor.
+ * Recebe o que está calculado ou gravado: o à vista e o cartão (o investimento sai sempre).
+ * Vazio = pode gerar e enviar.
+ */
+export function faltaNasCondicoes(c: { aVista: unknown; cartao: unknown }): string[] {
+  return [...(c.aVista == null ? ['o desconto à vista (%)'] : []), ...(c.cartao == null ? ['o número de parcelas no cartão'] : [])];
+}
+
+/** Mesma mensagem na tela e na API (como AVISO_SEM_PRAZO). */
+export function avisoSemCondicoes(faltam: string[]): string {
+  return `Preencha ${faltam.join(' e ')} da proposta e salve: sem ${faltam.length > 1 ? 'eles' : 'ele'}, a proposta não é gerada nem enviada ao cliente.`;
 }
 
 export type CondicoesDaProposta = {

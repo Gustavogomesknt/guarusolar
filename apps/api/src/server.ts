@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import './lib/zod-pt'; // mensagens de validação em português; antes de qualquer rota
-import { situacaoDoModeloDaProposta } from './lib/pdf-orcamento';
+import { modeloDaProposta } from './lib/pdf-orcamento';
 import { artesQueFaltam } from './lib/pdf-proposta-nova';
 import express from 'express';
 import cors from 'cors';
@@ -67,11 +67,10 @@ app.get('/saude', async (req, res) => {
     // `fotos`: onde as fotos novas são gravadas e se a API as está recebendo (em produção, só com
     // armazenamento persistente). Responde "por que o app de campo não aceita fotos?" sem abrir o painel.
     const fotos = { destino: destinoAtual(), recebendo: appTecnicoLiberado() };
-    // modelo da proposta em uso; `recusado` = pediram o novo e a trava segurou (padrões em branco)
-    const { modelo, recusado } = situacaoDoModeloDaProposta();
-    // `artesFaltando`: só os arquivos do modelo novo que faltam na pasta (aviso; o PDF sai igual)
+    // modelo da proposta em uso (PROPOSTA_MODELO); `artesFaltando`: só os arquivos do modelo novo
+    // que faltam na pasta (aviso; o PDF sai igual)
     const artesFaltando = artesQueFaltam();
-    const proposta = { modelo, ...(recusado ? { recusado } : {}), ...(artesFaltando.length > 0 ? { artesFaltando } : {}) };
+    const proposta = { modelo: modeloDaProposta(), ...(artesFaltando.length > 0 ? { artesFaltando } : {}) };
     res.set('Cache-Control', 'no-store').json({ ok: true, banco: 'ok', producao, fotos, proposta, versao, hora: new Date().toISOString() });
   } catch (erro) {
     console.error(`[saude] banco inacessível: ${(erro as Error).message}`);
@@ -108,10 +107,7 @@ app.use(tratadorDeErros);
 
 const porta = Number(process.env.PORT ?? 3333);
 app.listen(porta, () => console.log(`API da Guarusolar rodando em http://localhost:${porta}`));
-// pediram o modelo novo da proposta com padrões em branco: fica no atual, e o motivo aparece aqui
 {
-  const { recusado } = situacaoDoModeloDaProposta();
-  if (recusado) console.error(`[proposta] ${recusado}`);
   // artes do modelo novo que faltam em apps/api/assets/proposta/: só avisa (nada é bloqueado)
   const faltando = artesQueFaltam();
   if (faltando.length > 0) {

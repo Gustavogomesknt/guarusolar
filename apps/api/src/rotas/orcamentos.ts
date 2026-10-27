@@ -11,6 +11,7 @@ import {
   calcularCondicoesDaProposta,
   type EntradaCalculo,
   AVISO_SEM_PRAZO,
+  avisoSemCondicoes,
   GARANTIA_MAXIMO_DE_CARACTERES,
   MAXIMO_PARCELAS,
   PRAZO_MAXIMO_DE_CARACTERES,
@@ -28,7 +29,7 @@ import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
 import { tipoTemCapa } from '../lib/capaDaProposta';
 import { CAPAS_DA_PROPOSTA } from '../conteudo/proposta';
-import { modeloDaProposta, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
+import { faltaNasCondicoesGravadas, modeloDaProposta, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
 
 export const rotasOrcamentos = Router();
 rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
@@ -171,6 +172,16 @@ function conferirSelos(dados: { prazoExecucao?: string; garantia?: string }, gra
     }
     if (!cabeNoSelo(c.selo, c.valor)) throw new ErroHttp(400, `${c.nome} "${c.valor}" não cabe na proposta: encurte o texto.`);
   }
+}
+
+/**
+ * Modelo novo: a proposta imprime as três condições juntas; sem alguma, não vai ao cliente (o
+ * gerador barra antes; aqui é a garantia, para WhatsApp e "Enviado"). No modelo atual não conta.
+ */
+function conferirCondicoes(orcamento: Parameters<typeof faltaNasCondicoesGravadas>[0]) {
+  if (modeloDaProposta() !== 'nova') return;
+  const faltam = faltaNasCondicoesGravadas(orcamento);
+  if (faltam.length > 0) throw new ErroHttp(409, avisoSemCondicoes(faltam));
 }
 
 function conferirPrazo(orcamento: { prazoExecucao: string | null }) {
@@ -696,7 +707,10 @@ rotasOrcamentos.patch(
       );
     }
     // marcar como enviado é dizer que a proposta foi para o cliente: exige o prazo
-    if (status === 'ENVIADO') conferirPrazo(orcamento);
+    if (status === 'ENVIADO') {
+      conferirPrazo(orcamento);
+      conferirCondicoes(orcamento);
+    }
 
     const atualizado = await prisma.$transaction((tx) =>
       mudarStatus(tx, orcamento, status, req.usuario!.id, observacao),
@@ -770,7 +784,10 @@ rotasOrcamentos.post(
       include: { cliente: true },
     });
     if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
-    if (orcamento.status !== 'APROVADO') conferirPrazo(orcamento);
+    if (orcamento.status !== 'APROVADO') {
+      conferirPrazo(orcamento);
+      conferirCondicoes(orcamento);
+    }
 
     // o texto usa a cópia gravada (a mesma do PDF); orçamento antigo sem cópia usa o cadastro
     const primeiroNome = (orcamento.clienteNome ?? orcamento.cliente.nome).split(' ')[0];

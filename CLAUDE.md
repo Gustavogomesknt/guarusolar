@@ -324,9 +324,9 @@ packages/compartilhado/        código usado pela API e pelos fronts (ESM, compi
                                data da última atualização
   src/textosDaProposta.ts      EDITÁVEL: GARANTIA_PADRAO (texto de garantia de todo orçamento novo) e
                                SUGESTOES_DE_PRAZO (atalhos do campo "Prazo de execução")
-  src/condicoesDaProposta.ts   EDITÁVEL: CONDICOES_PADRAO_DA_PROPOSTA (desconto à vista e parcelas da
-                               condição que o vendedor NÃO escolheu; EM BRANCO até a Guarusolar
-                               confirmar) e calcularCondicoesDaProposta (as três da página 3)
+  src/condicoesDaProposta.ts   EDITÁVEL: CONDICOES_PADRAO_DA_PROPOSTA (VALOR SUGERIDO do desconto à
+                               vista, em branco de propósito, e das parcelas, opcional),
+                               calcularCondicoesDaProposta (as três da página 3) e faltaNasCondicoes
   src/margemDoOrcamento.ts     EDITÁVEL: MARGEM_PADRAO (margem em reais de todo orçamento novo) e
                                distribuirMargem (preços do PDF detalhado)
   src/roteiroDoServico.ts      EDITÁVEL: por tipo de serviço, as fotos pedidas, as observações (nome e
@@ -411,17 +411,26 @@ O `.env` da API fica em `apps/api/.env`.
    **Três condições na proposta (modelo novo, 23/10/2026):** ao salvar, a API grava também
    `proposta*` (investimento = sem desconto à vista nem taxa; à vista via Pix; cartão) com
    `calcularCondicoesDaProposta`: a condição escolhida usa o que o vendedor informou (o cartão
-   dele, em parcelas ou no débito); a outra, os padrões de `condicoesDaProposta.ts`
-   (cartão padrão). `valorTotal` continua sendo o da condição escolhida (indicadores
-   não mudam). Desconto à vista e parcelas são gravados em QUALQUER condição (entradas das três;
-   null = padrão), e o gerador mostra as três (`CondicoesDaProposta.tsx`, só com o modelo novo
-   ligado), com os dois campos da condição não escolhida ajustáveis ali.
-   **Nada de "[A DEFINIR]" para o cliente:** com padrão em branco, `PROPOSTA_MODELO=nova` é
-   RECUSADO (`situacaoDoModeloDaProposta`, pdf-orcamento.ts: a API fica no atual, diz o padrão que
-   falta no log e em `/saude` → `proposta.recusado`); orçamento sem as três gravadas sai no modelo
-   atual. Antes da virada: `npm run orcamentos:condicoes` (só mostra) e `-- --executar` grava as
-   três nos já salvos, copiando a condição escolhida do que está gravado (nunca recalcula o que o
-   cliente recebeu) e pulando o que não confere; roda de novo sem estragar (não mexe no editadoEm).
+   dele, em parcelas ou no débito); a outra, o que ele preencheu no quadro das três condições.
+   `valorTotal` continua sendo o da condição escolhida (indicadores não mudam). Desconto à vista
+   e parcelas são gravados em QUALQUER condição (entradas das três), e o gerador mostra as três
+   (`CondicoesDaProposta.tsx`, SEMPRE: antes da virada é onde se completam os já salvos), com os
+   dois campos da condição não escolhida ajustáveis ali. Os padrões de `condicoesDaProposta.ts` são só VALOR SUGERIDO, o valor
+   inicial do campo (27/10/2026): o `descontoAVistaPct` é EM BRANCO DE PROPÓSITO (a Guarusolar não
+   tem percentual padrão, varia a cada venda) e o de parcelas é opcional. Padrão em branco = campo
+   VAZIO no gerador (nada de "0" ou "6" inventado); na condição à vista o desconto é obrigatório
+   para salvar (0 = sem desconto); na condição escolhida, as parcelas também.
+   **Nada de "[A DEFINIR]" para o cliente, nem troca de modelo:** com o modelo novo ligado, sem as
+   três condições a proposta NÃO sai. O gerador desabilita "Gerar PDF" e "Enviar via WhatsApp"
+   com o que falta (`faltaNasCondicoes` / `avisoSemCondicoes`, compartilhado, como o prazo); a API
+   recusa o WhatsApp e o "Enviado" (`conferirCondicoes`, orcamentos.ts) e o PDF
+   (`PropostaSemCondicoes` em `gerarPdfOrcamento`; o link mostra a página "ainda não está pronta"
+   com o que falta). Nunca cair no modelo atual por isso (duas identidades visuais, decisão de
+   27/10/2026). No modelo atual as três condições não contam. Antes da virada:
+   `npm run orcamentos:condicoes` (só mostra) e `-- --executar` grava as três nos já salvos,
+   copiando a condição escolhida do que está gravado (nunca recalcula o que o cliente recebeu);
+   o que os padrões não resolvem (o à vista, sempre) é LISTADO para o vendedor completar no
+   gerador; roda de novo sem estragar (não mexe no editadoEm).
    **Margem do orçamento:** a Guarusolar aplica uma margem de lucro em REAIS por proposta (não um
    percentual por item; na planilha antiga era o "material" MARGEM ALEATORIA). Ordem do cálculo
    (comentada em `calculo.ts`): itens + margem = `subtotal` -> desconto geral -> desconto à vista

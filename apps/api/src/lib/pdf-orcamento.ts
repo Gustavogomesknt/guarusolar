@@ -6,7 +6,8 @@ import type { Prisma } from '@prisma/client';
 import {
   formatarBRL,
   formatarData,
-  faltaNosPadroes,
+  avisoSemCondicoes,
+  faltaNasCondicoes,
   formatarQuantidade,
   GARANTIA_PADRAO,
   mascararCep,
@@ -786,29 +787,24 @@ function documento(o: OrcamentoParaPdf): TDocumentDefinitions {
  */
 export type ModeloDaProposta = 'atual' | 'nova';
 
-/**
- * TRAVA: com algum padrão das condições em branco (compartilhado/condicoesDaProposta.ts) o modelo
- * novo NÃO liga, mesmo com PROPOSTA_MODELO=nova: a proposta sairia com "[A DEFINIR]". A API sobe
- * normalmente (nunca derrubar o sistema por configuração), fica no modelo atual e diz o motivo:
- * no log ao subir e em /saude (`proposta`).
- */
-export function situacaoDoModeloDaProposta(): { modelo: ModeloDaProposta; pedido: ModeloDaProposta; recusado: string | null } {
-  const pedido: ModeloDaProposta = process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual';
-  const faltam = faltaNosPadroes();
-  if (pedido === 'nova' && faltam.length > 0) {
-    return {
-      modelo: 'atual',
-      pedido,
-      recusado: `O modelo novo da proposta não foi ligado: falta preencher em packages/compartilhado/src/condicoesDaProposta.ts o padrão de ${faltam.join(' e o de ')}.`,
-    };
-  }
-  return { modelo: pedido, pedido, recusado: null };
-}
-export const modeloDaProposta = (): ModeloDaProposta => situacaoDoModeloDaProposta().modelo;
+/** O modelo pedido pela variável PROPOSTA_MODELO (sem trava de configuração: ver gerarPdfOrcamento). */
+export const modeloDaProposta = (): ModeloDaProposta => (process.env.PROPOSTA_MODELO === 'nova' ? 'nova' : 'atual');
 
-/** O orçamento tem as três condições gravadas? Sem elas o modelo novo mostraria "[A DEFINIR]". */
-const temAsTresCondicoes = (o: OrcamentoParaPdf) =>
-  o.propostaInvestimento != null && o.propostaAVistaValor != null && o.propostaCartaoTotal != null;
+/**
+ * O que falta das três condições GRAVADAS (o modelo novo imprime as três juntas). Vazio = pode
+ * gerar. A mesma conferência do gerador, que barra antes (faltaNasCondicoes, compartilhado).
+ */
+export const faltaNasCondicoesGravadas = (o: Pick<OrcamentoParaPdf, 'propostaInvestimento' | 'propostaAVistaValor' | 'propostaCartaoTotal'>) =>
+  o.propostaInvestimento == null
+    ? ['o desconto à vista (%)', 'o número de parcelas no cartão'] // nunca recalculado: salvo antes das três condições
+    : faltaNasCondicoes({ aVista: o.propostaAVistaValor, cartao: o.propostaCartaoTotal });
+
+/** Proposta do modelo novo sem as três condições: NÃO é gerada (nunca troca de modelo por isso). */
+export class PropostaSemCondicoes extends Error {
+  constructor(readonly faltam: string[]) {
+    super(avisoSemCondicoes(faltam));
+  }
+}
 
 /** Gera o PDF em memória (Buffer). */
 export async function gerarPdfOrcamento(
@@ -816,12 +812,12 @@ export async function gerarPdfOrcamento(
   modelo: ModeloDaProposta = modeloDaProposta(),
   opcoes: { forcar?: boolean } = {},
 ): Promise<Buffer> {
-  // orçamento sem as três condições gravadas (salvo antes e ainda não acertado pelo
-  // `npm run orcamentos:condicoes`): sai no modelo atual, nunca com "[A DEFINIR]" para o cliente.
+  // sem as três condições gravadas o modelo novo NÃO sai (nem troca para o atual: duas
+  // identidades visuais para clientes diferentes, sem motivo aparente; decisão de 27/10/2026).
   // Só o pdf:exemplo pede o novo sem essa conferência (forcar), para mostrar o lugar reservado
-  if (modelo === 'nova' && !temAsTresCondicoes(o) && !opcoes.forcar) {
-    console.warn(`[pdf] ${o.codigo} sem as três condições gravadas: proposta no modelo atual`);
-    modelo = 'atual';
+  if (modelo === 'nova' && !opcoes.forcar) {
+    const faltam = faltaNasCondicoesGravadas(o);
+    if (faltam.length > 0) throw new PropostaSemCondicoes(faltam);
   }
   if (modelo === 'nova') {
     // carregado só quando usado (o arquivo novo importa as peças deste: sem ciclo na carga)

@@ -11,12 +11,14 @@
  * escolhida, na página 3, sai COPIADA do que está gravado, não recalculada: o cartão de um
  * orçamento de cartão fica com a taxa, a entrada (se tinha) e as parcelas que o cliente já recebeu, mesmo
  * que a tabela de taxas tenha mudado depois. Só a OUTRA condição é calculada, com os padrões de
- * compartilhado/condicoesDaProposta.ts (recusa se algum estiver em branco).
+ * compartilhado/condicoesDaProposta.ts. Padrão em branco (o desconto à vista é SEMPRE em branco:
+ * varia a cada venda) não é inventado: a condição fica sem valor e o orçamento é LISTADO para o
+ * vendedor completar no gerador (abrir, preencher, salvar). Com a lista cheia, o modelo novo
+ * recusa gerar o PDF desses orçamentos (dizendo o que falta), então zere a lista antes da virada.
  *
  * CONFERÊNCIA: antes de gravar, refaz o total do orçamento com os dados gravados (itens, margem,
  * descontos, imposto). Se não bater com o valorTotal gravado (orçamento de uma regra antiga), o
- * orçamento é PULADO e listado: melhor ficar no modelo atual do que mostrar outro número.
- * Orçamento sem as três condições sai no modelo atual (pdf-orcamento.ts), nunca com colchetes.
+ * orçamento é PULADO e listado: abra-o no gerador e salve (as três são gravadas ao salvar).
  *
  * PODE RODAR DUAS VEZES (ou mais): grava o mesmo resultado, e o que já está certo não é tocado
  * ("já corretos"). Orçamento salvo depois pelo gerador já tem as três: também não é tocado.
@@ -27,7 +29,7 @@ import {
   calcularCondicoesDaProposta,
   calcularOrcamento,
   CONDICOES_PADRAO_DA_PROPOSTA,
-  faltaNosPadroes,
+  faltaNasCondicoes,
   formatarBRL,
   type EntradaCalculo,
 } from '@guarusolar/compartilhado';
@@ -64,14 +66,9 @@ const CAMPOS = [
 ] as const;
 
 async function main() {
-  const faltam = faltaNosPadroes();
-  if (faltam.length > 0) {
-    console.error(`Recusado: falta preencher em packages/compartilhado/src/condicoesDaProposta.ts o padrão de ${faltam.join(' e o de ')}.`);
-    process.exitCode = 1;
-    return;
-  }
   const P = CONDICOES_PADRAO_DA_PROPOSTA;
-  console.log(`Padrões: desconto à vista ${P.descontoAVistaPct}% · cartão em ${P.parcelas}x sem entrada`);
+  const padrao = (v: number | null, unidade: string) => (v == null ? 'em branco (o vendedor informa)' : `${v}${unidade}`);
+  console.log(`Padrões: desconto à vista ${padrao(P.descontoAVistaPct, '%')} · cartão ${padrao(P.parcelas, 'x')}`);
   console.log(executar ? 'Modo: GRAVAR\n' : 'Modo: só mostrar (para gravar: -- --executar)\n');
 
   const orcamentos = await prisma.orcamento.findMany({
@@ -81,6 +78,7 @@ async function main() {
 
   let corretos = 0;
   const pulados: string[] = [];
+  const completar: string[] = [];
   const tocar: { id: string; codigo: string; dados: Condicoes }[] = [];
 
   for (const o of orcamentos) {
@@ -138,6 +136,10 @@ async function main() {
       dados.propostaCartaoTaxaPct = num(o.taxaCartaoPct);
     }
 
+    // o que nem os padrões resolvem: o vendedor completa no gerador
+    const faltam = faltaNasCondicoes({ aVista: dados.propostaAVistaValor, cartao: dados.propostaCartaoTotal });
+    if (faltam.length > 0) completar.push(`${o.codigo} (${o.status}): falta ${faltam.join(' e ')}`);
+
     const igual = CAMPOS.every((k) => {
       const atual = o[k] as Prisma.Decimal | number | boolean | null;
       const novo = dados[k];
@@ -152,15 +154,17 @@ async function main() {
   console.log(`Já corretos (não mudam): ${corretos}`);
   console.log(`${executar ? 'Gravados' : 'Tocaria'}: ${tocar.length}`);
   if (pulados.length > 0) {
-    console.log(`Pulados (o total refeito não bate com o gravado; ficam no modelo atual): ${pulados.length}`);
+    console.log(`Pulados (o total refeito não bate com o gravado; abra no gerador e salve): ${pulados.length}`);
     for (const p of pulados) console.log(`  ${p}`);
   }
+  console.log(`\nPara COMPLETAR no gerador (abrir, preencher o que falta e salvar): ${completar.length}`);
+  for (const c of completar) console.log(`  ${c}`);
   if (!executar) {
     for (const t of tocar.slice(0, 20)) {
       const d = t.dados;
-      console.log(
-        `  ${t.codigo}: investimento ${formatarBRL(d.propostaInvestimento!)} · à vista ${formatarBRL(d.propostaAVistaValor!)} (${d.propostaAVistaPct}%) · cartão ${d.propostaCartaoParcelas}x de ${formatarBRL(d.propostaCartaoParcela!)} (total ${formatarBRL(d.propostaCartaoTotal!)})`,
-      );
+      const aVista = d.propostaAVistaValor == null ? 'à vista —' : `à vista ${formatarBRL(d.propostaAVistaValor)} (${d.propostaAVistaPct}%)`;
+      const cartao = d.propostaCartaoTotal == null ? 'cartão —' : `cartão ${d.propostaCartaoParcelas}x de ${formatarBRL(d.propostaCartaoParcela!)} (total ${formatarBRL(d.propostaCartaoTotal)})`;
+      console.log(`  ${t.codigo}: investimento ${formatarBRL(d.propostaInvestimento!)} · ${aVista} · ${cartao}`);
     }
     if (tocar.length > 20) console.log(`  … e mais ${tocar.length - 20}`);
     return;
@@ -179,7 +183,7 @@ async function main() {
         "propostaCartaoTotal" = ${d.propostaCartaoTotal}, "propostaCartaoTaxaPct" = ${d.propostaCartaoTaxaPct}
       WHERE "id" = ${t.id}`;
   }
-  console.log('\nRESULTADO: gravados', tocar.length, '· já corretos', corretos, '· pulados', pulados.length);
+  console.log('\nRESULTADO: gravados', tocar.length, '· já corretos', corretos, '· pulados', pulados.length, '· para completar', completar.length);
 }
 
 main()

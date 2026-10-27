@@ -114,10 +114,10 @@ export function valoresIniciais(): FormularioOrcamento {
     impostoPct: '0',
     mostrarImpostosNoPdf: true,
     condicaoPagamento: 'A_VISTA',
-    // desconto à vista e parcelas começam nos padrões das três condições da proposta
-    // (compartilhado/condicoesDaProposta.ts); sem padrão, como antes
-    descontoAVistaPct: PADRAO_A_VISTA ?? '0',
-    parcelas: PADRAO_PARCELAS ?? '6',
+    // desconto à vista e parcelas começam no VALOR SUGERIDO (compartilhado/condicoesDaProposta.ts);
+    // sem sugestão, VAZIOS: o vendedor informa (nenhum número inventado; 27/10/2026)
+    descontoAVistaPct: PADRAO_A_VISTA ?? '',
+    parcelas: PADRAO_PARCELAS ?? '',
     absorverTaxaCartao: false,
     validade: dataDaquiA(DIAS_DE_VALIDADE),
     observacoes: '',
@@ -221,9 +221,12 @@ export function validarParaSalvar(f: FormularioOrcamento, subtotal: number): Pro
   if (desconto) problemas.push({ campo: 'descontoValor', mensagem: desconto });
   const imposto = problemaNoImposto(f.impostoPct);
   if (imposto) problemas.push({ campo: 'impostoPct', mensagem: imposto });
-  // vale em qualquer condição: é também o desconto do "à vista via Pix" da proposta
-  if (f.condicaoPagamento === 'A_VISTA' || f.descontoAVistaPct.trim() !== '') {
-    const pct = lerNumero(f.descontoAVistaPct || '0');
+  // vale em qualquer condição: é também o desconto do "à vista via Pix" da proposta. Na condição
+  // à vista ele é o da própria venda: obrigatório para salvar (0 = sem desconto)
+  if (f.condicaoPagamento === 'A_VISTA' && f.descontoAVistaPct.trim() === '') {
+    problemas.push({ campo: 'descontoAVistaPct', mensagem: 'Informe o desconto à vista (use 0 para nenhum)' });
+  } else if (f.descontoAVistaPct.trim() !== '') {
+    const pct = lerNumero(f.descontoAVistaPct);
     if (!(pct >= 0 && pct <= 100)) {
       problemas.push({ campo: 'descontoAVistaPct', mensagem: 'Use um percentual entre 0 e 100' });
     }
@@ -430,7 +433,7 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     // das três condições, era resto de edição: não vale
     descontoAVistaPct:
       o.condicaoPagamento === 'A_VISTA'
-        ? numeroTexto(o.descontoAVistaPct, '0')
+        ? numeroTexto(o.descontoAVistaPct, '')
         : numeroTexto(o.propostaAVistaPct, PADRAO_A_VISTA ?? ''),
     // os selects só têm estas opções; valores fora delas voltam ao padrão
     parcelas:
@@ -439,7 +442,7 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
           ? DEBITO
           : parcelaValida(String(o.parcelas))
             ? String(o.parcelas)
-            : '6'
+            : ''
         : o.propostaCartaoParcelas != null && parcelaValida(String(o.propostaCartaoParcelas))
           ? String(o.propostaCartaoParcelas)
           : (PADRAO_PARCELAS ?? ''),

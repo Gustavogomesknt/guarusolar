@@ -4,7 +4,7 @@ import { FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { calcularOrcamento, formatarHora, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
+import { calcularCondicoesDaProposta, calcularOrcamento, faltaNasCondicoes, formatarHora, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
 import { api, ErroApi, tokenSalvo, urlDaApi } from '@guarusolar/web/api';
 import { enviarPeloWhatsApp } from '@/lib/whatsapp';
 import type { Cliente } from '@/lib/tipos';
@@ -85,6 +85,8 @@ export function GeradorOrcamento({
   // Recalcula a cada digitação. É só a prévia: a API recalcula com a mesma função ao salvar.
   const valores = useWatch({ control }) as FormularioOrcamento;
   const previa = useMemo(() => calcularOrcamento(entradaDoCalculo(valores)), [valores]);
+  // com as mesmas regras da API ao salvar: o que o PDF do modelo novo teria das três condições
+  const faltam = useMemo(() => faltaNasCondicoes(calcularCondicoesDaProposta(entradaDoCalculo(valores))), [valores]);
 
   const alterado = formState.isDirty;
   // lido pelo bloqueio de navegação, que pode rodar antes da próxima renderização
@@ -299,6 +301,8 @@ export function GeradorOrcamento({
             alteradoDepoisDeSalvar={salvo !== null && alterado}
             // aprovado não pode mais ser editado: o anterior ao campo continua abrindo o PDF
             semPrazo={!somenteLeitura && !valores.prazoExecucao?.trim()}
+            // o que falta das três condições da proposta (modelo novo); aprovado só abre o PDF
+            faltaNasCondicoes={somenteLeitura ? [] : faltam}
             enviandoWhatsApp={enviandoWhatsApp}
             avisoDaCapa={capa.aviso(valores.tipoDeServicoId)}
             onWhatsApp={() => capa.confirmar(valores.tipoDeServicoId, 'Enviar assim mesmo', aoEnviarWhatsApp)}

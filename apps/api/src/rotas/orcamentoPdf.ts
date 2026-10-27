@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Router, type Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { rota } from '../lib/erros';
-import { gerarPdfOrcamento } from '../lib/pdf-orcamento';
+import { gerarPdfOrcamento, PropostaSemCondicoes } from '../lib/pdf-orcamento';
 
 /*
  * PDF do orçamento para o CLIENTE FINAL, que abre o link recebido pelo WhatsApp sem login.
@@ -77,6 +77,15 @@ rotasOrcamentoPdf.get(
     try {
       pdf = await gerarPdfOrcamento(orcamento);
     } catch (erro) {
+      // modelo novo sem as três condições: não sai (nem em outro modelo); diz o que falta
+      if (erro instanceof PropostaSemCondicoes) {
+        return paginaParaOCliente(
+          res,
+          409,
+          'Esta proposta ainda não está pronta',
+          `Falta ${erro.faltam.join(' e ')} nas condições de pagamento. No sistema, preencha no orçamento, salve e gere a proposta de novo.`,
+        );
+      }
       // o erro completo vai para o log; o cliente vê uma página, não o texto técnico
       console.error(`[pdf] falha ao gerar ${orcamento.codigo}:`, erro);
       return paginaParaOCliente(
