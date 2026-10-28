@@ -6,10 +6,10 @@
  * comando RODA EM PRODUÇÃO. Não tem volta: faça o Backup (Actions › Backup do banco) antes.
  *
  * APAGA: orçamentos (com itens, histórico de status, cópia do cliente e tokens de PDF), projetos,
- * histórico dos projetos, agendamentos, escala, fotos, materiais utilizados e TODOS os clientes.
- * Zera a numeração: o próximo orçamento sai GS-<ano>-0001 e o próximo projeto, PRJ-<ano>-0001.
- * Os ARQUIVOS das fotos também saem do armazenamento (senão ficariam na mesma pasta das fotos do
- * primeiro projeto real, que reusa o código PRJ-<ano>-0001).
+ * histórico dos projetos, agendamentos, escala, fotos, vídeos, materiais utilizados e TODOS os
+ * clientes. Zera a numeração: o próximo orçamento sai GS-<ano>-0001 e o próximo projeto, PRJ-<ano>-0001.
+ * Os ARQUIVOS das fotos e dos vídeos também saem do armazenamento (senão ficariam na mesma pasta
+ * do primeiro projeto real, que reusa o código PRJ-<ano>-0001).
  *
  * Usuários, em dois modos:
  *   --admin <e-mail>     remove TODOS os usuários menos esse ADMIN (limpeza completa);
@@ -22,8 +22,9 @@
  * existir, não for ADMIN ou estiver desativado (para o sistema não ficar sem acesso); mostra
  * quantos registros saem e quem fica (e quem sai), por nome e e-mail; exige digitar uma frase em
  * maiúsculas que traz o nome do banco; apaga tudo numa transação e confere o resultado antes de
- * confirmar (qualquer diferença desfaz tudo). Se as fotos estão num armazenamento que esta janela
- * não alcança (faltam as variáveis), recusa antes de apagar qualquer coisa.
+ * confirmar (qualquer diferença desfaz tudo). Se as fotos OU os vídeos estão num armazenamento que
+ * esta janela não alcança (faltam as variáveis), recusa antes de apagar qualquer coisa: a
+ * segurança não depende de lembrar de exportar as variáveis (vídeo só existe no bucket S3).
  */
 // Sem `import` no topo de propósito: anota o que já existe no ambiente ANTES de o dotenv carregar o .env.
 const daJanela = process.env.DATABASE_URL !== undefined;
@@ -108,6 +109,10 @@ async function main() {
     ]);
     // ---- os arquivos das fotos: em qual armazenamento estão, e se esta janela alcança cada um
     const chavesDasFotos = (await prisma.fotoServico.findMany({ select: { arquivoChave: true } })).map((f) => f.arquivoChave);
+    // vídeos (e capas): só o bucket S3 recebe vídeo; contam para a recusa como as fotos
+    const videos = await prisma.videoServico.findMany({ select: { arquivoChave: true, capaChave: true } });
+    const videosNoS3 = videos.filter((v) => destinoDaChave(v.arquivoChave) === 's3');
+    const chavesDosVideosNoS3 = videosNoS3.flatMap((v) => [v.arquivoChave, ...(v.capaChave && destinoDaChave(v.capaChave) === 's3' ? [v.capaChave] : [])]);
     // pastas dos arquivos: uma por projeto, mais a das visitas técnicas avulsas (VISITAS/<serviço>)
     const codigosDosProjetos = [...(await prisma.projeto.findMany({ select: { codigo: true } })).map((p) => p.codigo), PASTA_DAS_VISITAS_AVULSAS];
     const noSupabase = chavesDasFotos.filter((c) => destinoDaChave(c) === 'supabase');
@@ -118,20 +123,23 @@ async function main() {
     if (!semArquivos) {
       const falta: string[] = [];
       if (noSupabase.length && variaveisDoSupabaseFaltando().length) falta.push(`${noSupabase.length} foto(s) no Supabase Storage, e faltam nesta janela: ${variaveisDoSupabaseFaltando().join(', ')}`);
-      if (noS3.length && variaveisDoS3Faltando().length) falta.push(`${noS3.length} foto(s) no bucket S3, e faltam nesta janela: ${variaveisDoS3Faltando().join(', ')}`);
+      if ((noS3.length || videosNoS3.length) && variaveisDoS3Faltando().length) {
+        const noBucket = [noS3.length ? `${noS3.length} foto(s)` : '', videosNoS3.length ? `${videosNoS3.length} vídeo(s)` : ''].filter(Boolean).join(' e ');
+        falta.push(`${noBucket} no bucket S3, e faltam nesta janela: ${variaveisDoS3Faltando().join(', ')}`);
+      }
       if (noSharepoint.length && variaveisDoSharepointFaltando().length) falta.push(`${noSharepoint.length} foto(s) no SharePoint, e faltam nesta janela: ${variaveisDoSharepointFaltando().join(', ')}`);
       if (falta.length) {
         console.error(
-          `\nRECUSADO: há arquivos de fotos que esta janela não consegue apagar.\n  ${falta.join('\n  ')}\n` +
+          `\nRECUSADO: há arquivos de fotos ou vídeos que esta janela não consegue apagar.\n  ${falta.join('\n  ')}\n` +
             'Nada foi apagado. Defina essas variáveis na janela (as mesmas da hospedagem) e rode de novo.\n' +
-            'Sem apagar os arquivos, as fotos de teste ficariam na pasta do primeiro projeto real (o código PRJ-<ano>-0001 é reusado).\n' +
+            'Sem apagar os arquivos, as fotos e os vídeos de teste ficariam na pasta do primeiro projeto real (o código PRJ-<ano>-0001 é reusado).\n' +
             '(Para apagar só os registros e deixar os arquivos: acrescente --sem-arquivos.)',
         );
         process.exitCode = 1;
         return;
       }
       if (noSupabase.length) await conferirBucketPrivado(true); // prova que a chave e o bucket desta janela funcionam
-      if (noS3.length) await conferirBucketDoS3();
+      if (noS3.length || videosNoS3.length) await conferirBucketDoS3();
     }
     // No Supabase sai a pasta inteira de cada projeto (com miniaturas e substituídas, que não têm registro)
     let objetosNoSupabase: string[] = [];
@@ -149,7 +157,7 @@ async function main() {
       for (const prefixo of codigosDosProjetos.flatMap((c) => [`${c}/`, `miniaturas/${c}/`])) {
         listados.push(...(await listarDoS3(prefixo)).map((o) => o.caminho));
       }
-      objetosNoS3 = [...new Set([...listados, ...noS3.map((c) => c.slice(3))])]; // "s3:" e "r2:" têm 3 letras
+      objetosNoS3 = [...new Set([...listados, ...[...noS3, ...chavesDosVideosNoS3].map((c) => c.slice(3))])]; // "s3:" e "r2:" têm 3 letras
     }
 
     const [produtos, produtosAtivos, equipes, checklist] = await Promise.all([
@@ -169,11 +177,12 @@ async function main() {
     linha('agendamentos', agendamentos);
     linha('escalas (quem ia em cada serviço)', escala);
     linha('fotos (registros)', fotos);
+    linha('vídeos (registros)', videos.length);
     if (semArquivos) {
-      console.log('          os ARQUIVOS das fotos NÃO serão apagados (--sem-arquivos)');
+      console.log('          os ARQUIVOS das fotos e dos vídeos NÃO serão apagados (--sem-arquivos)');
     } else {
       if (objetosNoSupabase.length) linha('arquivos no Supabase Storage (fotos, miniaturas e substituídas dos projetos apagados)', objetosNoSupabase.length);
-      if (objetosNoS3.length) linha('arquivos no bucket S3 (fotos, miniaturas e substituídas dos projetos apagados)', objetosNoS3.length);
+      if (objetosNoS3.length) linha('arquivos no bucket S3 (fotos, vídeos, capas, miniaturas e substituídas dos projetos apagados)', objetosNoS3.length);
       if (noSharepoint.length) linha('arquivos no SharePoint', noSharepoint.length);
       if (noDisco.length) linha('arquivos no disco deste computador (se existirem aqui)', noDisco.length);
     }
