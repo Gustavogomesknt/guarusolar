@@ -19,7 +19,7 @@ export const EMPRESA = {
   razaoSocial: 'MARCIO ROBERTO MENDES ENERGIA SOLAR',
   cnpj: '31.276.254/0001-60',
   endereco: 'Est. do Moinho Velho, 340 — Jardim Angélica, Guarulhos/SP · CEP 07260-430',
-  telefone: '(11) 4030-4671',
+  telefone: '(11) 94030-4671',
   email: 'guarusolar@hotmail.com',
   instagram: '@guarusolar',
   site: 'guarusolar.com',
