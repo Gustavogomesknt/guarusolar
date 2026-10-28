@@ -169,8 +169,10 @@ apps/api/                      API (Express + Prisma)
                                arte de fundo (assets/proposta/; sem arquivo, cinza com o nome
                                esperado). Itens: nome · descrição técnica. Acima do nome do
                                vendedor, o "Cargo na proposta" dele (Usuario.cargoNaProposta,
-                               tela Usuários, padrão "Consultor"). Rodapé "Página X de N" da
-                               página 2 em diante (RODAPE_DA_PROPOSTA_NOVA). Página 3: os três
+                               tela Usuários, padrão "Consultor"). Rodapé "Página X de N" em TODAS
+                               as páginas, com o total real (RODAPE_DA_PROPOSTA_NOVA; 27/10/2026: as
+                               artes não trazem mais o número), na mesma linha de base (y ~832); na
+                               capa e na última, branco sobre a faixa navy do pé. Página 3: os três
                                valores GRAVADOS (proposta*) e o contato, em posições de
                                PAGINA_3_NOVA (conteudo/proposta.ts), e, SÓ SEM A ARTE (ela já traz as logos), a faixa das logos das
                                montadoras (mesmo tamanho todas, 24 mm, logo faltando é pulada).
@@ -182,9 +184,18 @@ apps/api/                      API (Express + Prisma)
                                FOTO_MINIMA = sem foto; itens que não cabem nem assim = reserva.
                                O arranjo sai de `planoDaPagina2` (o PDF e o aviso do gerador,
                                POST /api/orcamentos/folhas-da-proposta, AvisoDasFolhas.tsx). Página 3 (arte de
-                               25/10/2026, 1055 x 1491 px): SETE campos em PAGINA_3_NOVA (pontos do PDF; px x 0,5643):
-                               selos de prazo e garantia, investimento, à vista, parcelas, total no cartão e
-                               consultora + telefone DA EMPRESA (EMPRESA.telefone; nunca o celular do vendedor; nome longo
+                               27/10/2026, 1055 x 1491 px; pontos do PDF, px x 0,5643): selos de prazo e garantia
+                               (PAGINA_3_NOVA.selos); os três cartões de valor (PAGINA_3_NOVA.cartoes): a régua
+                               laranja fica logo abaixo do título e o valor vai EMBAIXO dela, com a linha de apoio
+                               embaixo do valor, a 9 pt (PAGINA_3_NOVA.legendas: "Condição comercial apresentada";
+                               "N% de desconto" do propostaAVistaPct, nada com desconto zero; no cartão, a última
+                               parcela diferente e o total). Posição pela LINHA DE BASE, a mesma nos três. Cartão
+                               em TRÊS linhas embaixo da régua: "12 × R$ 916,36" (pior caso "18 × R$ 12.345,67" cabe
+                               a 17 pt), a última parcela (NÃO tirar: no modelo novo é o único lugar que explica a
+                               diferença para o total) e o total, com ", sem juros" se absorvida. Pagamento ÚNICO
+                               (o valor já é o total, sem "1 ×"): débito = valor + "no débito"; 1 parcela = valor +
+                               "em uma vez no cartão"; SEM a linha do total (só o orçamento antigo com entrada a
+                               mantém). Quatro linhas não cabem. E a consultora + telefone DA EMPRESA (EMPRESA.telefone; nunca o celular do vendedor; nome longo
                                é abreviado, nunca abaixo de 9 pt); rótulos e logos são da arte. Prazo e garantia nos SELOS da arte
                                (PAGINA_3_NOVA.selos): 11 pt a 9 pt, nunca cortados (a API barra o que não cabe). Arte faltando (artesQueFaltam): aviso no log ao subir e em
                                /saude → proposta.artesFaltando; nunca trava. Texto por cima das artes

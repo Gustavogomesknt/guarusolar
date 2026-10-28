@@ -144,44 +144,61 @@ export const ARTES_DA_PROPOSTA_NOVA = {
 };
 
 /**
- * Rodapé "Página X de N" das páginas 2 em diante (a capa não tem). Copie o estilo da numeração
- * da arte da capa quando ela chegar: tamanho, cor, alinhamento, espaçamento entre letras e a
- * distância da base da folha. `corSobreAArte` vale na última página, que é a arte da página 3.
+ * Rodapé "Página X de N" em TODAS as páginas (27/10/2026: as artes das páginas 1 e 3 não trazem
+ * mais o número impresso), com o total real de páginas. Mesma linha de base em todas (y ~832),
+ * que nas artes cai na faixa navy do pé (na página 3, à direita, ela começa em y ~820).
+ * `corSobreAArte` vale na capa e na última página (as artes); sem o arquivo da arte, `cor`.
  */
 export const RODAPE_DA_PROPOSTA_NOVA = {
   texto: 'Página {pagina} de {total}',
   tamanho: 8,
   cor: '#5A6675',
-  corSobreAArte: '#5A6675',
+  corSobreAArte: '#FFFFFF',
   alinhamento: 'right' as 'left' | 'center' | 'right',
   espacamento: 0.3,
-  distanciaDaBase: 16,
+  distanciaDaBase: 10,
 };
 
 /**
- * Página 3 do modelo novo: SETE campos POR CIMA da arte (assets/proposta/pagina-3.jpg, 1055 x
- * 1491 px, A4 exato: 1 px da arte = 0,5643 pt). Posições em PONTOS do PDF (1/72 de polegada), a
+ * Página 3 do modelo novo: campos POR CIMA da arte (assets/proposta/pagina-3.jpg, 1055 x 1491
+ * px, A4 exato: 1 px da arte = 0,5643 pt). Posições em PONTOS do PDF (1/72 de polegada), a
  * partir do canto de cima à esquerda da folha (A4 = 595,28 x 841,89); px da arte x 0,5643 = pt.
- * Medidas em 25/10/2026 na arte sem os valores embutidos. Cada campo é uma caixa: o texto não
- * passa da largura (diminui até caber) e a altura dela fica livre da régua laranja e do texto
- * fixo da arte. Os valores vêm gravados no orçamento (condições da proposta).
+ * Medidas em 27/10/2026 na arte nova, sem os valores. Os valores vêm gravados no orçamento
+ * (condições da proposta).
  */
 export const PAGINA_3_NOVA = {
   /** tamanho máximo do valor grande (diminui até caber na largura do campo, mínimo 11) */
   tamanhoDoValor: 17,
   /** sobre os cartões escuros da arte */
   cores: { valor: '#FFFFFF', detalhe: '#CBDBF0' },
+  /**
+   * Os três cartões de valor (arte de 27/10/2026): a régua laranja fica logo abaixo do título
+   * (y 650 a 652) e o espaço livre é o de BAIXO dela, até o fim do cartão (y 699). Ali vão o valor
+   * e, embaixo dele, as linhas de apoio. `y` é a LINHA DE BASE do valor, a mesma nos três; as
+   * linhas de apoio descem `entreLinhas`. `x` = início da régua de cada cartão.
+   */
+  cartoes: {
+    investimento: { x: 38, y: 669.5, largura: 157 },
+    aVista: { x: 229, y: 669.5, largura: 151 },
+    cartao: { x: 418, y: 669.5, largura: 148 },
+  },
+  /** do valor (17 pt) para a 1ª linha de apoio; de uma linha de apoio (9 pt) para a próxima */
+  entreLinhas: { doValor: 13.5, doApoio: 11.5 },
+  /**
+   * Legendas embaixo do valor (a arte antiga as trazia impressas; a nova, não), a 9 pt, nunca
+   * menos. À vista: o desconto GRAVADO (propostaAVistaPct); desconto zero = sem legenda. O cartão
+   * não tem legenda fixa: o valor é "12 × R$ 916,36" numa linha (o pior caso, "18 × R$ 12.345,67",
+   * cabe a 17 pt: 146 de 148 pt) e embaixo vão a última parcela (se diferente) e o total, com
+   * ", sem juros" no fim quando a taxa é absorvida. Quatro linhas não cabem embaixo da régua.
+   */
+  legendas: {
+    investimento: 'Condição comercial apresentada',
+    aVista: '{percentual} de desconto',
+    tamanho: 9,
+  },
   campos: {
-    /** cartão da esquerda: entre o título e a régua laranja (y 676,5) */
-    investimento: { x: 35, y: 638, largura: 158, altura: 30 },
-    /** cartão do meio: idem (régua em y 676,5) */
-    aVista: { x: 225, y: 638, largura: 150, altura: 30 },
-    /** cartão da direita (sem régua): parcelas em duas linhas e, embaixo, a última diferente */
-    cartaoParcelas: { x: 409, y: 634, largura: 152, altura: 56 },
-    /** cartão da direita, embaixo (o quadro escuro acaba em y 705, o cartão em 709) */
-    cartaoTotal: { x: 409, y: 692, largura: 152, altura: 11 },
     /** faixa "PRONTO PARA APROVAR?": consultora + telefone da empresa, abaixo do título, até a diagonal laranja (x ~ 400) */
-    contato: { x: 104, y: 742, largura: 285, altura: 14 },
+    contato: { x: 104, y: 734, largura: 285, altura: 14 },
   },
   /**
    * faixa das logos das montadoras (ARTES_DA_PROPOSTA_NOVA.logosDasMontadoras): SÓ SEM A ARTE

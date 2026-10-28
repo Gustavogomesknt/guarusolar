@@ -790,10 +790,10 @@ function campo(nome: keyof typeof PAGINA_3_NOVA.campos, linhas: Linha[]): Conten
   } as Content;
 }
 
-/** Valor grande de um campo: o maior tamanho que cabe na largura dele. */
-const valorGrande = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string): Linha => ({
+/** Valor grande de um cartão: o maior tamanho que cabe na largura dele. */
+const valorGrande = (largura: number, texto: string): Linha => ({
   texto,
-  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura) ?? 11,
+  tamanho: tamanhoQueCabe(texto, largura) ?? 11,
   negrito: true,
 });
 
@@ -802,30 +802,73 @@ const valorGrande = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string): Li
  * antigo com entrada (anterior a 25/10/2026) saem a 7,5 pt e podem descer até 7 para caber numa
  * linha (`encolheAte`); fora isso, só a linha "N parcelas sem juros de" desce, até o piso de 9.
  */
-const linhaDeApoio = (nome: keyof typeof PAGINA_3_NOVA.campos, texto: string, maximo: number, acima = 0, encolheAte = maximo): Linha => ({
+const linhaDeApoio = (largura: number, texto: string, maximo: number, encolheAte = maximo): Linha => ({
   texto,
-  tamanho: tamanhoQueCabe(texto, PAGINA_3_NOVA.campos[nome].largura, maximo, encolheAte) ?? maximo,
+  tamanho: tamanhoQueCabe(texto, largura, maximo, encolheAte) ?? maximo,
   cor: PAGINA_3_NOVA.cores.detalhe,
-  acima,
 });
+
+/** IBM Plex Sans (normal e negrito): o pdfmake põe a linha de base 1,025 x o tamanho abaixo do topo da linha. */
+const ASCENDENTE = 1.025;
+
+/** Uma linha posicionada pela LINHA DE BASE (x, base), limitada à largura. */
+function linhaNaBase(x: number, base: number, largura: number, l: Linha): Content {
+  return {
+    absolutePosition: { x, y: base - ASCENDENTE * l.tamanho },
+    // tabela de uma célula: em posição absoluta é ela que limita a largura do texto
+    table: {
+      widths: [largura],
+      body: [[{ text: l.texto, fontSize: l.tamanho, bold: l.negrito ?? false, color: l.cor ?? PAGINA_3_NOVA.cores.valor, lineHeight: 1.05 }]],
+    },
+    layout: semBordas([0, 0, 0, 0]),
+  } as Content;
+}
+
+type CartaoDeValor = keyof typeof PAGINA_3_NOVA.cartoes;
+
+/**
+ * O valor de um cartão (linha de base PAGINA_3_NOVA.cartoes) e, embaixo, as linhas de apoio, cada
+ * uma `entreLinhas` abaixo da anterior. `apertado`: só o orçamento antigo com entrada (três linhas
+ * de apoio a 7,5 pt; nenhum na base).
+ */
+function noCartao(nome: CartaoDeValor, valor: Linha, apoio: Linha[], apertado = false): Content[] {
+  const c = PAGINA_3_NOVA.cartoes[nome];
+  const doValor = apertado ? 12 : PAGINA_3_NOVA.entreLinhas.doValor;
+  const doApoio = apertado ? 8.5 : PAGINA_3_NOVA.entreLinhas.doApoio;
+  return [valor, ...apoio].map((l, i) => linhaNaBase(c.x, c.y + (i === 0 ? 0 : doValor + (i - 1) * doApoio), c.largura, l));
+}
+
+/** Legenda fixa embaixo do valor (PAGINA_3_NOVA.legendas), a 9 pt. */
+const legenda = (nome: CartaoDeValor, texto: string): Linha =>
+  linhaDeApoio(PAGINA_3_NOVA.cartoes[nome].largura, texto, PAGINA_3_NOVA.legendas.tamanho);
 
 /**
  * Os campos dos valores, só com o que está GRAVADO (propostaInvestimento, propostaAVista...,
- * propostaCartao...). Os rótulos ("VALOR DO INVESTIMENTO", "CARTÃO DE CRÉDITO"...) são da arte.
+ * propostaCartao...). Os rótulos ("VALOR DO INVESTIMENTO", "CARTÃO DE CRÉDITO"...) são da arte;
+ * as legendas embaixo do valor, do sistema (PAGINA_3_NOVA.legendas).
  */
 function camposDosValores(o: OrcamentoParaPdf): Content[] {
   const P = PAGINA_3_NOVA;
   const investimento = n(o.propostaInvestimento);
   const aVista = n(o.propostaAVistaValor);
+  const pctAVista = n(o.propostaAVistaPct) ?? 0;
   const parcelas = o.propostaCartaoParcelas;
   const parcela = n(o.propostaCartaoParcela);
   const total = n(o.propostaCartaoTotal);
+  const largura = (nome: CartaoDeValor) => P.cartoes[nome].largura;
   const campos: Content[] = [
-    campo('investimento', [valorGrande('investimento', investimento == null ? A_DEFINIR : formatarBRL(investimento))]),
-    campo('aVista', [valorGrande('aVista', aVista == null ? A_DEFINIR : formatarBRL(aVista))]),
+    ...noCartao('investimento', valorGrande(largura('investimento'), investimento == null ? A_DEFINIR : formatarBRL(investimento)), [
+      legenda('investimento', P.legendas.investimento),
+    ]),
+    // desconto zero: sem legenda
+    ...noCartao(
+      'aVista',
+      valorGrande(largura('aVista'), aVista == null ? A_DEFINIR : formatarBRL(aVista)),
+      aVista != null && pctAVista > 0 ? [legenda('aVista', P.legendas.aVista.replace('{percentual}', `${formatarQuantidade(pctAVista)}%`))] : [],
+    ),
   ];
   if (parcelas == null || parcela == null || total == null) {
-    return [...campos, campo('cartaoParcelas', [valorGrande('cartaoParcelas', A_DEFINIR)])];
+    return [...campos, ...noCartao('cartao', valorGrande(largura('cartao'), A_DEFINIR), [])];
   }
   const debito = Boolean(o.propostaCartaoDebito);
   const entrada = n(o.propostaCartaoEntrada) ?? 0;
@@ -842,26 +885,36 @@ function camposDosValores(o: OrcamentoParaPdf): Content[] {
         : primeira != null && primeira !== parcela
           ? `1ª parcela de ${formatarBRL(primeira)}`
           : null;
-  // entrada: só orçamento salvo antes de 25/10/2026 (sai como foi enviado), na linha de baixo
-  // "sem juros" só com a taxa absorvida (27/10/2026; taxaDoCartaoDaProposta)
+  // até três linhas embaixo da régua: o valor ("12 × R$ 916,36"), a parcela diferente e o total;
+  // débito: o valor e "no débito"; 1 parcela: o valor e "em uma vez no cartão" (os dois sem a
+  // linha do total, salvo com entrada). "Sem juros" só com a taxa absorvida (27/10/2026;
+  // taxaDoCartaoDaProposta), no fim do total: não há lugar para uma quarta linha a 9 pt
   const semJuros = !debito && parcelas > 1 && taxaDoCartaoDaProposta(o) === 'absorvida';
-  const acima = debito ? 'no débito' : `${parcelas} ${parcelas === 1 ? 'parcela' : 'parcelas'}${semJuros ? ' sem juros' : ''} de`;
-  const valor = debito ? formatarBRL(total - entrada) : formatarBRL(parcela);
-  const abaixo = [...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []), ...(outra ? [outra] : [])];
-  // duas linhas de apoio (só orçamento antigo com entrada): menores, para caber antes do total
-  const tamanhoAbaixo = abaixo.length > 1 ? 7.5 : 8.5;
+  // um pagamento só (débito ou 1 parcela): o valor JÁ é o total, então a linha do total sai
+  // (o cliente procuraria uma diferença que não existe); com entrada (orçamento antigo) ela fica
+  const pagamentoUnico = debito || parcelas === 1;
+  const valor = debito ? formatarBRL(total - entrada) : parcelas === 1 ? formatarBRL(parcela) : `${parcelas} × ${formatarBRL(parcela)}`;
+  // entrada: só orçamento salvo antes de 25/10/2026 (sai como foi enviado)
+  const abaixo = [
+    ...(debito ? ['no débito'] : parcelas === 1 ? ['em uma vez no cartão'] : []),
+    ...(entrada > 0 ? [`+ entrada de ${formatarBRL(entrada)} via Pix`] : []),
+    ...(outra ? [outra] : []),
+  ];
+  const comTotal = !pagamentoUnico || entrada > 0;
+  // duas linhas de apoio antes do total (só orçamento antigo com entrada): menores, para caber
+  const apertado = abaixo.length > 1;
+  const L = largura('cartao');
   return [
     ...campos,
-    campo('cartaoParcelas', [
-      // 10 pt; desce até o piso de 9 se "18 parcelas sem juros de" não couber
-      linhaDeApoio('cartaoParcelas', acima, 10, 0, 9),
-      { ...valorGrande('cartaoParcelas', valor), acima: 1 },
-      ...abaixo.map((t, i) => ({
-        ...linhaDeApoio('cartaoParcelas', t, tamanhoAbaixo, i === 0 ? (abaixo.length > 1 ? 1 : 2) : 0, abaixo.length > 1 ? 7 : tamanhoAbaixo),
-        entrelinha: abaixo.length > 1 ? 0.95 : 1.05,
-      })),
-    ]),
-    campo('cartaoTotal', [linhaDeApoio('cartaoTotal', `total de ${formatarBRL(total)}`, 9)]),
+    ...noCartao(
+      'cartao',
+      valorGrande(L, valor),
+      [
+        ...abaixo.map((t) => linhaDeApoio(L, t, apertado ? 7.5 : 9, apertado ? 7 : 9)),
+        ...(comTotal ? [linhaDeApoio(L, `total de ${formatarBRL(total)}${semJuros ? ', sem juros' : ''}`, apertado ? 7.5 : 9)] : []),
+      ],
+      apertado,
+    ),
   ];
 }
 
@@ -979,26 +1032,28 @@ function capa(o: OrcamentoParaPdf): Arte {
 export function documentoDaPropostaNova(o: OrcamentoParaPdf): TDocumentDefinitions {
   const A = artes();
   const escopo = paginaDoEscopo(o);
+  const arteDaCapa = capa(o);
   return {
     pageSize: 'A4',
     pageMargins: [LATERAL, MARGEM_PAGINA, LATERAL, MARGEM_PAGINA],
     info: { title: `Proposta ${o.codigo} — ${EMPRESA.nome}`, author: EMPRESA.nome, subject: 'Proposta comercial' },
     defaultStyle: { font: 'PlexSans', fontSize: 10, color: COR.texto, lineHeight: 1.15 },
-    // "Página X de N" nas páginas 2 em diante; a capa (página 1) é a arte, sem rodapé do sistema
+    // "Página X de N" em todas (27/10/2026: as artes não trazem mais o número), com o total real;
+    // na capa e na última (as artes), branco sobre a faixa navy do pé
     footer: (pagina: number, total: number) => {
-      if (pagina === 1) return null;
       const R = RODAPE_DA_PROPOSTA_NOVA;
+      const sobreAArte = (pagina === 1 && arteDaCapa.arquivo !== null) || (pagina === total && A.pagina3.arquivo !== null);
       return {
         text: R.texto.replace('{pagina}', String(pagina)).replace('{total}', String(total)),
         fontSize: R.tamanho,
-        color: pagina === total ? R.corSobreAArte : R.cor,
+        color: sobreAArte ? R.corSobreAArte : R.cor,
         alignment: R.alinhamento,
         characterSpacing: R.espacamento,
         margin: [LATERAL, MARGEM_PAGINA - R.distanciaDaBase - R.tamanho, LATERAL, 0],
       } as Content;
     },
     content: [
-      ...paginaDeArte(capa(o), 1, o),
+      ...paginaDeArte(arteDaCapa, 1, o),
       { text: '', pageBreak: 'after' },
       ...escopo.conteudo,
       { text: '', pageBreak: 'before' },
