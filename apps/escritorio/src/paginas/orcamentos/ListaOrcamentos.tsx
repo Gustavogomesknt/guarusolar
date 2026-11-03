@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MenuStatus, useMudancaDeStatus, type PedirMudanca } from './MenuStatus';
 import { AlternadorVisao } from './AlternadorVisao';
-import { opcoesDePeriodo, parametrosDoPeriodo, SeletorPeriodo, type Periodo } from './periodo';
+import { opcoesDePeriodo, parametrosDoPeriodo, parametrosDoResumo, periodoNaFrase, SeletorPeriodo, type Periodo } from './periodo';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 import { useConfirmacaoDaCapa } from './capa';
@@ -70,7 +70,8 @@ export function ListaOrcamentos() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-col gap-1">
-          <p className="text-[13px] text-muted-foreground">Comercial · {opcoes[0].rotulo}</p>
+          {/* o período ESCOLHIDO no seletor (lista e indicadores seguem ele) */}
+          <p className="text-[13px] text-muted-foreground">Comercial · {opcoes.find((o) => o.valor === periodo)?.rotulo}</p>
           <h1 className="text-4xl font-bold tracking-[-0.02em]">Orçamentos</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -84,7 +85,7 @@ export function ListaOrcamentos() {
         </div>
       </header>
 
-      <Indicadores />
+      <Indicadores periodo={periodo} />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div role="group" aria-label="Filtrar por status" className="flex flex-wrap gap-2">
@@ -147,23 +148,51 @@ export function ListaOrcamentos() {
 }
 
 // ---------------------------------------------------------------------------
-// Indicadores do mês
+// Indicadores do período do seletor (03/11/2026; antes, sempre o mês corrente)
 // ---------------------------------------------------------------------------
-function Indicadores() {
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/**
+ * Os quatro cartões. Cada um com a data do que mede (API /resumo): orçado e taxa pelos CRIADOS
+ * no período, valor aprovado pela APROVAÇÃO, em aberto é a situação de HOJE (fora do período).
+ * Período sem nada: o texto de baixo diz o motivo, nunca só "R$ 0,00" (no começo do mês a tela
+ * parecia quebrada). O período entra na chave da consulta: trocar de mês busca de novo.
+ */
+function Indicadores({ periodo }: { periodo: Periodo }) {
+  const parametros = parametrosDoResumo(periodo).toString();
   const resumo = useQuery({
-    queryKey: ['orcamentos', 'resumo'],
-    queryFn: ({ signal }) => api.get<ResumoOrcamentos>('/api/orcamentos/resumo', { signal }),
+    queryKey: ['orcamentos', 'resumo', parametros],
+    queryFn: ({ signal }) => api.get<ResumoOrcamentos>(`/api/orcamentos/resumo${parametros ? `?${parametros}` : ''}`, { signal }),
+    // sempre recalcula ao voltar a um período (o padrão do escritório guarda 30 s): mostra o
+    // último resultado DAQUELE período enquanto a resposta nova não chega
+    staleTime: 0,
   });
   const r = resumo.data;
   const valor = (v: number | undefined) => (r ? formatarBRL(v ?? 0) : '–');
+  const quando = periodoNaFrase(periodo);
+
+  const textoDaTaxa = !r
+    ? ' '
+    : r.quantidadeCriados === 0
+      ? `Nenhum orçamento criado ${quando}`
+      : r.enviadosDaTurma === 0
+        ? r.quantidadeCriados === 1
+          ? `O orçamento criado ${quando} ainda não foi enviado`
+          : `Nenhum dos ${r.quantidadeCriados} criados ${quando} foi enviado ainda`
+        : // mesma turma no numerador e no denominador: os orçamentos criados no período
+          `${plural(r.aprovadosDaTurma, 'aprovado', 'aprovados')} de ${plural(r.enviadosDaTurma, 'enviado', 'enviados')} entre os criados ${quando}`;
 
   return (
     <div className="flex flex-col gap-4">
-    <section aria-label="Indicadores do mês" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Cartao titulo="Total orçado no mês" valor={valor(r?.totalOrcadoMes)}>
-        {r ? `${r.quantidadeMes} ${r.quantidadeMes === 1 ? 'orçamento emitido' : 'orçamentos emitidos'}` : ' '}
+    <section aria-label="Indicadores do período" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Cartao titulo="Total orçado" valor={valor(r?.totalOrcado)}>
+        {!r
+          ? ' '
+          : r.quantidadeCriados === 0
+            ? `Nenhum orçamento criado ${quando}`
+            : `${plural(r.quantidadeCriados, 'orçamento criado', 'orçamentos criados')} ${quando}`}
       </Cartao>
-      <Cartao titulo="Taxa de aprovação" valor={r ? `${r.taxaAprovacao}%` : '–'}>
+      <Cartao titulo="Taxa de aprovação" valor={!r ? '–' : r.taxaAprovacao === null ? 'Sem envios' : `${r.taxaAprovacao}%`}>
         <span
           role="progressbar"
           aria-label="Taxa de aprovação"
@@ -174,16 +203,22 @@ function Indicadores() {
         >
           <span className="block h-full rounded-full bg-destaque" style={{ width: `${r?.taxaAprovacao ?? 0}%` }} />
         </span>
-        {/* mesma turma no numerador e no denominador: os orçamentos criados no mês */}
-        {r
-          ? `${r.aprovadosMes} ${r.aprovadosMes === 1 ? 'aprovado' : 'aprovados'} de ${r.enviadosMes} ${r.enviadosMes === 1 ? 'enviado' : 'enviados'} entre os criados no mês`
-          : ' '}
+        {textoDaTaxa}
       </Cartao>
       <Cartao titulo="Em aberto" valor={r ? String(r.quantidadeEmAberto) : '–'}>
-        Enviados e em negociação hoje · {valor(r?.valorEmAberto)}
+        {/* não segue o período: é o funil de hoje, também com um mês passado no seletor */}
+        {!r
+          ? ' '
+          : r.quantidadeEmAberto === 0
+            ? 'Hoje não há orçamento enviado nem em negociação (não segue o período)'
+            : `Situação de hoje, qualquer que seja o período: enviados e em negociação · ${formatarBRL(r.valorEmAberto)}`}
       </Cartao>
-      <Cartao titulo="Valor aprovado no mês" valor={valor(r?.valorAprovadoMes)} escuro>
-        Aprovados neste mês, confirmados para instalação
+      <Cartao titulo="Valor aprovado" valor={valor(r?.valorAprovado)} escuro>
+        {!r
+          ? ' '
+          : r.quantidadeAprovados === 0
+            ? `Nenhum orçamento aprovado ${quando}`
+            : `${plural(r.quantidadeAprovados, 'aprovado', 'aprovados')} ${quando}, confirmados para instalação`}
       </Cartao>
     </section>
     </div>

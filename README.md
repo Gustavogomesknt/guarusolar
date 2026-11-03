@@ -85,7 +85,7 @@ packages/web/               o que os dois fronts usam no navegador
 | POST/PUT | `/api/produtos` | comercial | CRUD do catálogo |
 | PATCH | `/api/produtos/:id/ativo` | comercial | ativar/desativar item |
 | GET | `/api/orcamentos` | comercial | lista com filtros (`status`, `q`, `de`/`ate`; com `abertosSempre=true`, em aberto ignoram o período e decididos usam a data da decisão) |
-| GET | `/api/orcamentos/resumo` | comercial | indicadores do mês |
+| GET | `/api/orcamentos/resumo?de=…&ate=…` | comercial | indicadores do período (sem de/ate: todo o período) |
 | POST/PUT | `/api/orcamentos` | comercial | criar/editar (totais no servidor) |
 | PATCH | `/api/orcamentos/:id/status` | comercial | mudança em 1 clique |
 | PATCH | `/api/orcamentos/:id/tipo` | comercial | classifica o tipo de serviço (qualquer status; o projeto acompanha) |

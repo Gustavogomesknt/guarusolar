@@ -46,6 +46,31 @@ export function intervalo(periodo: Periodo): { de?: string; ate?: string } {
   }
 }
 
+/** O período no meio de uma frase: "em outubro de 2026", "nos últimos 90 dias", "em 2026". */
+export function periodoNaFrase(periodo: Periodo): string {
+  switch (periodo) {
+    case 'ESTE_MES':
+    case 'MES_PASSADO':
+      // "Outubro de 2026" -> "em outubro de 2026"
+      return `em ${opcoesDePeriodo().find((o) => o.valor === periodo)!.rotulo.toLowerCase()}`;
+    case 'ULTIMOS_90':
+      return 'nos últimos 90 dias';
+    case 'ESTE_ANO':
+      return `em ${partesNoFuso().ano}`;
+    case 'TUDO':
+      return 'em todo o período';
+  }
+}
+
+/** Parâmetros dos indicadores (/api/orcamentos/resumo): só os limites, sem a regra dos em aberto da lista. */
+export function parametrosDoResumo(periodo: Periodo): URLSearchParams {
+  const p = new URLSearchParams();
+  const { de, ate } = intervalo(periodo);
+  if (de) p.set('de', de);
+  if (ate) p.set('ate', ate);
+  return p;
+}
+
 /** Parâmetros da API para o período: em aberto sempre, decididos pelo período. */
 export function parametrosDoPeriodo(periodo: Periodo): URLSearchParams {
   const p = new URLSearchParams();

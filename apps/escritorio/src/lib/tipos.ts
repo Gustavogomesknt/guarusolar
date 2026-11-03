@@ -135,14 +135,19 @@ export type OrcamentoNaLista = {
  * turma criada no mês, em aberto sem filtro de data.
  */
 export type ResumoOrcamentos = {
-  totalOrcadoMes: number;
-  quantidadeMes: number;
-  taxaAprovacao: number;
-  aprovadosMes: number;
-  enviadosMes: number;
+  /** criados no período (criadoEm) */
+  totalOrcado: number;
+  quantidadeCriados: number;
+  /** null = nenhum enviado entre os criados no período: não há taxa */
+  taxaAprovacao: number | null;
+  aprovadosDaTurma: number;
+  enviadosDaTurma: number;
+  /** HOJE, fora do período */
   quantidadeEmAberto: number;
   valorEmAberto: number;
-  valorAprovadoMes: number;
+  /** aprovados no período (aprovadoEm; sem a data, a criação) */
+  valorAprovado: number;
+  quantidadeAprovados: number;
 };
 
 /** Orçamento completo (GET /api/orcamentos/:id), usado para abrir no gerador. */

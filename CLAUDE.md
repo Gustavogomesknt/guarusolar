@@ -246,7 +246,14 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                abre só para leitura. PERÍODO da lista e do pipeline (periodo.tsx,
                                API abertosSempre): em aberto (rascunho, enviado, em negociação)
                                aparecem SEMPRE, negociação não tem mês (decisão da Guarusolar);
-                               aprovado e recusado entram pelo mês da DECISÃO (aprovadoEm/recusadoEm)
+                               aprovado e recusado entram pelo mês da DECISÃO (aprovadoEm/recusadoEm).
+                               INDICADORES do topo (03/11/2026) seguem o MESMO seletor (GET /resumo
+                               com de/ate; o período na chave da consulta, staleTime 0), cada um com a
+                               data do que mede, NÃO a regra da lista: total orçado e taxa pelos
+                               CRIADOS no período; valor aprovado por aprovadoEm (sem a data, criadoEm);
+                               em aberto = HOJE, fora do período (o texto diz). Período vazio: o texto
+                               diz o motivo ("Nenhum orçamento criado em novembro de 2026"), nunca só
+                               R$ 0,00. O título mostra o período escolhido.
   src/paginas/orcamentos/Pipeline.tsx  Kanban (/pipeline): arrastar e soltar com
                                @atlaskit/pragmatic-drag-and-drop respeitando TRANSICOES_STATUS;
                                o menu de status do cartão é a alternativa por teclado

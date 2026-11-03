@@ -18,7 +18,6 @@ import {
   PRAZO_MAXIMO_DE_CARACTERES,
   formatarBRL,
   formatarData,
-  inicioDoMes,
   podeMudarStatus,
   ROTULO_STATUS_ORCAMENTO,
   type CondicaoPagamento,
@@ -335,33 +334,41 @@ rotasOrcamentos.get(
 );
 
 // --------------------------------------------------------------------------
-// Indicadores do topo da tela comercial. Cada um usa a data do que mede:
+// Indicadores do topo da tela comercial, no PERÍODO do seletor (de/até, os mesmos limites que
+// a lista recebe; sem nenhum dos dois = todo o período). 03/11/2026: antes eram sempre do mês
+// corrente e não seguiam o seletor. Cada um usa a data do que mede (NÃO é a regra da lista,
+// que junta os em aberto de qualquer mês: aqui são perguntas diferentes):
 //
-// - Total orçado e quantidade: orçamentos CRIADOS no mês (criadoEm) — o que foi emitido.
-// - Valor aprovado: orçamentos APROVADOS no mês (aprovadoEm), qualquer que seja a data de
-//   criação — a venda fechada no mês.
+// - Total orçado e quantidade: orçamentos CRIADOS no período (criadoEm).
+// - Valor aprovado: orçamentos APROVADOS no período (aprovadoEm), qualquer que seja a data de
+//   criação — a venda fechada no período. Aprovado sem a data (anterior à coluna) usa a
+//   criação, o mesmo recurso da lista; sem isso ele não apareceria em período nenhum.
 // - Taxa de aprovação: numerador e denominador da MESMA turma, os orçamentos criados no
-//   mês. Denominador = os que já saíram do rascunho (foram enviados); numerador = os que,
-//   entre eles, estão aprovados. Misturar critérios (aprovados no mês ÷ enviados no mês)
-//   contaria no numerador orçamentos que não estão no denominador. Orçamentos recentes
-//   ainda em negociação puxam a taxa para baixo até serem decididos.
-// - Em aberto: situação atual do funil (ENVIADO + EM_NEGOCIACAO), sem filtro de data —
-//   um orçamento de meses anteriores ainda em negociação continua em aberto hoje.
+//   período. Denominador = os que já saíram do rascunho (foram enviados); numerador = os que,
+//   entre eles, estão aprovados. Misturar critérios (aprovados no período ÷ enviados no
+//   período) contaria no numerador orçamentos que não estão no denominador. Orçamentos
+//   recentes ainda em negociação puxam a taxa para baixo até serem decididos.
+// - Em aberto: situação de HOJE do funil (ENVIADO + EM_NEGOCIACAO), sem filtro de data e fora
+//   do período: um orçamento de meses anteriores ainda em negociação continua em aberto hoje.
 //
-// O mês é o do fuso da empresa (America/Sao_Paulo), não o do servidor.
+// Os limites chegam prontos do front, no fuso da empresa (America/Sao_Paulo).
 // --------------------------------------------------------------------------
 rotasOrcamentos.get(
   '/resumo',
-  rota(async (_req, res) => {
-    const doMes = { gte: inicioDoMes(0), lt: inicioDoMes(1) };
+  rota(async (req, res) => {
+    const { de, ate } = z
+      .object({ de: z.coerce.date().optional(), ate: z.coerce.date().optional() })
+      .parse(req.query);
+    const periodo = de || ate ? { ...(de ? { gte: de } : {}), ...(ate ? { lte: ate } : {}) } : undefined;
+    const criadoNoPeriodo: Prisma.OrcamentoWhereInput = periodo ? { criadoEm: periodo } : {};
+    const aprovadoNoPeriodo: Prisma.OrcamentoWhereInput = periodo
+      ? { status: 'APROVADO', OR: [{ aprovadoEm: periodo }, { aprovadoEm: null, criadoEm: periodo }] }
+      : { status: 'APROVADO' };
 
-    const [criadosNoMes, criadosPorStatus, aprovadosNoMes, emAberto] = await Promise.all([
-      prisma.orcamento.aggregate({ where: { criadoEm: doMes }, _sum: { valorTotal: true }, _count: true }),
-      prisma.orcamento.groupBy({ by: ['status'], where: { criadoEm: doMes }, _count: true }),
-      prisma.orcamento.aggregate({
-        where: { status: 'APROVADO', aprovadoEm: doMes },
-        _sum: { valorTotal: true },
-      }),
+    const [criados, criadosPorStatus, aprovados, emAberto] = await Promise.all([
+      prisma.orcamento.aggregate({ where: criadoNoPeriodo, _sum: { valorTotal: true }, _count: true }),
+      prisma.orcamento.groupBy({ by: ['status'], where: criadoNoPeriodo, _count: true }),
+      prisma.orcamento.aggregate({ where: aprovadoNoPeriodo, _sum: { valorTotal: true }, _count: true }),
       prisma.orcamento.aggregate({
         where: { status: { in: ['ENVIADO', 'EM_NEGOCIACAO'] } },
         _sum: { valorTotal: true },
@@ -371,7 +378,7 @@ rotasOrcamentos.get(
     // por tipo de serviço não há quadro (decisão do cliente, 15/10/2026): a lista filtrada por
     // situação + tipo mostra a quantidade e o total em valor
 
-    // taxa de aprovação: turma dos criados no mês
+    // taxa de aprovação: turma dos criados no período
     const quantos = (s: StatusOrcamento) => criadosPorStatus.find((p) => p.status === s)?._count ?? 0;
     const aprovadosDaTurma = quantos('APROVADO');
     const enviadosDaTurma = criadosPorStatus
@@ -379,15 +386,17 @@ rotasOrcamentos.get(
       .reduce((soma, p) => soma + p._count, 0);
 
     res.json({
-      totalOrcadoMes: Number(criadosNoMes._sum.valorTotal ?? 0),
-      quantidadeMes: criadosNoMes._count,
-      taxaAprovacao: enviadosDaTurma ? Math.round((aprovadosDaTurma / enviadosDaTurma) * 100) : 0,
-      // numerador e denominador da taxa (orçamentos criados no mês)
-      aprovadosMes: aprovadosDaTurma,
-      enviadosMes: enviadosDaTurma,
+      totalOrcado: Number(criados._sum.valorTotal ?? 0),
+      quantidadeCriados: criados._count,
+      // null = nenhum enviado na turma: não há taxa (0% diria que todos foram recusados)
+      taxaAprovacao: enviadosDaTurma ? Math.round((aprovadosDaTurma / enviadosDaTurma) * 100) : null,
+      // numerador e denominador da taxa (orçamentos criados no período)
+      aprovadosDaTurma,
+      enviadosDaTurma,
       quantidadeEmAberto: emAberto._count,
       valorEmAberto: Number(emAberto._sum.valorTotal ?? 0),
-      valorAprovadoMes: Number(aprovadosNoMes._sum.valorTotal ?? 0),
+      valorAprovado: Number(aprovados._sum.valorTotal ?? 0),
+      quantidadeAprovados: aprovados._count,
     });
   }),
 );
