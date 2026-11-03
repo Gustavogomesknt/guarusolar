@@ -263,6 +263,18 @@ apps/escritorio/               front do escritório (Vite + React + Tailwind v4 
                                remarcar e cancelar. Datas como texto AAAA-MM-DD (dias.ts no
                                compartilhado); serviço de N dias pula o domingo (fimDoServico).
                                A duração não existe na API: o front pergunta os dias e manda dataFim.
+                               HORA DE INÍCIO (03/11/2026): `Agendamento.horaInicio`, texto "HH:MM",
+                               campo SEPARADO (dataInicio/dataFim continuam só dia; nada de timestamp).
+                               Só início, sem fim nem duração. Obrigatória ao AGENDAR e ao REMARCAR
+                               (data ou equipe), conferida na API (`conferirHora`, operacao.ts); trocar a
+                               escala, cancelar ou "em execução" não exigem. Nula = agendado antes do
+                               campo: as telas mostram só o dia. Vale no PRIMEIRO dia (pedaço de outra
+                               semana e dias seguintes saem sem ela). No mesmo dia, ordem pela hora e os
+                               sem hora no fim (`compararPelaHora`, compartilhado/dias.ts); no app, a
+                               continuação de um serviço longo vem antes. Bloco da grade: hora antes da
+                               etapa, numa linha só (`LinhaDaEtapa`; no compacto a etapa corta, a hora
+                               não). Histórico: textos NOVOS com a hora (`periodoDoServico`). O aviso de
+                               conflito continua por dia: a Guarusolar NÃO quer choque de horário.
                                A linha da equipe empilha em FAIXAS os serviços com dias em comum
                                (blocosDaSemana); com mais de uma faixa os blocos ficam compactos.
                                escala.tsx: "Quem vai" (QuemVai), avisos de conflito e os nomes

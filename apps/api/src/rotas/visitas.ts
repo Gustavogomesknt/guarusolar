@@ -27,6 +27,7 @@ const DADOS_DA_VISITA = {
   id: true,
   status: true,
   dataInicio: true,
+  horaInicio: true,
   dataFim: true,
   projeto: { select: { id: true, codigo: true } },
   cliente: { select: { id: true, nome: true, cidade: true, uf: true } },

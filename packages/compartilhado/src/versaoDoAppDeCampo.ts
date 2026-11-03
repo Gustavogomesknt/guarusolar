@@ -20,8 +20,10 @@
  * aberto o app ao menos uma vez com esta versão (ela se atualiza sozinha quando está parada).
  */
 // 2: vídeo nos serviços (rotas novas). 3: visita técnica avulsa (`projeto` null e `cliente` no topo;
-// a API manda às versões < 3 um projeto "Visita avulsa" para não quebrar a agenda delas)
-export const VERSAO_DO_APP_DE_CAMPO = 3;
+// a API manda às versões < 3 um projeto "Visita avulsa" para não quebrar a agenda delas).
+// 4: hora de início do serviço (horaInicio, 03/11/2026). Campo opcional: a API aceita a versão 3
+// (a mínima não muda); subir aqui é para a tela de Usuários marcar quem ainda não vê a hora.
+export const VERSAO_DO_APP_DE_CAMPO = 4;
 export const VERSAO_MINIMA_DO_APP_DE_CAMPO = 0;
 
 /** Cabeçalho com a versão do app de campo, em todo pedido dele à API. */

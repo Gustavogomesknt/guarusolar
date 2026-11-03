@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Bell, BellOff, Check, Clock, Loader2, LocateFixed, MapPin } from 'lucide-react';
-import { diaDaApi, diaDeHoje, diaMes, nomeLongo, ROTEIRO_DO_SERVICO, somarDias } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, diaDeHoje, diaMes, nomeLongo, ROTEIRO_DO_SERVICO, somarDias } from '@guarusolar/compartilhado';
 import { toast } from 'sonner';
 import { api, ErroApi, SEM_CONEXAO } from '@guarusolar/web/api';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
@@ -75,11 +75,12 @@ function useAcompanharValidacao(id: string, ativo: boolean) {
 }
 
 /** "Hoje, 28/09", "Amanhã, 29/09" ou "quarta, 30/09"; período quando tem vários dias. */
-const quando = (inicio: string, fim: string) => {
+/** "Hoje, 03/11 às 08:30"; vários dias: "Hoje, 03/11 às 08:30 a quarta, 05/11" (a hora vale no primeiro dia). */
+const quando = (inicio: string, fim: string, hora?: string | null) => {
   const hoje = diaDeHoje();
   const nome = (d: string) =>
     d === hoje ? `Hoje, ${diaMes(d)}` : d === somarDias(hoje, 1) ? `Amanhã, ${diaMes(d)}` : nomeLongo(d);
-  return inicio === fim ? nome(inicio) : `${nome(inicio)} a ${nome(fim)}`;
+  return inicio === fim ? comHora(nome(inicio), hora) : `${comHora(nome(inicio), hora)} a ${nome(fim)}`;
 };
 
 /**
@@ -383,7 +384,7 @@ export function Servico() {
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <SituacaoServico status={s.status} />
             <span className="rounded-full bg-[#EDF1F6] px-2.5 py-1 text-xs text-[#3A4A5E]">
-              {quando(diaDaApi(s.dataInicio), diaDaApi(s.dataFim))}
+              {quando(diaDaApi(s.dataInicio), diaDaApi(s.dataFim), s.horaInicio)}
             </span>
           </div>
         </section>

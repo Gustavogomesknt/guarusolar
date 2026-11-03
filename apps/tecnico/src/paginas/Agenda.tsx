@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CalendarX2, Clock, KeyRound, Loader2, LogOut, MapPin, Navigation, RefreshCw, Users } from 'lucide-react';
-import { diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
+import { comHora, compararPelaHora, diaDaApi, diaDeHoje, diasUteis, nomeLongo, somarDias, type Dia } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { useSessao } from '@guarusolar/web/sessao';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
@@ -47,9 +47,9 @@ export function Agenda() {
   const dias = Array.from({ length: DIAS_A_FRENTE + 1 }, (_, i) => somarDias(hoje, i))
     .map((dia) => ({
       dia,
-      servicos: servicos.filter(
-        (s) => s.status !== 'DEVOLVIDO' && diaDaApi(s.dataInicio) <= dia && dia <= diaDaApi(s.dataFim),
-      ),
+      servicos: servicos
+        .filter((s) => s.status !== 'DEVOLVIDO' && diaDaApi(s.dataInicio) <= dia && dia <= diaDaApi(s.dataFim))
+        .sort((a, b) => ordemNoDia(a, dia) - ordemNoDia(b, dia) || compararPelaHora(a, b)),
     }))
     .filter((d) => d.servicos.length > 0);
 
@@ -184,6 +184,13 @@ export function Agenda() {
   );
 }
 
+/**
+ * Ordem dentro do dia: primeiro o que CONTINUA de um serviço de vários dias (já em andamento, a
+ * hora dele vale no primeiro dia); depois os que começam no dia, pela hora (compararPelaHora), e
+ * os sem hora (agendados antes do campo) por último.
+ */
+const ordemNoDia = (s: ServicoNaAgenda, dia: Dia) => (diaDaApi(s.dataInicio) < dia ? 0 : 1);
+
 function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaAgenda; dia: Dia; atrasado?: boolean }) {
   const cliente = clienteDoServico(servico);
   const { usuario } = useSessao();
@@ -193,6 +200,8 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
   const fim = diaDaApi(servico.dataFim);
   const total = diasUteis(inicio, fim);
   const atual = diasUteis(inicio, dia);
+  // a hora vale no primeiro dia; agendado antes do campo (ou agenda guardada antes da atualização), sem hora
+  const hora = servico.horaInicio && dia === inicio ? servico.horaInicio : null;
   const endereco = enderecoEscrito(cliente);
   const mapa = linkDoMapa(cliente);
 
@@ -204,6 +213,13 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
         className="flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:ring-inset active:bg-muted/60"
       >
         <span className="flex flex-wrap items-center gap-2">
+          {/* a hora de chegada, antes de tudo: é o que o técnico confere antes de sair */}
+          {hora && !atrasado && (
+            <span className="flex items-center gap-1 text-lg leading-none font-bold tabular-nums">
+              <Clock className="size-4.5" aria-hidden />
+              {hora}
+            </span>
+          )}
           {/* o tipo em destaque: o técnico precisa saber o que foi agendado antes de sair */}
           <span className={cn('rounded-full border-2 px-3 py-1 text-sm font-bold', tipo.fundo, tipo.borda, tipo.texto)}>
             {tipo.rotulo}
@@ -211,7 +227,7 @@ function CartaoServico({ servico, dia, atrasado = false }: { servico: ServicoNaA
           <SituacaoServico status={servico.status} />
           {atrasado ? (
             <span className="text-xs text-destaque-texto">
-              {inicio === fim ? `era para ${nomeLongo(inicio)}` : `de ${nomeLongo(inicio)} a ${nomeLongo(fim)}`}
+              {inicio === fim ? `era para ${comHora(nomeLongo(inicio), servico.horaInicio)}` : `de ${comHora(nomeLongo(inicio), servico.horaInicio)} a ${nomeLongo(fim)}`}
             </span>
           ) : (
             total > 1 && (

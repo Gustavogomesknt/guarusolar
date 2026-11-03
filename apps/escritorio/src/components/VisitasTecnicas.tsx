@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ImageOff, Loader2 } from 'lucide-react';
-import { diaDaApi, formatarDataHora } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, formatarDataHora } from '@guarusolar/compartilhado';
 import { api, urlDaFoto } from '@guarusolar/web/api';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
@@ -38,7 +38,9 @@ const useVisitasDoCliente = (clienteId: string) =>
 
 /** Datas do agendamento são só dia (meia-noite UTC): nada de fuso, senão 15/10 vira 14/10. */
 const diaBr = (iso: string) => diaDaApi(iso).split('-').reverse().join('/');
-const periodo = (v: VisitaTecnica) => (diaDaApi(v.dataInicio) === diaDaApi(v.dataFim) ? diaBr(v.dataInicio) : `${diaBr(v.dataInicio)} a ${diaBr(v.dataFim)}`);
+// a hora vale no primeiro dia; visita agendada antes do campo mostra só o dia
+const periodo = (v: VisitaTecnica) =>
+  diaDaApi(v.dataInicio) === diaDaApi(v.dataFim) ? comHora(diaBr(v.dataInicio), v.horaInicio) : `${comHora(diaBr(v.dataInicio), v.horaInicio)} a ${diaBr(v.dataFim)}`;
 
 /** Uma visita: quando, quem foi, quem enviou e validou, observações, fotos e vídeos. */
 export function CartaoVisita({ visita: v, mostrarCliente = false, acoes }: { visita: VisitaTecnica; mostrarCliente?: boolean; acoes?: ReactNode }) {

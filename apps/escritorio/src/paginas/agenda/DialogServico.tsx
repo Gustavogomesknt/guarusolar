@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { diaDaApi, diasUteis, fimDoServico, nomeLongo, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type Dia, type TipoServico } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, diasUteis, fimDoServico, FORMATO_DA_HORA, nomeLongo, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type Dia, type TipoServico } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { CLASSE_SELECT, EFEITO_DA_VALIDACAO } from './DialogAgendar';
 import { AvisosDeConflito, escalaPadrao, nomesDaEscala, QuemVai, SemTecnicoEscalado, useAvisosDeConflito, useTecnicos } from './escala';
@@ -45,6 +45,8 @@ export function DialogServico({
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
   const [dias, setDias] = useState('1');
+  // hora de início: obrigatória ao remarcar; serviço antigo (sem hora) começa vazio
+  const [hora, setHora] = useState('');
   const [tipoEscolhido, setTipoEscolhido] = useState<TipoServico>('INSTALACAO');
   const [escala, setEscala] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export function DialogServico({
     setEquipeId(servico.equipeId);
     setDia(diaDaApi(servico.dataInicio));
     setDias(String(diasUteis(diaDaApi(servico.dataInicio), diaDaApi(servico.dataFim))));
+    setHora(servico.horaInicio ?? '');
     setEscala(servico.escala.map((e) => e.usuario.id));
     setTipoEscolhido(servico.tipo);
     setErro(null);
@@ -85,7 +88,7 @@ export function DialogServico({
           ? `Serviço de ${cliente} cancelado.`
           : corpo.tecnicos
             ? `Escala de ${cliente} atualizada`
-            : `Serviço de ${cliente} atualizado: ${nomeLongo(dia)}`,
+            : `Serviço de ${cliente} atualizado: ${comHora(nomeLongo(dia), hora)}`,
       );
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
       void clienteConsultas.invalidateQueries({ queryKey: ['projetos'] });
@@ -144,7 +147,8 @@ export function DialogServico({
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Quando</dt>
-            <dd className="font-medium">{inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`}</dd>
+            {/* a hora vale no primeiro dia; serviço agendado antes do campo mostra só o dia */}
+            <dd className="font-medium">{inicio === fim ? comHora(nomeLongo(inicio), servico.horaInicio) : `${comHora(nomeLongo(inicio), servico.horaInicio)} a ${nomeLongo(fim)}`}</dd>
           </div>
           <div className="col-span-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -194,7 +198,7 @@ export function DialogServico({
             onSubmit={(e) => {
               e.preventDefault();
               setErro(null);
-              alterar.mutate({ equipeId, dataInicio: dia, dataFim: novoFim, ...(tipoEscolhido !== servico.tipo ? { tipo: tipoEscolhido } : {}) });
+              alterar.mutate({ equipeId, dataInicio: dia, dataFim: novoFim, horaInicio: hora, ...(tipoEscolhido !== servico.tipo ? { tipo: tipoEscolhido } : {}) });
             }}
             className="flex flex-col gap-3"
           >
@@ -244,9 +248,17 @@ export function DialogServico({
                 ))}
               </select>
             </Campo>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Campo id="rm-dia" rotulo="Primeiro dia">
                 <Input id="rm-dia" type="date" value={dia} onChange={(e) => setDia(e.target.value)} className="h-11 rounded-[10px]" />
+              </Campo>
+              <Campo
+                id="rm-hora"
+                rotulo="Hora de início"
+                obrigatorio
+                ajuda={FORMATO_DA_HORA.test(hora) ? (quantidade > 1 ? 'No primeiro dia' : undefined) : servico.horaInicio ? 'Obrigatória' : 'Sem hora até agora: informe para salvar'}
+              >
+                <Input id="rm-hora" type="time" required value={hora} onChange={(e) => setHora(e.target.value)} className="h-11 rounded-[10px]" />
               </Campo>
               <Campo id="rm-dias" rotulo="Duração (dias)" ajuda={novoFim && quantidade > 1 ? `Termina ${nomeLongo(novoFim)}` : undefined}>
                 <Input id="rm-dias" type="number" min={1} max={30} value={dias} onChange={(e) => setDias(e.target.value)} className="h-11 rounded-[10px]" />
@@ -305,7 +317,7 @@ export function DialogServico({
               <Button variant="outline" className="h-11 rounded-[10px]" onClick={() => setModo('ver')} disabled={alterar.isPending}>
                 Voltar
               </Button>
-              <Button type="submit" form="form-remarcar" className="h-11 rounded-[10px] font-semibold" disabled={alterar.isPending || !dia}>
+              <Button type="submit" form="form-remarcar" className="h-11 rounded-[10px] font-semibold" disabled={alterar.isPending || !dia || !FORMATO_DA_HORA.test(hora)}>
                 {alterar.isPending && <Loader2 className="animate-spin" aria-hidden />}
                 Salvar alterações
               </Button>

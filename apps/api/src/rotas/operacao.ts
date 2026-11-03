@@ -35,7 +35,7 @@ import {
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 import { filtroDeInstalacaoDoCliente, filtroDeVisitasDoCliente, filtroDoTecnico } from '../lib/acesso';
 import { pastaDoServico } from '../lib/armazenamento';
-import { CABECALHO_VERSAO_DO_APP, diaDeHoje, moveOProjeto, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
+import { CABECALHO_VERSAO_DO_APP, diaDeHoje, FORMATO_DA_HORA, moveOProjeto, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
 import { mudarSituacaoDoProjeto, outroServicoAndando, situacaoDevida } from '../lib/situacaoDoProjeto';
 
 // Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
@@ -50,6 +50,17 @@ rotasAgenda.use(autenticar, autorizar('GESTOR'));
 
 // ids de equipe não são UUID (o seed usa o nome, ex.: "Equipe A")
 const idEquipe = z.string().trim().min(1, 'Escolha a equipe');
+
+// Hora de início (03/11/2026): obrigatória ao AGENDAR e ao REMARCAR, nunca para mexer na escala
+// ou cancelar. A tela aberta antes da publicação não tem o campo: a mensagem manda recarregar.
+// Conferida fora do Zod de propósito: o erro do Zod chega à tela como "Dados inválidos".
+const AVISO_SEM_HORA = 'Informe a hora de início do serviço. Se o campo não aparecer, recarregue a página.';
+const horaDoServico = z.string().optional();
+function conferirHora(hora: string | undefined): string {
+  if (!hora?.trim()) throw new ErroHttp(400, AVISO_SEM_HORA);
+  if (!FORMATO_DA_HORA.test(hora)) throw new ErroHttp(400, 'Hora de início inválida: use o formato 08:30, de 00:00 a 23:59.');
+  return hora;
+}
 
 /** 2026-09-29 -> 29/09 (datas do agendamento são só dia, sem hora). */
 const diaMes = (d: Date) => d.toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/');
@@ -241,7 +252,7 @@ rotasAgenda.get(
         membros: { where: { ativo: true }, select: { id: true, nome: true, papel: true } },
         agendamentos: {
           where: { dataInicio: { lte: fim }, dataFim: { gte: inicio }, status: { not: 'CANCELADO' } },
-          orderBy: { dataInicio: 'asc' },
+          orderBy: [{ dataInicio: 'asc' }, { horaInicio: { sort: 'asc', nulls: 'last' } }],
           include: {
             projeto: {
               include: {
@@ -295,6 +306,7 @@ rotasAgenda.post(
         tipo: z.enum(TIPOS_SERVICO_AGENDAVEIS, { message: 'Escolha a etapa' }),
         dataInicio: z.coerce.date(),
         dataFim: z.coerce.date(),
+        horaInicio: horaDoServico,
         // quem vai; ausente = os técnicos ativos da equipe (a composição padrão)
         tecnicos: z.array(z.string().uuid()).max(20).optional(),
       })
@@ -311,6 +323,7 @@ rotasAgenda.post(
         path: ['tipo'],
       })
       .parse(req.body);
+    const horaInicio = conferirHora(dados.horaInicio);
 
     if (dados.clienteId) {
       // visita técnica AVULSA: antes (ou depois) do orçamento, sem projeto; o endereço é o do cadastro
@@ -339,12 +352,12 @@ rotasAgenda.post(
 
     const agendamento = await prisma.$transaction(async (tx) => {
       const criado = await tx.agendamento.create({
-        data: { ...campos, escala: { create: escala.map((t) => ({ usuarioId: t.id })) } },
+        data: { ...campos, horaInicio, escala: { create: escala.map((t) => ({ usuarioId: t.id })) } },
       });
       await passoDoServico(tx, {
         servico: { id: criado.id, projetoId: dados.projetoId ?? null, tipo: dados.tipo },
         evento: 'SERVICO_AGENDADO',
-        descricao: `${rotuloDoServico(dados.tipo)} agendad${oa(dados.tipo)} para ${periodoDoServico(dados.dataInicio, dados.dataFim)} com a ${equipe.nome}: ${nomesDe(escala)}`,
+        descricao: `${rotuloDoServico(dados.tipo)} agendad${oa(dados.tipo)} para ${periodoDoServico(dados.dataInicio, dados.dataFim, horaInicio)} com a ${equipe.nome}: ${nomesDe(escala)}`,
         usuarioId: req.usuario!.id,
       });
       return criado;
@@ -363,6 +376,8 @@ rotasAgenda.patch(
         equipeId: idEquipe.optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
+        // obrigatória ao remarcar (data ou equipe): conferida logo abaixo
+        horaInicio: horaDoServico,
         // troca a escala (quem vai); só com o serviço em aberto
         tecnicos: z.array(z.string().uuid()).max(20).optional(),
         // troca o tipo; só antes de o técnico começar (o tipo define o roteiro de fotos)
@@ -370,6 +385,11 @@ rotasAgenda.patch(
         status: z.enum(['AGENDADO', 'EM_EXECUCAO', 'CANCELADO']).optional(),
       })
       .parse(req.body);
+
+    // remarcar = mudar data ou equipe (o formulário da janela do serviço, que manda também a
+    // etapa): exige a hora, mesmo num serviço antigo sem ela. Escala, cancelar e "em execução" não.
+    const remarcando = dados.dataInicio !== undefined || dados.dataFim !== undefined || dados.equipeId !== undefined;
+    if ((remarcando && dados.status !== 'CANCELADO') || dados.horaInicio !== undefined) conferirHora(dados.horaInicio);
 
     const atual = await prisma.agendamento.findUnique({ where: { id: req.params.id }, include: ESCALA });
     if (!atual) throw new ErroHttp(404, 'Serviço não encontrado');
@@ -435,12 +455,13 @@ rotasAgenda.patch(
         await passoDoServico(tx, {
           servico: atual,
           evento: 'SERVICO_CANCELADO',
-          descricao: `${servico} de ${periodoDoServico(atual.dataInicio, atual.dataFim)} cancelad${oa(atual.tipo)}`,
+          descricao: `${servico} de ${periodoDoServico(atual.dataInicio, atual.dataFim, atual.horaInicio)} cancelad${oa(atual.tipo)}`,
           usuarioId: req.usuario!.id,
         });
       } else {
-        const antes = periodoDoServico(atual.dataInicio, atual.dataFim);
-        const depois = periodoDoServico(ag.dataInicio, ag.dataFim);
+        // com a hora: mudar só o horário também é remarcar ("de 30/09 às 08:30 para 30/09 às 14:00")
+        const antes = periodoDoServico(atual.dataInicio, atual.dataFim, atual.horaInicio);
+        const depois = periodoDoServico(ag.dataInicio, ag.dataFim, ag.horaInicio);
         const mudancas: string[] = [];
         if (antes !== depois) mudancas.push(`de ${antes} para ${depois}`);
         if (ag.equipeId !== atual.equipeId) mudancas.push(`equipe: ${ag.equipe.nome}`);
@@ -783,7 +804,7 @@ rotasTecnico.get(
           },
         ],
       },
-      orderBy: { dataInicio: 'asc' },
+      orderBy: [{ dataInicio: 'asc' }, { horaInicio: { sort: 'asc', nulls: 'last' } }],
       include: {
         // com quem ele vai: a equipe (linha da agenda) e os colegas escalados
         equipe: { select: { nome: true } },
@@ -852,6 +873,7 @@ async function visitasParaAInstalacao(instalacao: { id: string; projetoId: strin
       id: true,
       status: true,
       dataInicio: true,
+      horaInicio: true,
       dataFim: true,
       enviadoEm: true,
       observacoesTecnico: true,

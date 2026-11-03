@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { FolderKanban, Loader2, Search } from 'lucide-react';
 import {
+  comHora,
   formatarData,
   intervaloEscrito,
   ROTULO_STATUS_PROJETO,
@@ -27,6 +28,12 @@ const FILTROS: Filtro[] = ['EM_ANDAMENTO', 'AGUARDANDO_AGENDAMENTO', 'AGENDADO',
 const COLUNAS = 'grid-cols-[minmax(0,1.3fr)_150px_130px_150px_minmax(0,1.2fr)]';
 
 const dia = (iso: string) => iso.slice(0, 10);
+/** "29 set 2026 às 08:30"; vários dias: "28 set a 3 out 2026, início às 08:30"; sem hora, só o dia */
+const quandoDoServico = (s: { dataInicio: string; dataFim: string; horaInicio: string | null }) => {
+  const intervalo = intervaloEscrito(dia(s.dataInicio), dia(s.dataFim));
+  if (!s.horaInicio) return intervalo;
+  return dia(s.dataInicio) === dia(s.dataFim) ? comHora(intervalo, s.horaInicio) : `${intervalo}, início às ${s.horaInicio}`;
+};
 
 /**
  * Projetos (obras), do orçamento aprovado à conclusão. Padrão: "Em andamento". O comercial
@@ -216,7 +223,7 @@ function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor:
       return s ? (
         <span className="flex flex-col">
           <span className="font-medium">
-            {ROTULO_TIPO_SERVICO[s.tipo]} · {intervaloEscrito(dia(s.dataInicio), dia(s.dataFim))}
+            {ROTULO_TIPO_SERVICO[s.tipo]} · {quandoDoServico(s)}
           </span>
           <span className="text-muted-foreground">
             {s.equipe}
@@ -232,7 +239,7 @@ function ProximoPasso({ projeto: p, gestor }: { projeto: ProjetoNaLista; gestor:
               ? 'Técnico refazendo fotos'
               : s.status === 'AGENDADO'
                 ? // obra em andamento: um dia já foi validado e este é o próximo
-                  `Próximo: ${ROTULO_TIPO_SERVICO[s.tipo]} · ${intervaloEscrito(dia(s.dataInicio), dia(s.dataFim))}`
+                  `Próximo: ${ROTULO_TIPO_SERVICO[s.tipo]} · ${quandoDoServico(s)}`
                 : `${ROTULO_TIPO_SERVICO[s.tipo]} em execução`}
           </span>
           <span className="text-muted-foreground">

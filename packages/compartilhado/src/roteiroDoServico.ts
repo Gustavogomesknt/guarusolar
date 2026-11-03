@@ -1,3 +1,4 @@
+import { compararPelaHora } from './dias.js';
 import type { StatusAgendamento, TipoServico } from './enums.js';
 
 /*
@@ -114,8 +115,11 @@ const dia = (d: string | Date) => (typeof d === 'string' ? d : d.toISOString()).
  * O serviço "da vez" de um projeto com vários: o que está andando; senão o próximo agendado
  * (a data mais próxima); senão o último validado. Cancelados não contam.
  */
-export function servicoDaVez<T extends { status: StatusAgendamento; dataInicio: string | Date }>(servicos: readonly T[]): T | null {
-  const porData = [...servicos].sort((a, b) => dia(a.dataInicio).localeCompare(dia(b.dataInicio)));
+export function servicoDaVez<T extends { status: StatusAgendamento; dataInicio: string | Date; horaInicio?: string | null }>(
+  servicos: readonly T[],
+): T | null {
+  // mesmo dia: pela hora de início, os sem hora por último
+  const porData = [...servicos].sort((a, b) => dia(a.dataInicio).localeCompare(dia(b.dataInicio)) || compararPelaHora(a, b));
   const andando: readonly StatusAgendamento[] = SERVICO_ANDANDO;
   return (
     porData.find((s) => andando.includes(s.status)) ??

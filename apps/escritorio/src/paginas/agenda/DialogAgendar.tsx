@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { fimDoServico, diaDeHoje, nomeLongo, type Dia } from '@guarusolar/compartilhado';
+import { comHora, fimDoServico, diaDeHoje, FORMATO_DA_HORA, nomeLongo, type Dia } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { AvisosDeConflito, escalaPadrao, QuemVai, useAvisosDeConflito, useTecnicos } from './escala';
 
@@ -65,6 +65,8 @@ export function DialogAgendar({
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
+  // hora de início: obrigatória, começa vazia (nada de horário inventado)
+  const [hora, setHora] = useState('');
   const [tipo, setTipo] = useState<TipoServico>('INSTALACAO');
   const [dias, setDias] = useState('1');
   const [escala, setEscala] = useState<string[]>([]);
@@ -76,6 +78,7 @@ export function DialogAgendar({
     setCliente(null);
     setEquipeId(inicial.equipeId ?? equipes[0]?.id ?? '');
     setDia(inicial.dia ?? diaDeHoje());
+    setHora('');
     setTipo(inicial.avulsa ? 'VISITA_TECNICA' : 'INSTALACAO');
     setDias('1');
     setErro(null);
@@ -100,13 +103,14 @@ export function DialogAgendar({
         tipo,
         dataInicio: dia,
         dataFim: fim,
+        horaInicio: hora,
         tecnicos: escala,
       }),
     meta: { erroTratadoNoFormulario: true },
     onSuccess: () => {
       const equipe = equipes.find((e) => e.id === equipeId)?.nome;
       const nome = avulsa ? `Visita técnica de ${cliente?.nome}` : (projeto?.cliente.nome ?? 'Serviço');
-      toast.success(`${nome} agendad${avulsa ? 'a' : 'o'} para ${equipe} em ${nomeLongo(dia)}`);
+      toast.success(`${nome} agendad${avulsa ? 'a' : 'o'} para ${equipe} em ${comHora(nomeLongo(dia), hora)}`);
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
       onAgendado();
     },
@@ -114,7 +118,8 @@ export function DialogAgendar({
   });
 
   // sem a lista de técnicos a escala iria vazia: espera carregar
-  const podeEnviar = (avulsa ? cliente : projetoId) && equipeId && dia && !agendar.isPending && todos !== undefined;
+  const horaValida = FORMATO_DA_HORA.test(hora);
+  const podeEnviar = (avulsa ? cliente : projetoId) && equipeId && dia && horaValida && !agendar.isPending && todos !== undefined;
 
   return (
     <Dialog open={aberto} onOpenChange={(a) => !a && !agendar.isPending && onFechar()}>
@@ -179,9 +184,12 @@ export function DialogAgendar({
             </Campo>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Campo id="ag-dia" rotulo="Primeiro dia">
               <Input id="ag-dia" type="date" value={dia} onChange={(e) => setDia(e.target.value)} className="h-11 rounded-[10px]" />
+            </Campo>
+            <Campo id="ag-hora" rotulo="Hora de início" obrigatorio ajuda={horaValida ? (quantidade > 1 ? 'No primeiro dia' : undefined) : 'Obrigatória'}>
+              <Input id="ag-hora" type="time" required value={hora} onChange={(e) => setHora(e.target.value)} className="h-11 rounded-[10px]" />
             </Campo>
             <Campo id="ag-dias" rotulo="Duração (dias)" ajuda={fim && quantidade > 1 ? `Termina ${nomeLongo(fim)}` : 'Um dia, por padrão'}>
               <Input

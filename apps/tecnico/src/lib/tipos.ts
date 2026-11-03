@@ -30,6 +30,8 @@ export type ServicoNaAgenda = {
   tipo: TipoServico;
   status: StatusAgendamento;
   dataInicio: string;
+  /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo, e ausente na agenda guardada no aparelho antes da atualização (03/11/2026) */
+  horaInicio?: string | null;
   dataFim: string;
   motivoDevolucao: string | null;
   projeto: { codigo: string; cliente?: ClienteDoServico } | null;
@@ -97,6 +99,8 @@ export type VisitaDoCliente = {
   id: string;
   status: StatusAgendamento;
   dataInicio: string;
+  /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo, e ausente na agenda guardada no aparelho antes da atualização (03/11/2026) */
+  horaInicio?: string | null;
   dataFim: string;
   enviadoEm: string | null;
   observacoesTecnico: string | null;

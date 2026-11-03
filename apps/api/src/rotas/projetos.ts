@@ -96,6 +96,7 @@ rotasProjetos.get(
               tipo: daVez.tipo,
               status: daVez.status,
               dataInicio: daVez.dataInicio,
+              horaInicio: daVez.horaInicio,
               dataFim: daVez.dataFim,
               equipe: daVez.equipe.nome,
               enviadoEm: daVez.enviadoEm,
@@ -146,7 +147,7 @@ rotasProjetos.get(
         },
         agendamentos: {
           // em ordem de data (um projeto pode ter vários agendados de uma vez)
-          orderBy: [{ dataInicio: 'asc' }, { criadoEm: 'asc' }],
+          orderBy: [{ dataInicio: 'asc' }, { horaInicio: { sort: 'asc', nulls: 'last' } }, { criadoEm: 'asc' }],
           include: {
             equipe: { select: { nome: true } },
             escala: { select: { usuario: { select: { id: true, nome: true } } }, orderBy: { usuario: { nome: 'asc' } } },

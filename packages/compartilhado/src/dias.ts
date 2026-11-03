@@ -77,3 +77,19 @@ export function numeroDaSemana(dia: Dia) {
 
 /** Data vinda da API ("2026-09-29T00:00:00.000Z") -> "2026-09-29" */
 export const diaDaApi = (iso: string): Dia => iso.slice(0, 10);
+
+// ---------------------------------------------------------------------------------------------
+// Hora de início do serviço (Agendamento.horaInicio, 03/11/2026): texto "HH:MM" no horário da
+// empresa, separado do dia (o dia continua sem hora e sem fuso). Vale só no PRIMEIRO dia de um
+// serviço de vários dias. Nula = agendado antes do campo: "sem horário", e a tela mostra só o dia.
+// ---------------------------------------------------------------------------------------------
+
+/** "08:30"; 00:00 a 23:59, sempre com dois dígitos (assim a ordem do texto é a da hora). */
+export const FORMATO_DA_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** "terça, 29/09" -> "terça, 29/09 às 08:30"; sem hora, o texto como veio. */
+export const comHora = (texto: string, hora: string | null | undefined) => (hora ? `${texto} às ${hora}` : texto);
+
+/** Ordena serviços do MESMO dia pela hora de início; os sem hora vão para o fim. */
+export const compararPelaHora = (a: { horaInicio?: string | null }, b: { horaInicio?: string | null }) =>
+  (a.horaInicio ?? '99:99').localeCompare(b.horaInicio ?? '99:99');

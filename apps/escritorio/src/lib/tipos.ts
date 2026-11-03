@@ -49,6 +49,8 @@ export type AgendamentoNaAgenda = {
   tipo: TipoServico;
   status: StatusAgendamento;
   dataInicio: string;
+  /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */
+  horaInicio: string | null;
   dataFim: string;
   projeto: {
     codigo: string;
@@ -292,6 +294,8 @@ export type ServicoEmValidacao = {
   tipo: TipoServico;
   status: StatusAgendamento;
   dataInicio: string;
+  /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */
+  horaInicio: string | null;
   dataFim: string;
   enviadoEm: string | null;
   sistemaTestado: boolean;
@@ -342,6 +346,8 @@ export type ProjetoNaLista = {
     tipo: TipoServico;
     status: StatusAgendamento;
     dataInicio: string;
+    /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */
+    horaInicio: string | null;
     dataFim: string;
     equipe: string;
     enviadoEm: string | null;
@@ -400,6 +406,8 @@ export type FichaDoProjeto = {
     tipo: TipoServico;
     status: StatusAgendamento;
     dataInicio: string;
+    /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */
+    horaInicio: string | null;
     dataFim: string;
     enviadoEm: string | null;
     validadoEm: string | null;
@@ -473,6 +481,8 @@ export type VisitaTecnica = {
   id: string;
   status: StatusAgendamento;
   dataInicio: string;
+  /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */
+  horaInicio: string | null;
   dataFim: string;
   avulsa: boolean;
   /** validada, sem orçamento do cliente criado depois e não dispensada */

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, TriangleAlert, Users, X } from 'lucide-react';
-import { ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
+import { comHora, compararPelaHora, ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { clienteDoServico, type AgendamentoNaAgenda, type EquipeNaAgenda, type ProjetoPendente } from '@/lib/tipos';
@@ -51,8 +51,9 @@ function blocosDaSemana(equipe: EquipeNaAgenda, dias: Dia[]) {
       return cobertos.length ? { servico, coluna: cobertos[0], largura: cobertos[cobertos.length - 1] - cobertos[0] + 1 } : null;
     })
     .filter((b) => b !== null)
-    // os mais longos primeiro: a barra de vários dias fica em cima e as visitas do dia, embaixo
-    .sort((a, b) => a.coluna - b.coluna || b.largura - a.largura);
+    // os mais longos primeiro: a barra de vários dias fica em cima e as visitas do dia, embaixo;
+    // no mesmo dia, pela hora de início (os sem hora por último)
+    .sort((a, b) => a.coluna - b.coluna || b.largura - a.largura || compararPelaHora(a.servico, b.servico));
   for (const b of recortados) {
     let faixa = fimDaFaixa.findIndex((fim) => fim < b.coluna);
     if (faixa < 0) faixa = fimDaFaixa.length;
@@ -416,7 +417,9 @@ function LinhaEquipe({
         const tipo = TIPOS_SERVICO_AGENDA[servico.tipo];
         const inicio = diaDaApi(servico.dataInicio);
         const fim = diaDaApi(servico.dataFim);
-        const quando = inicio === fim ? nomeLongo(inicio) : `${nomeLongo(inicio)} a ${nomeLongo(fim)}`;
+        const quando = inicio === fim ? comHora(nomeLongo(inicio), servico.horaInicio) : `${comHora(nomeLongo(inicio), servico.horaInicio)} a ${nomeLongo(fim)}`;
+        // a hora vale no primeiro dia: o pedaço de um serviço que começou na semana anterior sai sem ela
+        const hora = servico.horaInicio && inicio === dias[coluna] ? servico.horaInicio : null;
         const cliente = clienteDoServico(servico);
         const cidade = cliente.cidade;
         // visita técnica avulsa: sem projeto (nem código), com a marca no bloco
@@ -446,10 +449,7 @@ function LinhaEquipe({
               // faixa compacta: tipo, sinal da situação e cliente; o resto está na janela do serviço
               <>
                 <span className="flex w-full items-center justify-between gap-1.5">
-                  <span className="truncate text-[10px] font-semibold tracking-[0.04em] uppercase">
-                    {tipo.rotulo}
-                    {avulsa && ' · avulsa'}
-                  </span>
+                  <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ' · avulsa' : ''}`} />
                   <span className="flex shrink-0 items-center gap-1">
                     {semEscala && (
                       <span title="Sem técnico escalado">
@@ -463,10 +463,7 @@ function LinhaEquipe({
               </>
             ) : (
               <>
-                <span className="w-full truncate text-[10px] font-semibold tracking-[0.04em] uppercase">
-                  {tipo.rotulo}
-                  {avulsa && ' · avulsa'}
-                </span>
+                <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ' · avulsa' : ''}`} className="w-full" />
                 <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{cliente.nome}</span>
                 <span className="w-full truncate text-xs opacity-80">
                   {[cidade, servico.projeto ? servico.projeto.orcamento.codigo : 'Sem projeto'].filter(Boolean).join(' · ')}
@@ -490,5 +487,19 @@ function LinhaEquipe({
         );
       })}
     </li>
+  );
+}
+
+/**
+ * Primeira linha do bloco: a hora de início (no primeiro dia) e a etapa. Numa linha só, também no
+ * modo compacto: sem espaço, quem corta com reticências é a etapa (a cor do bloco já a diz), nunca
+ * a hora. Sem hora (agendado antes do campo), só a etapa, como antes.
+ */
+function LinhaDaEtapa({ hora, etapa, className }: { hora: string | null; etapa: string; className?: string }) {
+  return (
+    <span className={cn('flex min-w-0 items-baseline gap-1 text-[10px] font-semibold tracking-[0.04em] uppercase', className)}>
+      {hora && <span className="shrink-0 tracking-normal tabular-nums">{hora} ·</span>}
+      <span className="min-w-0 truncate">{etapa}</span>
+    </span>
   );
 }

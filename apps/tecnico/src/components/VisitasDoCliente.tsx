@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ClipboardList, ImageIcon, X } from 'lucide-react';
-import { diaDaApi, nomeLongo } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, nomeLongo } from '@guarusolar/compartilhado';
 import { urlDaFoto } from '@guarusolar/web/api';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import type { VisitaDoCliente } from '@/lib/tipos';
@@ -38,7 +38,7 @@ export function VisitasDoCliente({ visitas }: { visitas: VisitaDoCliente[] }) {
           {visitas.map((v) => (
             <article key={v.id} className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold">
-                {nomeLongo(diaDaApi(v.dataInicio))}
+                {comHora(nomeLongo(diaDaApi(v.dataInicio)), v.horaInicio)}
                 {v.enviadoPor && <span className="font-normal text-muted-foreground"> · {v.enviadoPor.nome}</span>}
               </h3>
               <p className="rounded-xl bg-background px-3 py-2 text-sm whitespace-pre-wrap">

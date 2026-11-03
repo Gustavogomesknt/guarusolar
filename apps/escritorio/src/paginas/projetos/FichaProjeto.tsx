@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ArrowRight, Check, ClipboardCheck, ExternalLink, ImageOff, Loader2, MessageCircle, RotateCcw } from 'lucide-react';
 import {
   formatarData,
+  comHora,
   formatarDataHora,
   ROTULO_STATUS_PROJETO,
   ROTULO_TIPO_SERVICO,
@@ -38,12 +39,13 @@ type Servico = Ficha['agendamentos'][number];
 const dia = (iso: string) => iso.slice(0, 10);
 // dia do serviço (AAAA-MM-DD, sem fuso) no mesmo formato numérico das outras datas da ficha
 const diaBr = (d: string) => d.split('-').reverse().join('/');
-const periodo = (s: Pick<Servico, 'dataInicio' | 'dataFim'>) => {
+const periodo = (s: Pick<Servico, 'dataInicio' | 'dataFim' | 'horaInicio'>) => {
   const inicio = dia(s.dataInicio);
   const fim = dia(s.dataFim);
-  if (inicio === fim) return diaBr(inicio);
-  // 29/09 a 01/10/2026; o ano aparece duas vezes só se mudar
-  return `${inicio.slice(0, 4) === fim.slice(0, 4) ? diaBr(inicio).slice(0, 5) : diaBr(inicio)} a ${diaBr(fim)}`;
+  // a hora vale no primeiro dia; agendado antes do campo, só o dia
+  if (inicio === fim) return comHora(diaBr(inicio), s.horaInicio);
+  // 29/09 às 08:30 a 01/10/2026; o ano aparece duas vezes só se mudar
+  return `${comHora(inicio.slice(0, 4) === fim.slice(0, 4) ? diaBr(inicio).slice(0, 5) : diaBr(inicio), s.horaInicio)} a ${diaBr(fim)}`;
 };
 const agendaDaSemana = (s: Servico) => `/agenda?semana=${segundaDaSemana(dia(s.dataInicio))}`;
 /** ainda não validado nem cancelado */

@@ -25,10 +25,14 @@ export async function registrarEvento(
   await tx.eventoProjeto.create({ data: evento });
 }
 
-/** "30/09" ou "30/09 a 02/10" (datas do serviço, gravadas como dia sem hora). */
-export function periodoDoServico(inicio: Date, fim: Date) {
+/**
+ * "30/09" ou "30/09 a 02/10" (datas do serviço, gravadas como dia sem hora). Com a hora de
+ * início (03/11/2026), ela entra no primeiro dia: "30/09 às 08:30", "30/09 às 08:30 a 02/10".
+ */
+export function periodoDoServico(inicio: Date, fim: Date, hora?: string | null) {
   const dia = (d: Date) => `${d.toISOString().slice(8, 10)}/${d.toISOString().slice(5, 7)}`;
-  return inicio.getTime() === fim.getTime() ? dia(inicio) : `${dia(inicio)} a ${dia(fim)}`;
+  const primeiro = hora ? `${dia(inicio)} às ${hora}` : dia(inicio);
+  return inicio.getTime() === fim.getTime() ? primeiro : `${primeiro} a ${dia(fim)}`;
 }
 
 export const rotuloDoServico = (tipo: TipoServico) => ROTULO_TIPO_SERVICO[tipo];

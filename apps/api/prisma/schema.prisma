@@ -542,6 +542,9 @@ model Agendamento {
 
   dataInicio DateTime @db.Date
   dataFim    DateTime @db.Date // mesma data do início quando é serviço de 1 dia
+  /// hora de início no primeiro dia, "HH:MM" (horário de São Paulo; 03/11/2026). Obrigatória ao
+  /// agendar e ao remarcar (a API confere); nula nos agendados antes do campo = "sem horário"
+  horaInicio String?  @db.VarChar(5)
 
   tecnicoResponsavelId String?
   tecnicoResponsavel   Usuario? @relation("TecnicoResponsavel", fields: [tecnicoResponsavelId], references: [id])
