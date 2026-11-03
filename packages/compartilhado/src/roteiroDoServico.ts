@@ -32,24 +32,27 @@ export type RoteiroDoServico = {
   aoValidar: 'A_AGENDAR' | 'AGUARDANDO_CONCLUSAO' | 'NAO_MEXE';
 };
 
+// roteiro enviado pelo cliente em 19/10/2026: todas com chave nova (nenhuma é a mesma foto de antes)
 const FOTOS_DA_INSTALACAO: ItemDoRoteiro[] = [
-  { chave: 'paineis_instalados', rotulo: 'Painéis instalados (visão geral)' },
-  { chave: 'estrutura_fixacao', rotulo: 'Estrutura e fixação' },
-  { chave: 'inversor', rotulo: 'Inversor instalado' },
-  { chave: 'string_box', rotulo: 'String box / quadro CC' },
-  { chave: 'aterramento', rotulo: 'Aterramento' },
-  { chave: 'padrao_entrada', rotulo: 'Padrão de entrada / medidor' },
+  { chave: 'carregador_frontal', rotulo: 'Foto frontal do carregador instalado' },
+  { chave: 'carregador_etiqueta', rotulo: 'Etiqueta de identificação do carregador' },
+  { chave: 'carregador_bornes', rotulo: 'Bornes internos do carregador' },
+  { chave: 'disjuntor_padrao_entrada', rotulo: 'Disjuntor do padrão de entrada' },
+  { chave: 'quadro_disjuntores_casa', rotulo: 'Quadro de disjuntores da casa' },
+  { chave: 'quadro_protecao_carregador', rotulo: 'Quadro de proteção exclusivo do carregador' },
+  { chave: 'bitola_cabos', rotulo: 'Bitola dos cabos com identificação legível' },
+  { chave: 'vista_ampla_local', rotulo: 'Foto ampla do local da instalação' },
 ];
 
 const OBSERVACOES_LIVRES = { rotulo: 'Observações', obrigatorias: false, dica: 'O que o escritório precisa saber sobre este serviço.' };
 
 export const ROTEIRO_DO_SERVICO: Record<TipoServico, RoteiroDoServico> = {
   VISITA_TECNICA: {
+    // padrao_entrada é a mesma foto de antes (só o nome mudou); as outras têm chave nova
     fotos: [
-      { chave: 'padrao_entrada', rotulo: 'Padrão de entrada' },
-      { chave: 'quadro_distribuicao', rotulo: 'Quadro de distribuição' },
-      { chave: 'local_instalacao', rotulo: 'Local da instalação' },
-      { chave: 'vista_geral', rotulo: 'Vista geral' },
+      { chave: 'vaga', rotulo: 'Foto da vaga' },
+      { chave: 'padrao_entrada', rotulo: 'Foto do padrão de entrada' },
+      { chave: 'local_infra', rotulo: 'Foto do local da infra que será instalada' },
     ],
     observacoes: {
       rotulo: 'Observações de medição',
@@ -61,10 +64,11 @@ export const ROTEIRO_DO_SERVICO: Record<TipoServico, RoteiroDoServico> = {
   },
   INSTALACAO: { fotos: FOTOS_DA_INSTALACAO, observacoes: OBSERVACOES_LIVRES, exigeTesteDoSistema: true, aoValidar: 'AGUARDANDO_CONCLUSAO' },
   MANUTENCAO: {
+    // antes é a mesma foto de antes (só o nome mudou); "depois" virou duas fotos: chaves novas
     fotos: [
-      { chave: 'antes', rotulo: 'Antes do serviço' },
-      { chave: 'depois', rotulo: 'Depois do serviço' },
-      { chave: 'leitura_inversor', rotulo: 'Leitura do inversor' },
+      { chave: 'antes', rotulo: 'Foto antes' },
+      { chave: 'servico_realizado', rotulo: 'Foto do que foi realizado' },
+      { chave: 'finalizada', rotulo: 'Foto finalizada' },
     ],
     observacoes: OBSERVACOES_LIVRES,
     exigeTesteDoSistema: true,
