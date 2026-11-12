@@ -1,4 +1,4 @@
-import type { StatusAgendamento, TipoServico } from '@guarusolar/compartilhado';
+import { rotuloAvulso, type StatusAgendamento, type TipoServico } from '@guarusolar/compartilhado';
 
 /*
  * Formato das respostas da API usadas pelo técnico.
@@ -97,6 +97,8 @@ export type ServicoDetalhe = ServicoNaAgenda & {
 /** O que um colega registrou na visita técnica do cliente (só leitura; fotos por /api/fotos/:id). */
 export type VisitaDoCliente = {
   id: string;
+  /** VISITA_TECNICA ou LAUDO (12/11/2026); ausente na API anterior = visita técnica */
+  tipo?: TipoServico;
   status: StatusAgendamento;
   dataInicio: string;
   /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo, e ausente na agenda guardada no aparelho antes da atualização (03/11/2026) */
@@ -111,5 +113,5 @@ export type VisitaDoCliente = {
 /** O cliente do serviço: no topo (API atual) ou, no formato antigo guardado no aparelho, pelo projeto. */
 export const clienteDoServico = (s: Pick<ServicoNaAgenda, 'cliente' | 'projeto'>): ClienteDoServico => (s.cliente ?? s.projeto?.cliente)!;
 
-/** O que vai no lugar do código do projeto: a visita avulsa não tem projeto. */
-export const identificacaoDoServico = (s: Pick<ServicoNaAgenda, 'projeto'>) => s.projeto?.codigo ?? 'Visita avulsa';
+/** O que vai no lugar do código do projeto: o serviço avulso não tem projeto ("Visita avulsa", "Laudo avulso"). */
+export const identificacaoDoServico = (s: Pick<ServicoNaAgenda, 'projeto' | 'tipo'>) => s.projeto?.codigo ?? rotuloAvulso(s.tipo);

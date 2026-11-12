@@ -35,7 +35,16 @@ import {
 import { TAMANHO_MAXIMO_FOTO } from '../lib/upload';
 import { filtroDeInstalacaoDoCliente, filtroDeVisitasDoCliente, filtroDoTecnico } from '../lib/acesso';
 import { pastaDoServico } from '../lib/armazenamento';
-import { CABECALHO_VERSAO_DO_APP, diaDeHoje, FORMATO_DA_HORA, moveOProjeto, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
+import {
+  CABECALHO_VERSAO_DO_APP,
+  diaDeHoje,
+  ehEtapaDeVisita,
+  FORMATO_DA_HORA,
+  moveOProjeto,
+  ROTEIRO_DO_SERVICO,
+  rotuloAvulso,
+  TIPOS_SERVICO_AGENDAVEIS,
+} from '@guarusolar/compartilhado';
 import { mudarSituacaoDoProjeto, outroServicoAndando, situacaoDevida } from '../lib/situacaoDoProjeto';
 
 // Upload das fotos do técnico (o limite de tamanho fica em src/lib/upload.ts).
@@ -187,7 +196,7 @@ async function avisosDeConflito(opcoes: { equipeId: string; tecnicos: string[]; 
     },
   });
   const onde = (o: (typeof outros)[number]) =>
-    `${o.projeto ? `${o.projeto.codigo} (${o.projeto.cliente.nome})` : `visita avulsa (${o.cliente?.nome ?? 'cliente'})`}, ${o.dataInicio.getTime() === o.dataFim.getTime() ? `em ${diaMes(o.dataInicio)}` : `de ${diaMes(o.dataInicio)} a ${diaMes(o.dataFim)}`}`;
+    `${o.projeto ? `${o.projeto.codigo} (${o.projeto.cliente.nome})` : `${rotuloAvulso(o.tipo).toLowerCase()} (${o.cliente?.nome ?? 'cliente'})`}, ${o.dataInicio.getTime() === o.dataFim.getTime() ? `em ${diaMes(o.dataInicio)}` : `de ${diaMes(o.dataInicio)} a ${diaMes(o.dataFim)}`}`;
   // um aviso por serviço: a equipe (se for a mesma linha da agenda) e quem dos escolhidos já está lá
   return outros.map((o) => {
     const mesmaEquipe = o.equipeId === equipeId;
@@ -318,8 +327,10 @@ rotasAgenda.post(
         message: 'Escolha o projeto do serviço, ou o cliente da visita técnica avulsa (um dos dois)',
         path: ['projetoId'],
       })
-      .refine((d) => !d.clienteId || d.tipo === 'VISITA_TECNICA', {
-        message: 'Sem projeto, só dá para agendar visita técnica. Instalação, vistoria, manutenção e retrabalho precisam de um orçamento aprovado.',
+      // avulso (sem projeto): só as visitas ao local, visita técnica e laudo (ETAPAS_DE_VISITA; o
+      // banco confere o mesmo na restrição Agendamento_projeto_ou_cliente)
+      .refine((d) => !d.clienteId || ehEtapaDeVisita(d.tipo), {
+        message: 'Sem projeto, só dá para agendar visita técnica ou laudo. Instalação, vistoria, manutenção e retrabalho precisam de um orçamento aprovado.',
         path: ['tipo'],
       })
       .parse(req.body);
@@ -400,9 +411,10 @@ rotasAgenda.patch(
     const tipoNovo = dados.tipo && dados.tipo !== atual.tipo ? dados.tipo : null;
     if (tipoNovo) {
       if (atual.status !== 'AGENDADO') throw new ErroHttp(409, 'A etapa só pode mudar antes de o técnico começar. Cancele este serviço e agende outro.');
-      // a visita avulsa é sempre visita técnica: as outras etapas precisam de projeto
+      // o serviço avulso (visita técnica ou laudo) não troca de etapa: as outras precisam de projeto,
+      // e trocar visita por laudo mudaria se ele vai para "Visitas a orçar" (agende o outro)
       if (atual.projetoId === null) {
-        throw new ErroHttp(409, 'Esta é uma visita técnica avulsa, sem projeto: a etapa não pode mudar. Instalação, vistoria, manutenção e retrabalho precisam de um orçamento aprovado.');
+        throw new ErroHttp(409, `${rotuloAvulso(atual.tipo)}, sem projeto: a etapa não pode mudar. Cancele e agende a etapa certa.`);
       }
       const projeto = await prisma.projeto.findUniqueOrThrow({ where: { id: atual.projetoId }, select: { id: true, status: true, codigo: true } });
       if (tipoNovo === 'VISITA_TECNICA') await conferirVisitaTecnica(projeto, atual.id);
@@ -738,6 +750,15 @@ const PROJETO_PARA_O_TECNICO = {
  * App de campo anterior à versão 3 lê `projeto.cliente` e `projeto.codigo` sem conferir: para ele,
  * a avulsa sai com um projeto de mentira (código "Visita avulsa"), em vez de quebrar a agenda.
  */
+/**
+ * App de campo anterior à versão 5 não conhece a etapa LAUDO (12/11/2026): a agenda e a tela do
+ * serviço dele leem a cor e o roteiro pela etapa e QUEBRARIAM com ela. A API não manda laudo a
+ * essas versões (agenda, detalhe e visitas do cliente na instalação); o resto segue igual.
+ */
+const VERSAO_QUE_CONHECE_O_LAUDO = 5;
+const semLaudoPara = (versaoDoApp: number): Prisma.AgendamentoWhereInput =>
+  versaoDoApp < VERSAO_QUE_CONHECE_O_LAUDO ? { tipo: { not: 'LAUDO' } } : {};
+
 function paraOTecnico<S extends { projeto: { id: string; codigo: string; cliente: object } | null; cliente: object | null }>(servico: S, versaoDoApp: number) {
   const cliente = servico.projeto?.cliente ?? servico.cliente;
   const projeto = servico.projeto ?? (versaoDoApp < 3 ? { id: null, codigo: 'Visita avulsa', cliente } : null);
@@ -790,10 +811,12 @@ rotasTecnico.get(
     const de = new Date(`${consulta.de ?? diaDeHoje()}T00:00:00Z`);
     const ate = consulta.ate ? new Date(`${consulta.ate}T00:00:00Z`) : new Date(de.getTime() + 7 * 864e5);
 
+    const versao = versaoDoAppQuePediu(req);
     const servicos = await prisma.agendamento.findMany({
       where: {
         AND: [
           filtroDoTecnico(req.usuario!),
+          semLaudoPara(versao),
           {
             OR: [
               { dataInicio: { lte: ate }, dataFim: { gte: de }, status: { notIn: ['CANCELADO', 'APROVADO'] } },
@@ -814,7 +837,6 @@ rotasTecnico.get(
       },
     });
 
-    const versao = versaoDoAppQuePediu(req);
     res.json(servicos.map((s) => paraOTecnico(s, versao)));
   }),
 );
@@ -824,6 +846,8 @@ rotasTecnico.get(
   '/servicos/:id',
   rota(async (req, res) => {
     const servico = await servicoDoTecnico(req.params.id, req.usuario!.id);
+    const versao = versaoDoAppQuePediu(req);
+    if (servico.tipo === 'LAUDO' && versao < VERSAO_QUE_CONHECE_O_LAUDO) throw new ErroHttp(404, 'Serviço não encontrado na sua agenda');
     const checklist = await prisma.checklistFoto.findMany({
       where: { tipoServico: servico.tipo, ativo: true },
       orderBy: { ordem: 'asc' },
@@ -838,9 +862,9 @@ rotasTecnico.get(
     });
 
     res.json({
-      ...paraOTecnico(servico, versaoDoAppQuePediu(req)),
-      // na INSTALAÇÃO: o que os colegas registraram nas visitas técnicas deste cliente (só leitura)
-      visitasDoCliente: servico.tipo === 'INSTALACAO' ? await visitasParaAInstalacao(servico, req.usuario!.id) : [],
+      ...paraOTecnico(servico, versao),
+      // na INSTALAÇÃO: o que os colegas registraram nas visitas técnicas e laudos deste cliente (só leitura)
+      visitasDoCliente: servico.tipo === 'INSTALACAO' ? await visitasParaAInstalacao(servico, req.usuario!.id, versao) : [],
       // vídeos já recebidos (opcionais; a capa sai por GET /api/videos/:id/capa)
       videos: videos.map(({ capaChave, ...v }) => ({ ...v, temCapa: capaChave !== null })),
       aguardandoOutro: outro ? avisoDeOutroAndando(outro) : null,
@@ -859,7 +883,7 @@ rotasTecnico.get(
  * quem enviou, observações e fotos (as fotos abrem por /api/fotos/:id, que confere o mesmo
  * direito em podeVerArquivosDoServico). Só as já enviadas pelo técnico; nada de contato do cliente.
  */
-async function visitasParaAInstalacao(instalacao: { id: string; projetoId: string | null }, usuarioId: string) {
+async function visitasParaAInstalacao(instalacao: { id: string; projetoId: string | null }, usuarioId: string, versaoDoApp: number) {
   if (!instalacao.projetoId) return [];
   const projeto = await prisma.projeto.findUnique({ where: { id: instalacao.projetoId }, select: { clienteId: true } });
   if (!projeto) return [];
@@ -867,10 +891,12 @@ async function visitasParaAInstalacao(instalacao: { id: string; projetoId: strin
   const pode = await prisma.agendamento.count({ where: { id: instalacao.id, ...filtroDeInstalacaoDoCliente({ id: usuarioId }, projeto.clienteId) } });
   if (!pode) return [];
   const visitas = await prisma.agendamento.findMany({
-    where: { ...filtroDeVisitasDoCliente(projeto.clienteId), status: { not: 'CANCELADO' }, enviadoEm: { not: null } },
+    where: { AND: [filtroDeVisitasDoCliente(projeto.clienteId), semLaudoPara(versaoDoApp)], status: { not: 'CANCELADO' }, enviadoEm: { not: null } },
     orderBy: { dataInicio: 'desc' },
     select: {
       id: true,
+      // visita técnica ou laudo: o app diz qual em cada cartão
+      tipo: true,
       status: true,
       dataInicio: true,
       horaInicio: true,
@@ -881,12 +907,11 @@ async function visitasParaAInstalacao(instalacao: { id: string; projetoId: strin
       fotos: { where: { revisao: { not: 'REFAZER' } }, orderBy: { criadoEm: 'asc' }, select: { id: true, rotulo: true, chave: true } },
     },
   });
-  // fotos na ordem do roteiro da visita; extras no fim
-  const ordem = new Map(ROTEIRO_DO_SERVICO.VISITA_TECNICA.fotos.map((f, i) => [f.chave, i]));
-  return visitas.map((v) => ({
-    ...v,
-    fotos: [...v.fotos].sort((a, b) => (a.chave ? (ordem.get(a.chave) ?? 99) : 100) - (b.chave ? (ordem.get(b.chave) ?? 99) : 100)),
-  }));
+  // fotos na ordem do roteiro da etapa (visita ou laudo); extras no fim
+  return visitas.map((v) => {
+    const ordem = new Map(ROTEIRO_DO_SERVICO[v.tipo].fotos.map((f, i) => [f.chave, i]));
+    return { ...v, fotos: [...v.fotos].sort((a, b) => (a.chave ? (ordem.get(a.chave) ?? 99) : 100) - (b.chave ? (ordem.get(b.chave) ?? 99) : 100)) };
+  });
 }
 
 /** Upload de uma foto do checklist (ou extra, quando não vier a chave). */

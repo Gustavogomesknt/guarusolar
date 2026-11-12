@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { comHora, diaDaApi, diasUteis, fimDoServico, FORMATO_DA_HORA, nomeLongo, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type Dia, type TipoServico } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, rotuloAvulso, diasUteis, fimDoServico, FORMATO_DA_HORA, nomeLongo, ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type Dia, type TipoServico } from '@guarusolar/compartilhado';
 import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import { CLASSE_SELECT, EFEITO_DA_VALIDACAO } from './DialogAgendar';
 import { AvisosDeConflito, escalaPadrao, nomesDaEscala, QuemVai, SemTecnicoEscalado, useAvisosDeConflito, useTecnicos } from './escala';
@@ -131,7 +131,7 @@ export function DialogServico({
               </>
             ) : (
               <>
-                Visita avulsa, sem projeto ·{' '}
+                {rotuloAvulso(servico.tipo)}, sem projeto ·{' '}
                 <Link to={`/clientes/${servico.cliente?.id}`} className="text-primary underline-offset-2 hover:underline">
                   ficha do cliente
                 </Link>
@@ -209,7 +209,7 @@ export function DialogServico({
               obrigatorio
               ajuda={
                 avulsa
-                  ? 'Visita avulsa: sem projeto, só pode ser visita técnica.'
+                  ? `${rotuloAvulso(servico.tipo)}: sem projeto, a etapa não muda.`
                   : servico.status === 'AGENDADO'
                     ? EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipoEscolhido].aoValidar]
                     : 'A etapa só pode mudar antes de o técnico começar.'

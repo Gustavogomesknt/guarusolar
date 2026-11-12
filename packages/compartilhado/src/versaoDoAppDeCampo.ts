@@ -23,7 +23,9 @@
 // a API manda às versões < 3 um projeto "Visita avulsa" para não quebrar a agenda delas).
 // 4: hora de início do serviço (horaInicio, 03/11/2026). Campo opcional: a API aceita a versão 3
 // (a mínima não muda); subir aqui é para a tela de Usuários marcar quem ainda não vê a hora.
-export const VERSAO_DO_APP_DE_CAMPO = 4;
+// 5: etapa LAUDO (12/11/2026). O app anterior não a conhece (a agenda dele quebraria): a API não
+// manda laudo às versões < 5 (VERSAO_QUE_CONHECE_O_LAUDO, rotas/operacao.ts). A mínima não muda.
+export const VERSAO_DO_APP_DE_CAMPO = 5;
 export const VERSAO_MINIMA_DO_APP_DE_CAMPO = 0;
 
 /** Cabeçalho com a versão do app de campo, em todo pedido dele à API. */

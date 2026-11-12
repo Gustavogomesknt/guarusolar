@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Loader2, MapPin, Plus, TriangleAlert, Users, X } from 'lucide-react';
-import { comHora, compararPelaHora, ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
+import { avulsoDa, comHora, compararPelaHora, ROTULO_STATUS_PROJETO, TIPOS_SERVICO_AGENDAVEIS } from '@guarusolar/compartilhado';
 import { api } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { clienteDoServico, type AgendamentoNaAgenda, type EquipeNaAgenda, type ProjetoPendente } from '@/lib/tipos';
@@ -171,10 +171,14 @@ export function PaginaAgenda() {
               </button>
             ))}
           </div>
-          {/* visita técnica AVULSA: pré-venda, escolhe um cliente cadastrado, sem projeto */}
-          <Button variant="outline" className="h-11 rounded-[10px] bg-card px-[18px] font-semibold" onClick={() => setAgendando({ avulsa: true })}>
+          {/* visita técnica e laudo AVULSOS: escolhe um cliente cadastrado, sem projeto (ETAPAS_DE_VISITA) */}
+          <Button variant="outline" className="h-11 rounded-[10px] bg-card px-[18px] font-semibold" onClick={() => setAgendando({ avulsa: true, etapa: 'VISITA_TECNICA' })}>
             <Plus aria-hidden />
             Agendar visita técnica
+          </Button>
+          <Button variant="outline" className="h-11 rounded-[10px] bg-card px-[18px] font-semibold" onClick={() => setAgendando({ avulsa: true, etapa: 'LAUDO' })}>
+            <Plus aria-hidden />
+            Agendar laudo
           </Button>
           <Button className="h-11 rounded-[10px] px-[18px] font-semibold" onClick={() => setAgendando({ projetoId: selecionado?.id })}>
             <Plus aria-hidden />
@@ -434,7 +438,7 @@ function LinhaEquipe({
             // com um projeto selecionado a grade serve para escolher dia livre: serviços ficam só de consulta
             disabled={selecionado !== null}
             onClick={() => onAbrirServico(servico)}
-            aria-label={`${tipo.rotulo}${avulsa ? ' avulsa' : ''}: ${cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}, ${quemVai}. Abrir detalhes`}
+            aria-label={`${tipo.rotulo}${avulsa ? ` ${avulsoDa(servico.tipo)}` : ''}: ${cliente.nome}, ${equipe.nome}, ${quando}, ${ROTULO_STATUS_AGENDAMENTO[servico.status].toLowerCase()}, ${quemVai}. Abrir detalhes`}
             style={{ gridColumn: `${coluna + 2} / span ${largura}`, gridRow: faixa + 1 }}
             className={cn(
               'relative z-10 flex min-w-0 flex-col items-start justify-center gap-0.5 rounded-[10px] border-l-4 text-left',
@@ -449,7 +453,7 @@ function LinhaEquipe({
               // faixa compacta: tipo, sinal da situação e cliente; o resto está na janela do serviço
               <>
                 <span className="flex w-full items-center justify-between gap-1.5">
-                  <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ' · avulsa' : ''}`} />
+                  <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ` · ${avulsoDa(servico.tipo)}` : ''}`} />
                   <span className="flex shrink-0 items-center gap-1">
                     {semEscala && (
                       <span title="Sem técnico escalado">
@@ -463,7 +467,7 @@ function LinhaEquipe({
               </>
             ) : (
               <>
-                <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ' · avulsa' : ''}`} className="w-full" />
+                <LinhaDaEtapa hora={hora} etapa={`${tipo.rotulo}${avulsa ? ` · ${avulsoDa(servico.tipo)}` : ''}`} className="w-full" />
                 <span className="line-clamp-2 w-full text-sm leading-tight font-semibold break-words">{cliente.nome}</span>
                 <span className="w-full truncate text-xs opacity-80">
                   {[cidade, servico.projeto ? servico.projeto.orcamento.codigo : 'Sem projeto'].filter(Boolean).join(' · ')}

@@ -1,6 +1,7 @@
 import type { Prisma, TipoServico } from '@prisma/client';
 import type { UsuarioToken } from './auth';
 import { prisma } from './prisma';
+import { ehEtapaDeVisita, ETAPAS_DE_VISITA } from '@guarusolar/compartilhado';
 
 /**
  * Regra 6 do CLAUDE.md: o técnico só acessa os serviços em que está ESCALADO (tabela
@@ -41,18 +42,19 @@ type ServicoParaConferir = {
 /**
  * Quem vê as fotos e os vídeos de um serviço (a rota das fotos e a dos vídeos usam só isto):
  * - GESTOR e ADMIN: todos, para validar.
- * - COMERCIAL: SÓ os de VISITA TÉCNICA (avulsa ou de projeto), para montar a proposta com o que
- *   foi medido; instalação, vistoria, manutenção e retrabalho continuam fora (decisão de 15/10/2026).
- * - TECNICO: os de serviço em que está escalado (regra 6) e, além disso, os de VISITA TÉCNICA do
- *   MESMO CLIENTE de uma INSTALAÇÃO (não cancelada) em que está escalado: quem vai instalar vê o
- *   que o colega registrou na visita. Só leitura (as rotas de envio continuam pela escala).
+ * - COMERCIAL: SÓ os de VISITA TÉCNICA e LAUDO (avulsos ou de projeto; ETAPAS_DE_VISITA), para
+ *   montar a proposta com o que foi medido; instalação, vistoria, manutenção e retrabalho continuam
+ *   fora (decisão de 15/10/2026; o laudo entrou em 12/11/2026, visto igual à visita).
+ * - TECNICO: os de serviço em que está escalado (regra 6) e, além disso, os de VISITA TÉCNICA e
+ *   LAUDO do MESMO CLIENTE de uma INSTALAÇÃO (não cancelada) em que está escalado: quem vai instalar
+ *   vê o que o colega registrou. Só leitura (as rotas de envio continuam pela escala).
  */
 export async function podeVerArquivosDoServico(usuario: Pick<UsuarioToken, 'id' | 'papel'>, servico: ServicoParaConferir) {
   if (usuario.papel === 'ADMIN' || usuario.papel === 'GESTOR') return true;
-  if (usuario.papel === 'COMERCIAL') return servico.tipo === 'VISITA_TECNICA';
+  if (usuario.papel === 'COMERCIAL') return ehEtapaDeVisita(servico.tipo);
   if (usuario.papel !== 'TECNICO') return false;
   if (tecnicoPodeVer(usuario, servico)) return true;
-  if (servico.tipo !== 'VISITA_TECNICA') return false;
+  if (!ehEtapaDeVisita(servico.tipo)) return false;
   const clienteId = servico.clienteId ?? servico.projeto?.clienteId;
   if (!clienteId) return false;
   return (await prisma.agendamento.count({ where: filtroDeInstalacaoDoCliente(usuario, clienteId) })) > 0;
@@ -66,8 +68,12 @@ export const filtroDeInstalacaoDoCliente = (usuario: Pick<UsuarioToken, 'id'>, c
   ...filtroDoTecnico(usuario),
 });
 
-/** As visitas técnicas de um cliente: as avulsas (ligadas a ele) e as dos projetos dele. */
+/**
+ * As visitas técnicas e os LAUDOS de um cliente (ETAPAS_DE_VISITA): os avulsos (ligados a ele) e os
+ * dos projetos dele. Alimenta a ficha do cliente, a do projeto e a instalação no app de campo; cada
+ * tela diz a etapa de cada um. "Visitas a orçar" NÃO usa este filtro: lá é só visita técnica.
+ */
 export const filtroDeVisitasDoCliente = (clienteId: string): Prisma.AgendamentoWhereInput => ({
-  tipo: 'VISITA_TECNICA',
+  tipo: { in: [...ETAPAS_DE_VISITA] },
   OR: [{ clienteId }, { projeto: { clienteId } }],
 });

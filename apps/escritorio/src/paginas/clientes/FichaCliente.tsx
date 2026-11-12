@@ -181,8 +181,8 @@ export function FichaCliente() {
         )}
       </section>
 
-      {/* todas as visitas técnicas dele: as avulsas (pré-venda) e as dos projetos, com fotos e observações */}
-      <VisitasDoCliente clienteId={c.id} titulo="Visitas técnicas" ocultarSemVisitas={false} />
+      {/* todas as visitas técnicas e laudos dele: os avulsos e os dos projetos, com fotos e observações */}
+      <VisitasDoCliente clienteId={c.id} ocultarSemVisitas={false} />
 
       {/* ação discreta, com confirmação: desativar não apaga nada */}
       <div className="flex flex-wrap items-center gap-3 border-t pt-4 text-[13px] text-muted-foreground">

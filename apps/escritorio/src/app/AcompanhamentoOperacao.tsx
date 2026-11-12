@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useFilaDeValidacao, useVersaoDaOperacao } from '@/paginas/validacao/fila';
-import { ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
+import { rotuloAvulso, ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
 import { clienteDoServico, type ServicoNaFila } from '@/lib/tipos';
 import { tocarSomDeChegada } from './somDaValidacao';
 
@@ -84,7 +84,7 @@ export function AcompanhamentoOperacao() {
     if (novos.length === 1) {
       const s = novos[0];
       toast.info(`Novo serviço para validar: ${clienteDoServico(s).nome}`, {
-        description: `${ROTULO_TIPO_SERVICO[s.tipo]} · ${s.projeto?.codigo ?? 'visita avulsa'}${s.reenviado ? ' · reenviado após devolução' : ''}`,
+        description: `${ROTULO_TIPO_SERVICO[s.tipo]} · ${s.projeto?.codigo ?? rotuloAvulso(s.tipo).toLowerCase()}${s.reenviado ? ' · reenviado após devolução' : ''}`,
         action: { label: 'Abrir', onClick: () => abrir(s.id) },
         duration: 10_000,
       });

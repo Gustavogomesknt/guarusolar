@@ -2,10 +2,12 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ImageOff, Loader2 } from 'lucide-react';
-import { comHora, diaDaApi, formatarDataHora } from '@guarusolar/compartilhado';
+import { avulsoDa, comHora, diaDaApi, formatarDataHora, ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
 import { api, urlDaFoto } from '@guarusolar/web/api';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
+import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
+import { cn } from '@/lib/utils';
 import type { VisitaTecnica } from '@/lib/tipos';
 import { textoDoErro } from '@/lib/consultas';
 import { Selo } from '@/components/Selo';
@@ -57,14 +59,18 @@ export function CartaoVisita({ visita: v, mostrarCliente = false, acoes }: { vis
             </Link>
           )}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Visita técnica de {periodo(v)}</span>
+            {/* a etapa em selo, na cor da agenda: visita técnica e laudo aparecem juntos e não podem se confundir */}
+            <span className={cn('rounded-full border px-2 py-px text-xs font-semibold', TIPOS_SERVICO_AGENDA[v.tipo].fundo, TIPOS_SERVICO_AGENDA[v.tipo].borda, TIPOS_SERVICO_AGENDA[v.tipo].texto)}>
+              {ROTULO_TIPO_SERVICO[v.tipo]}
+            </span>
+            <span className="font-semibold text-foreground">{periodo(v)}</span>
             {mostrarCliente && cidade && <span>· {cidade}</span>}
             {v.projeto ? (
               <Link to={`/projetos/${v.projeto.id}`} className="font-mono text-primary hover:underline">
                 {v.projeto.codigo}
               </Link>
             ) : (
-              <Selo>Avulsa</Selo>
+              <Selo>{avulsoDa(v.tipo) === 'avulso' ? 'Avulso' : 'Avulsa'}</Selo>
             )}
             {v.aguardandoOrcamento && <Selo variante="destaque">Aguardando orçamento</Selo>}
           </p>
@@ -149,9 +155,13 @@ export function CartaoVisita({ visita: v, mostrarCliente = false, acoes }: { vis
  * As visitas técnicas de um cliente (avulsas e as dos projetos dele), da mais recente.
  * `ocultarSemVisitas`: na ficha do projeto, a seção só aparece quando há alguma.
  */
-export function VisitasDoCliente({ clienteId, titulo, ocultarSemVisitas = true }: { clienteId: string; titulo: string; ocultarSemVisitas?: boolean }) {
+export function VisitasDoCliente({ clienteId, complemento = '', ocultarSemVisitas = true }: { clienteId: string; complemento?: string; ocultarSemVisitas?: boolean }) {
   const visitas = useVisitasDoCliente(clienteId);
   if (ocultarSemVisitas && visitas.data?.length === 0) return null;
+  // o título diz o que há: visitas técnicas, laudos ou os dois (12/11/2026)
+  const temLaudo = visitas.data?.some((v) => v.tipo === 'LAUDO') ?? false;
+  const temVisita = visitas.data?.some((v) => v.tipo !== 'LAUDO') ?? true;
+  const titulo = `${temLaudo ? (temVisita ? 'Visitas técnicas e laudos' : 'Laudos') : 'Visitas técnicas'}${complemento ? ` ${complemento}` : ''}`;
   return (
     <section aria-labelledby="titulo-visitas-do-cliente" className="flex flex-col gap-3.5 rounded-[14px] border bg-card px-6 py-[22px]">
       <h2 id="titulo-visitas-do-cliente" className="text-xl font-bold">
@@ -167,7 +177,7 @@ export function VisitasDoCliente({ clienteId, titulo, ocultarSemVisitas = true }
           Não foi possível carregar as visitas. {textoDoErro(visitas.error)}
         </p>
       ) : visitas.data.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhuma visita técnica agendada para este cliente.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma visita técnica nem laudo agendado para este cliente.</p>
       ) : (
         visitas.data.map((v) => <CartaoVisita key={v.id} visita={v} />)
       )}

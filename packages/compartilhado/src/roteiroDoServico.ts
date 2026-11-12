@@ -25,7 +25,7 @@ export type RoteiroDoServico = {
    * O que a APROVAÇÃO do gestor faz com o projeto (regra em apps/api/src/lib/situacaoDoProjeto.ts):
    * - 'A_AGENDAR': visita técnica; o projeto volta para "A agendar" (falta a instalação);
    * - 'AGUARDANDO_CONCLUSAO': instalação; fica esperando o gestor concluir o projeto;
-   * - 'NAO_MEXE': vistoria, manutenção e retrabalho; a situação do projeto fica como está.
+   * - 'NAO_MEXE': laudo, vistoria, manutenção e retrabalho; a situação do projeto fica como está.
    * Os dois primeiros valem quando não sobra outro serviço pendente (visita ou instalação) no
    * projeto: enquanto sobrar, o projeto segue a situação deles (situacaoPelosServicos, na API).
    * NENHUM tipo conclui o projeto: isso é sempre uma ação do gestor.
@@ -47,22 +47,25 @@ const FOTOS_DA_INSTALACAO: ItemDoRoteiro[] = [
 
 const OBSERVACOES_LIVRES = { rotulo: 'Observações', obrigatorias: false, dica: 'O que o escritório precisa saber sobre este serviço.' };
 
+// padrao_entrada é a mesma foto de antes (só o nome mudou); as outras têm chave nova. O laudo usa
+// as MESMAS: a ChecklistFoto separa a chave por etapa (@@unique([tipoServico, chave])), não mistura
+const FOTOS_DA_VISITA: ItemDoRoteiro[] = [
+  { chave: 'vaga', rotulo: 'Foto da vaga' },
+  { chave: 'padrao_entrada', rotulo: 'Foto do padrão de entrada' },
+  { chave: 'local_infra', rotulo: 'Foto do local da infra que será instalada' },
+];
+const OBSERVACOES_DA_VISITA = {
+  rotulo: 'Observações de medição',
+  obrigatorias: true,
+  dica: 'Medidas, distâncias, bitola dos cabos, disjuntor geral e o que mais o projeto precisar.',
+};
+
 export const ROTEIRO_DO_SERVICO: Record<TipoServico, RoteiroDoServico> = {
-  VISITA_TECNICA: {
-    // padrao_entrada é a mesma foto de antes (só o nome mudou); as outras têm chave nova
-    fotos: [
-      { chave: 'vaga', rotulo: 'Foto da vaga' },
-      { chave: 'padrao_entrada', rotulo: 'Foto do padrão de entrada' },
-      { chave: 'local_infra', rotulo: 'Foto do local da infra que será instalada' },
-    ],
-    observacoes: {
-      rotulo: 'Observações de medição',
-      obrigatorias: true,
-      dica: 'Medidas, distâncias, bitola dos cabos, disjuntor geral e o que mais o projeto precisar.',
-    },
-    exigeTesteDoSistema: false,
-    aoValidar: 'A_AGENDAR',
-  },
+  VISITA_TECNICA: { fotos: FOTOS_DA_VISITA, observacoes: OBSERVACOES_DA_VISITA, exigeTesteDoSistema: false, aoValidar: 'A_AGENDAR' },
+  // LAUDO (12/11/2026): uma visita técnica que NÃO vira orçamento e NÃO move o projeto. Mesmo
+  // roteiro da visita; validar não mexe na situação (nem grava visitaTecnicaConcluidaEm). Pode ser
+  // avulso (ETAPAS_DE_VISITA) ou de um projeto, a qualquer momento, também com a obra concluída
+  LAUDO: { fotos: FOTOS_DA_VISITA, observacoes: OBSERVACOES_DA_VISITA, exigeTesteDoSistema: false, aoValidar: 'NAO_MEXE' },
   INSTALACAO: { fotos: FOTOS_DA_INSTALACAO, observacoes: OBSERVACOES_LIVRES, exigeTesteDoSistema: true, aoValidar: 'AGUARDANDO_CONCLUSAO' },
   MANUTENCAO: {
     // antes é a mesma foto de antes (só o nome mudou); "depois" virou duas fotos: chaves novas
@@ -95,11 +98,20 @@ export const ROTEIRO_DO_SERVICO: Record<TipoServico, RoteiroDoServico> = {
 };
 
 /** Tipos que o gestor pode escolher ao agendar, na ordem do seletor (instalação é o padrão). */
-export const TIPOS_SERVICO_AGENDAVEIS = ['INSTALACAO', 'VISITA_TECNICA', 'VISTORIA_CONCESSIONARIA', 'MANUTENCAO', 'RETRABALHO'] as const satisfies readonly TipoServico[];
+export const TIPOS_SERVICO_AGENDAVEIS = ['INSTALACAO', 'VISITA_TECNICA', 'LAUDO', 'VISTORIA_CONCESSIONARIA', 'MANUTENCAO', 'RETRABALHO'] as const satisfies readonly TipoServico[];
+
+/**
+ * As VISITAS AO LOCAL: visita técnica e laudo (12/11/2026). Só elas podem ser AVULSAS (sem projeto,
+ * direto no cliente: a API, a restrição Agendamento_projeto_ou_cliente do banco e o botão da
+ * agenda), e o comercial vê as fotos delas (lib/acesso.ts). "Visitas a orçar" continua SÓ com a
+ * visita técnica: o laudo não vira orçamento (rotas/visitas.ts).
+ */
+export const ETAPAS_DE_VISITA = ['VISITA_TECNICA', 'LAUDO'] as const satisfies readonly TipoServico[];
+export const ehEtapaDeVisita = (tipo: TipoServico) => (ETAPAS_DE_VISITA as readonly TipoServico[]).includes(tipo);
 
 /**
  * O serviço move a situação do projeto ao longo da execução (agendado, em execução, em
- * validação)? Só visita técnica e instalação. Vistoria, manutenção e retrabalho correm "por
+ * validação)? Só visita técnica e instalação. Laudo, vistoria, manutenção e retrabalho correm "por
  * fora": um projeto concluído continua concluído enquanto a manutenção é agendada, feita e validada.
  */
 export const moveOProjeto = (tipo: TipoServico) => ROTEIRO_DO_SERVICO[tipo].aoValidar !== 'NAO_MEXE';

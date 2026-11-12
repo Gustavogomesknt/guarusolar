@@ -49,10 +49,19 @@ export const ROTULO_UNIDADE: Record<Unidade, string> = {
 export const ROTULO_TIPO_SERVICO: Record<TipoServico, string> = {
   INSTALACAO: 'Instalação',
   VISITA_TECNICA: 'Visita técnica',
+  LAUDO: 'Laudo',
   MANUTENCAO: 'Manutenção',
   VISTORIA_CONCESSIONARIA: 'Vistoria da concessionária',
   RETRABALHO: 'Retrabalho',
 };
+
+/** Serviço AVULSO (sem projeto, direto no cliente), no gênero da etapa: "Visita avulsa", "Laudo avulso". */
+export const rotuloAvulso = (tipo: TipoServico) => (tipo === 'LAUDO' ? 'Laudo avulso' : 'Visita avulsa');
+/** Etapa masculina (retrabalho, laudo): "o"; as outras, "a". Para "agendadO", "fotos dO laudo". */
+export const generoDaEtapa = (tipo: TipoServico): 'o' | 'a' => (tipo === 'RETRABALHO' || tipo === 'LAUDO' ? 'o' : 'a');
+
+/** Só o adjetivo, no gênero da etapa: "avulsa" (visita) ou "avulso" (laudo). */
+export const avulsoDa = (tipo: TipoServico) => (tipo === 'LAUDO' ? 'avulso' : 'avulsa');
 
 /** Situação da obra (projeto), como aparece na lista e na ficha. */
 export const ROTULO_STATUS_PROJETO: Record<StatusProjeto, string> = {

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ClipboardList, ImageIcon, X } from 'lucide-react';
-import { comHora, diaDaApi, nomeLongo } from '@guarusolar/compartilhado';
+import { comHora, diaDaApi, nomeLongo, ROTULO_TIPO_SERVICO, type TipoServico } from '@guarusolar/compartilhado';
 import { urlDaFoto } from '@guarusolar/web/api';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
+import { TIPOS_SERVICO_AGENDA } from '@guarusolar/web/tiposServico';
 import type { VisitaDoCliente } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +28,7 @@ export function VisitasDoCliente({ visitas }: { visitas: VisitaDoCliente[] }) {
       >
         <ClipboardList className="size-5 shrink-0 text-primary" aria-hidden />
         <span className="flex flex-1 flex-col">
-          <span className="font-semibold">{visitas.length === 1 ? 'Visita técnica deste cliente' : `Visitas técnicas deste cliente (${visitas.length})`}</span>
+          <span className="font-semibold">{tituloDasVisitas(visitas)}</span>
           <span className="text-[13px] text-muted-foreground">O que o colega mediu e fotografou. Só para consulta.</span>
         </span>
         <ChevronDown className={cn('size-5 shrink-0 text-muted-foreground transition-transform', aberta && 'rotate-180')} aria-hidden />
@@ -37,7 +38,9 @@ export function VisitasDoCliente({ visitas }: { visitas: VisitaDoCliente[] }) {
         <div className="flex flex-col gap-4 border-t px-4 py-4">
           {visitas.map((v) => (
             <article key={v.id} className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold">
+              <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+                {/* a etapa em selo, na cor da agenda: visita técnica e laudo não podem se confundir */}
+                <EtapaDaVisita tipo={v.tipo ?? 'VISITA_TECNICA'} />
                 {comHora(nomeLongo(diaDaApi(v.dataInicio)), v.horaInicio)}
                 {v.enviadoPor && <span className="font-normal text-muted-foreground"> · {v.enviadoPor.nome}</span>}
               </h3>
@@ -91,4 +94,18 @@ export function VisitasDoCliente({ visitas }: { visitas: VisitaDoCliente[] }) {
       )}
     </section>
   );
+}
+
+/** "Visita técnica deste cliente", "Laudos deste cliente (2)", "Visitas técnicas e laudos deste cliente (3)". */
+function tituloDasVisitas(visitas: VisitaDoCliente[]) {
+  const laudos = visitas.filter((v) => v.tipo === 'LAUDO').length;
+  const outras = visitas.length - laudos;
+  const nome = laudos && outras ? 'Visitas técnicas e laudos' : laudos ? (laudos === 1 ? 'Laudo' : 'Laudos') : outras === 1 ? 'Visita técnica' : 'Visitas técnicas';
+  return `${nome} deste cliente${visitas.length > 1 ? ` (${visitas.length})` : ''}`;
+}
+
+/** A etapa em selo, com as cores da agenda. */
+function EtapaDaVisita({ tipo }: { tipo: TipoServico }) {
+  const cores = TIPOS_SERVICO_AGENDA[tipo];
+  return <span className={cn('rounded-full border px-2 py-px text-xs font-semibold', cores.fundo, cores.borda, cores.texto)}>{ROTULO_TIPO_SERVICO[tipo]}</span>;
 }

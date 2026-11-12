@@ -82,6 +82,8 @@ export type TipoEventoProjeto = (typeof TIPOS_EVENTO_PROJETO)[number];
 export const TIPOS_SERVICO = [
   'INSTALACAO',
   'VISITA_TECNICA',
+  // 12/11/2026: visita técnica que não vira orçamento nem move o projeto (roteiroDoServico.ts)
+  'LAUDO',
   'MANUTENCAO',
   'VISTORIA_CONCESSIONARIA',
   'RETRABALHO',

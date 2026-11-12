@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { ROTEIRO_DO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type TipoServico } from '@guarusolar/compartilhado';
+import { ETAPAS_DE_VISITA, ROTEIRO_DO_SERVICO, ROTULO_TIPO_SERVICO, TIPOS_SERVICO_AGENDAVEIS, type TipoServico } from '@guarusolar/compartilhado';
 import { api, ErroApi } from '@guarusolar/web/api';
 import type { Cliente, EquipeNaAgenda, ProjetoPendente } from '@/lib/tipos';
 import { useValorAtrasado } from '@/hooks/useValorAtrasado';
@@ -25,8 +25,24 @@ import { AvisosDeConflito, escalaPadrao, QuemVai, useAvisosDeConflito, useTecnic
 export const CLASSE_SELECT =
   'h-11 w-full rounded-[10px] border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30';
 
-/** `avulsa`: visita técnica de pré-venda, ligada ao CLIENTE (sem projeto, sem orçamento aprovado). */
-export type PreAgendamento = { projetoId?: string; equipeId?: string; dia?: Dia; avulsa?: boolean };
+/**
+ * `avulsa`: serviço ligado ao CLIENTE (sem projeto, sem orçamento aprovado), na `etapa` dada: visita
+ * técnica (pré-venda; o padrão) ou laudo (12/11/2026; não vira orçamento). ETAPAS_DE_VISITA.
+ */
+export type PreAgendamento = { projetoId?: string; equipeId?: string; dia?: Dia; avulsa?: boolean; etapa?: EtapaAvulsa };
+export type EtapaAvulsa = (typeof ETAPAS_DE_VISITA)[number];
+
+/** Textos do agendamento avulso, por etapa: a visita vai para o comercial orçar; o laudo, não. */
+const AVULSO: Record<EtapaAvulsa, { descricao: string; ajuda: string }> = {
+  VISITA_TECNICA: {
+    descricao: 'Visita avulsa, antes ou depois do orçamento: escolha um cliente já cadastrado. O endereço é o do cadastro.',
+    ajuda: 'Sem projeto, só visita técnica. Validada, vai para o comercial montar a proposta.',
+  },
+  LAUDO: {
+    descricao: 'Laudo avulso, sem orçamento: escolha um cliente já cadastrado. O endereço é o do cadastro.',
+    ajuda: 'Sem projeto. Validado, fica registrado no cliente e não gera orçamento.',
+  },
+};
 
 /** O que a validação das fotos faz com o projeto, conforme o tipo (o gestor escolhe sabendo). */
 export const EFEITO_DA_VALIDACAO: Record<(typeof ROTEIRO_DO_SERVICO)[TipoServico]['aoValidar'], string> = {
@@ -37,8 +53,8 @@ export const EFEITO_DA_VALIDACAO: Record<(typeof ROTEIRO_DO_SERVICO)[TipoServico
 
 /**
  * Agendar um projeto aprovado. Aberto pela grade (dia clicado, já com equipe e data) ou pelo
- * botão "Novo agendamento" (tudo em branco). Com `avulsa`, é a VISITA TÉCNICA AVULSA (botão
- * "Agendar visita técnica"): escolhe um cliente já cadastrado, sem projeto, e a etapa é fixa. A duração não existe na API: pergunta quantos
+ * botão "Novo agendamento" (tudo em branco). Com `avulsa`, é o serviço AVULSO na `etapa` dada (botões
+ * "Agendar visita técnica" e "Agendar laudo"): escolhe um cliente já cadastrado, sem projeto, e a etapa é fixa. A duração não existe na API: pergunta quantos
  * dias, com 1 como padrão, e manda o último dia como dataFim.
  * "Quem vai" já vem com os técnicos da equipe (a composição padrão): agendar o caso normal não
  * ganha clique nenhum. Conflito de equipe ou de pessoa AVISA e não bloqueia (regra 8).
@@ -62,6 +78,7 @@ export function DialogAgendar({
   const tecnicos = useTecnicos();
   const [projetoId, setProjetoId] = useState('');
   const avulsa = inicial.avulsa === true;
+  const etapaAvulsa: EtapaAvulsa = inicial.etapa ?? 'VISITA_TECNICA';
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [equipeId, setEquipeId] = useState('');
   const [dia, setDia] = useState<Dia>('');
@@ -79,7 +96,7 @@ export function DialogAgendar({
     setEquipeId(inicial.equipeId ?? equipes[0]?.id ?? '');
     setDia(inicial.dia ?? diaDeHoje());
     setHora('');
-    setTipo(inicial.avulsa ? 'VISITA_TECNICA' : 'INSTALACAO');
+    setTipo(inicial.avulsa ? (inicial.etapa ?? 'VISITA_TECNICA') : 'INSTALACAO');
     setDias('1');
     setErro(null);
   }, [aberto, inicial, projetos, equipes]);
@@ -109,8 +126,9 @@ export function DialogAgendar({
     meta: { erroTratadoNoFormulario: true },
     onSuccess: () => {
       const equipe = equipes.find((e) => e.id === equipeId)?.nome;
-      const nome = avulsa ? `Visita técnica de ${cliente?.nome}` : (projeto?.cliente.nome ?? 'Serviço');
-      toast.success(`${nome} agendad${avulsa ? 'a' : 'o'} para ${equipe} em ${comHora(nomeLongo(dia), hora)}`);
+      const nome = avulsa ? `${ROTULO_TIPO_SERVICO[etapaAvulsa]} de ${cliente?.nome}` : (projeto?.cliente.nome ?? 'Serviço');
+      // "Visita técnica … agendada", "Laudo … agendado", "Fulano … agendado"
+      toast.success(`${nome} agendad${avulsa && etapaAvulsa === 'VISITA_TECNICA' ? 'a' : 'o'} para ${equipe} em ${comHora(nomeLongo(dia), hora)}`);
       void clienteConsultas.invalidateQueries({ queryKey: ['agenda'] });
       onAgendado();
     },
@@ -133,10 +151,10 @@ export function DialogAgendar({
           className="flex flex-col gap-4"
         >
           <DialogHeader>
-            <DialogTitle>{avulsa ? 'Agendar visita técnica' : 'Agendar serviço'}</DialogTitle>
+            <DialogTitle>{avulsa ? `Agendar ${ROTULO_TIPO_SERVICO[etapaAvulsa].toLowerCase()}` : 'Agendar serviço'}</DialogTitle>
             <DialogDescription>
               {avulsa
-                ? 'Visita avulsa, antes ou depois do orçamento: escolha um cliente já cadastrado. O endereço é o do cadastro.'
+                ? AVULSO[etapaAvulsa].descricao
                 : projeto
                   ? `${projeto.cliente.nome} · ${projeto.orcamento.codigo}`
                   : 'Escolha o projeto aprovado, a equipe e o dia.'}
@@ -163,7 +181,7 @@ export function DialogAgendar({
               id="ag-tipo"
               rotulo="Etapa"
               obrigatorio
-              ajuda={avulsa ? 'Sem projeto, só visita técnica. Validada, vai para o comercial montar a proposta.' : EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipo].aoValidar]}
+              ajuda={avulsa ? AVULSO[etapaAvulsa].ajuda : EFEITO_DA_VALIDACAO[ROTEIRO_DO_SERVICO[tipo].aoValidar]}
             >
               <select id="ag-tipo" required value={tipo} disabled={avulsa} onChange={(e) => setTipo(e.target.value as TipoServico)} className={CLASSE_SELECT}>
                 {TIPOS_SERVICO_AGENDAVEIS.map((t) => (

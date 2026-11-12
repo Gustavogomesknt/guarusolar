@@ -484,6 +484,8 @@ export function clienteDoServico<C>(s: { projeto: { cliente: C } | null; cliente
  */
 export type VisitaTecnica = {
   id: string;
+  /** VISITA_TECNICA ou LAUDO (12/11/2026): o cartão diz qual */
+  tipo: TipoServico;
   status: StatusAgendamento;
   dataInicio: string;
   /** hora de início no primeiro dia ("08:30"); nula nos agendados antes do campo (03/11/2026) */

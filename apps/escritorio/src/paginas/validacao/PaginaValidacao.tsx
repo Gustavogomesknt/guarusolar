@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { CheckCircle2, Loader2, WifiOff } from 'lucide-react';
-import { tempoDesde } from '@guarusolar/compartilhado';
+import { rotuloAvulso, tempoDesde } from '@guarusolar/compartilhado';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { clienteDoServico, type ServicoNaFila } from '@/lib/tipos';
 import { cn } from '@/lib/utils';
@@ -116,7 +116,7 @@ function ItemDaFila({ servico, aberto, onAbrir }: { servico: ServicoNaFila; aber
         {servico.projeto ? (
           <span className="font-mono text-muted-foreground">{servico.projeto.codigo}</span>
         ) : (
-          <span className="text-muted-foreground">Visita avulsa</span>
+          <span className="text-muted-foreground">{rotuloAvulso(servico.tipo)}</span>
         )}
         {devolvido ? (
           <SituacaoServico status={servico.status} className="py-0.5 text-[11px]" />

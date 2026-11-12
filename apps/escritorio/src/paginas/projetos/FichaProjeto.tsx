@@ -168,8 +168,8 @@ export function FichaProjeto() {
 
       <Servicos projeto={p} gestor={gestor} />
       <Fotos projeto={p} />
-      {/* as visitas técnicas do MESMO CLIENTE (avulsas ou deste e de outros projetos): sem vínculo rígido */}
-      <VisitasDoCliente clienteId={p.cliente.id} titulo="Visitas técnicas deste cliente" />
+      {/* as visitas técnicas e laudos do MESMO CLIENTE (avulsos ou deste e de outros projetos): sem vínculo rígido */}
+      <VisitasDoCliente clienteId={p.cliente.id} complemento="deste cliente" />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <DadosDoProjeto projeto={p} gestor={gestor} />

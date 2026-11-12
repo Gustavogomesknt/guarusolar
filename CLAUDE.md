@@ -555,11 +555,12 @@ O `.env` da API fica em `apps/api/.env`.
    do técnico; o app de campo não tem botão de WhatsApp (o contato passa pelo escritório).
    **Fotos de serviço nunca têm link público**: só saem por `GET /api/fotos/:id`, com login
    e conferência de papel e equipe a cada pedido (`podeVerArquivosDoServico`, lib/acesso.ts, vale
-   para fotos e vídeos). Duas aberturas decididas em 15/10/2026, só de VISITA TÉCNICA: o COMERCIAL
-   vê as fotos de visita técnica (avulsa ou não) para montar a proposta, e continua sem ver as de
-   instalação, vistoria, manutenção e retrabalho; o TÉCNICO escalado numa INSTALAÇÃO (não
-   cancelada) vê, só para consulta, as visitas técnicas do MESMO CLIENTE (observações e fotos, na
-   tela da instalação). Cancelar a instalação ou tirá-lo da escala tira o acesso na hora. Nada de `express.static` para arquivos de
+   para fotos e vídeos). Duas aberturas decididas em 15/10/2026, só de VISITA TÉCNICA (e, desde
+   12/11/2026, também do LAUDO: `ETAPAS_DE_VISITA`): o COMERCIAL vê as fotos de visita técnica e
+   laudo (avulsos ou não) para montar a proposta, e continua sem ver as de instalação, vistoria,
+   manutenção e retrabalho; o TÉCNICO escalado numa INSTALAÇÃO (não cancelada) vê, só para
+   consulta, as visitas técnicas e laudos do MESMO CLIENTE (observações e fotos, na tela da
+   instalação, cada um com a etapa). Cancelar a instalação ou tirá-lo da escala tira o acesso na hora. Nada de `express.static` para arquivos de
    cliente. Única exceção proposital de conteúdo sem login: o PDF do orçamento, pelo `tokenPdf`.
    **Vídeo do serviço** (15/10/2026; opcional, separado do roteiro de fotos, até
    `MAXIMO_DE_VIDEOS_POR_SERVICO` = 2, números em `compartilhado/videoDoServico.ts`): gravado DENTRO
@@ -616,7 +617,7 @@ O `.env` da API fica em `apps/api/.env`.
 9. **Nenhum caminho conclui um projeto sozinho.** O TIPO do serviço decide o efeito da validação
    (`aoValidar` em `roteiroDoServico.ts`): VISITA_TECNICA devolve o projeto para "A agendar" e grava
    `visitaTecnicaConcluidaEm` (aviso "Visita concluída — agendar instalação"); INSTALACAO leva a
-   `AGUARDANDO_CONCLUSAO`; VISTORIA_CONCESSIONARIA, MANUTENCAO e RETRABALHO não mexem na situação
+   `AGUARDANDO_CONCLUSAO`; LAUDO, VISTORIA_CONCESSIONARIA, MANUTENCAO e RETRABALHO não mexem na situação
    em NENHUM passo (um projeto concluído continua concluído enquanto a manutenção é agendada, feita
    e validada), e por isso cabem também em projeto aguardando conclusão ou concluído, sem reabrir.
    **Um projeto pode ter VÁRIOS serviços agendados** (o gestor planeja a semana: os dois dias de
@@ -1028,6 +1029,23 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
   esconde nada: a ficha do cliente lista todas as visitas técnicas dele (avulsas e de projetos), e
   a ficha do projeto mostra as visitas do MESMO CLIENTE. Não há vínculo entre visita e projeto:
   basta serem do mesmo cliente (`filtroDeVisitasDoCliente`).
+- **LAUDO** (etapa `LAUDO`, 12/11/2026): uma visita técnica que NÃO vira orçamento e NÃO move o
+  projeto. Roteiro IGUAL ao da visita (mesmas fotos e chaves, "Observações de medição"
+  obrigatórias, sem teste do sistema; a `ChecklistFoto` separa a chave por etapa, então não
+  mistura) e `aoValidar: 'NAO_MEXE'`: não grava `visitaTecnicaConcluidaEm`, não devolve o projeto
+  para "A agendar", não entra na conta da situação. Pode ser AVULSO (botão "Agendar laudo" na
+  agenda; `ETAPAS_DE_VISITA` no compartilhado e na restrição `Agendamento_projeto_ou_cliente`,
+  migration `20261112120100_laudo_avulso`) ou de um projeto, a QUALQUER momento: as regras de
+  `conferirVisitaTecnica` (uma pendente por projeto, só antes da instalação) NÃO valem para ele;
+  "só um serviço do projeto anda por vez" vale, como para toda etapa. NÃO entra em "Visitas a
+  orçar" (o filtro de `rotas/visitas.ts` e o "Dispensar" continuam só com VISITA_TECNICA;
+  `aguardaOrcamento` também). Onde aparece junto da visita (ficha do cliente, ficha do projeto,
+  instalação no app), cada cartão mostra a etapa em selo com a cor da agenda (marinho `#0B2F5E`
+  sobre `#C3CEE0`) e o título diz "Visitas técnicas e laudos". Textos da avulsa no gênero da etapa
+  (`rotuloAvulso`, `avulsoDa`, `generoDaEtapa`): "Laudo avulso", "Validar as fotos do laudo". Na
+  validação, o laudo avulso "fica registrado na ficha do cliente e não gera orçamento". App de
+  campo anterior à versão 5 não conhece a etapa (a agenda dele quebraria): a API não manda laudo a
+  ele (`semLaudoPara`, operacao.ts: agenda, detalhe e visitas do cliente na instalação).
 - **Endereço na operação = cadastro ATUAL do cliente** (decisão consciente, 15/10/2026). Agenda,
   validação e app de campo leem o endereço do CADASTRO do cliente (pelo projeto ou, na visita
   avulsa, direto), nunca da cópia gravada no orçamento (que só o PDF, a ficha e a lista de

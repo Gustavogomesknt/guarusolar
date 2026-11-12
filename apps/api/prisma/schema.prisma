@@ -494,6 +494,8 @@ model Projeto {
 enum TipoServico {
   INSTALACAO
   VISITA_TECNICA
+  /// visita técnica que não vira orçamento nem move o projeto (12/11/2026); pode ser avulsa
+  LAUDO
   MANUTENCAO
   /// não é mais oferecida na agenda (ficou para registros antigos); não mexe no projeto
   VISTORIA_CONCESSIONARIA

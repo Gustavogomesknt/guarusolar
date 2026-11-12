@@ -1,5 +1,5 @@
 import type { Prisma, StatusProjeto, TipoEventoProjeto, TipoServico } from '@prisma/client';
-import { ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
+import { generoDaEtapa, ROTULO_TIPO_SERVICO } from '@guarusolar/compartilhado';
 
 /*
  * Histórico do projeto (tabela EventoProjeto): quem muda a obra registra o evento na MESMA
@@ -38,4 +38,4 @@ export function periodoDoServico(inicio: Date, fim: Date, hora?: string | null) 
 export const rotuloDoServico = (tipo: TipoServico) => ROTULO_TIPO_SERVICO[tipo];
 
 /** Final do particípio no texto do histórico: "Instalação agendadA", "Retrabalho agendadO". */
-export const oa = (tipo: TipoServico) => (tipo === 'RETRABALHO' ? 'o' : 'a');
+export const oa = (tipo: TipoServico) => generoDaEtapa(tipo);

@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ImageOff, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatarDataHora, formatarHora, ROTEIRO_DO_SERVICO, ROTULO_TIPO_SERVICO, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
+import { formatarDataHora, formatarHora, generoDaEtapa, ROTEIRO_DO_SERVICO, rotuloAvulso, ROTULO_TIPO_SERVICO, ROTULO_UNIDADE } from '@guarusolar/compartilhado';
 import { api, ErroApi, urlDaFoto } from '@guarusolar/web/api';
 import { SituacaoServico } from '@guarusolar/web/SituacaoServico';
 import { ImagemProtegida } from '@guarusolar/web/ImagemProtegida';
@@ -30,10 +30,18 @@ const DEPOIS_DE_VALIDAR: Record<(typeof ROTEIRO_DO_SERVICO)[keyof typeof ROTEIRO
   AGUARDANDO_CONCLUSAO: 'Sem outro serviço pendente, o projeto fica "Aguardando conclusão": quando a obra terminar, conclua na ficha do projeto.',
   NAO_MEXE: 'A situação do projeto não muda.',
 };
-/** Visita técnica avulsa: não há projeto para mexer; ela vai para o comercial. */
+/**
+ * Avulso (sem projeto), por etapa: a visita técnica vai para o comercial orçar; o LAUDO não vira
+ * orçamento (12/11/2026), só fica registrado no cliente.
+ */
 const DEPOIS_DA_AVULSA = 'Não há projeto: a visita aparece para o comercial em "Visitas aguardando orçamento".';
+const DEPOIS_DO_LAUDO_AVULSO = 'Não há projeto: o laudo fica registrado na ficha do cliente e não gera orçamento.';
 const depoisDeValidar = (s: Pick<ServicoEmValidacao, 'tipo' | 'projeto'>) =>
-  s.projeto === null ? DEPOIS_DA_AVULSA : DEPOIS_DE_VALIDAR[ROTEIRO_DO_SERVICO[s.tipo].aoValidar];
+  s.projeto !== null
+    ? DEPOIS_DE_VALIDAR[ROTEIRO_DO_SERVICO[s.tipo].aoValidar]
+    : s.tipo === 'LAUDO'
+      ? DEPOIS_DO_LAUDO_AVULSO
+      : DEPOIS_DA_AVULSA;
 
 const linkDoMapa = (f: FotoEmValidacao) =>
   f.latitude && f.longitude ? `https://www.google.com/maps/search/?api=1&query=${f.latitude},${f.longitude}` : null;
@@ -162,7 +170,7 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-[13px] text-muted-foreground">
-            {dados.projeto ? <span className="font-mono">{dados.projeto.codigo}</span> : 'Visita avulsa, sem projeto'} · {tipo.rotulo}
+            {dados.projeto ? <span className="font-mono">{dados.projeto.codigo}</span> : `${rotuloAvulso(dados.tipo)}, sem projeto`} · {tipo.rotulo}
             {cidade && ` · ${cidade}`}
           </p>
           <h2 id="titulo-servico" className="text-[28px] leading-tight font-bold">
@@ -332,9 +340,9 @@ export function DetalheValidacao({ id, onResolvido }: { id: string; onResolvido:
       <Dialog open={confirmarAprovacao} onOpenChange={(aberto) => !aberto && !aprovar.isPending && setConfirmarAprovacao(false)}>
         <DialogContent className="bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Validar as fotos da {tipo.rotulo.toLowerCase()}?</DialogTitle>
+            <DialogTitle>Validar as fotos d{generoDaEtapa(dados.tipo)} {tipo.rotulo.toLowerCase()}?</DialogTitle>
             <DialogDescription>
-              {cliente.nome} · {dados.projeto ? <>projeto <span className="font-mono">{dados.projeto.codigo}</span></> : 'visita avulsa'}. O serviço fica{' '}
+              {cliente.nome} · {dados.projeto ? <>projeto <span className="font-mono">{dados.projeto.codigo}</span></> : rotuloAvulso(dados.tipo).toLowerCase()}. O serviço fica{' '}
               <strong>Validado</strong> e sai da fila. {depoisDeValidar(dados)}
               {marcadasNoBanco > 0 &&
                 ` ${marcadasNoBanco === 1 ? 'A foto que estava marcada' : `As ${marcadasNoBanco} fotos que estavam marcadas`} para refazer ${marcadasNoBanco === 1 ? 'será aceita' : 'serão aceitas'} como estão.`}

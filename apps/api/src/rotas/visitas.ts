@@ -25,6 +25,8 @@ const nome = { select: { nome: true } } as const;
 /** O que a lista e a ficha mostram de cada visita. */
 const DADOS_DA_VISITA = {
   id: true,
+  // visita técnica ou laudo (12/11/2026): a ficha do cliente e a do projeto dizem qual em cada cartão
+  tipo: true,
   status: true,
   dataInicio: true,
   horaInicio: true,
@@ -51,24 +53,30 @@ const DADOS_DA_VISITA = {
 
 type Visita = Prisma.AgendamentoGetPayload<{ select: typeof DADOS_DA_VISITA }>;
 
-const ORDEM_DAS_FOTOS = new Map(ROTEIRO_DO_SERVICO.VISITA_TECNICA.fotos.map((f, i) => [f.chave, i]));
-const posicao = (chave: string | null) => (chave ? (ORDEM_DAS_FOTOS.get(chave) ?? 99) : 100);
-
-/** Fotos na ordem do roteiro da visita (extras no fim); vídeo sem a chave do arquivo. */
-const paraATela = ({ videos, fotos, ...v }: Visita, aguardandoOrcamento: boolean) => ({
-  ...v,
-  avulsa: v.projeto === null,
-  aguardandoOrcamento,
-  fotos: [...fotos].sort((a, b) => posicao(a.chave) - posicao(b.chave)),
-  videos: videos.map(({ capaChave, ...video }) => ({ ...video, temCapa: capaChave !== null })),
-});
+/** Fotos na ordem do roteiro da etapa, visita ou laudo (extras no fim); vídeo sem a chave do arquivo. */
+const paraATela = ({ videos, fotos, ...v }: Visita, aguardandoOrcamento: boolean) => {
+  const ordem = new Map(ROTEIRO_DO_SERVICO[v.tipo].fotos.map((f, i) => [f.chave, i]));
+  const posicao = (chave: string | null) => (chave ? (ordem.get(chave) ?? 99) : 100);
+  return {
+    ...v,
+    avulsa: v.projeto === null,
+    aguardandoOrcamento,
+    fotos: [...fotos].sort((a, b) => posicao(a.chave) - posicao(b.chave)),
+    videos: videos.map(({ capaChave, ...video }) => ({ ...video, temCapa: capaChave !== null })),
+  };
+};
 
 /**
- * A avulsa validada, não dispensada, cujo cliente não tem orçamento criado depois da validação.
- * (O orçamento mais recente do cliente basta: se ele é anterior, todos são.)
+ * A VISITA TÉCNICA avulsa validada, não dispensada, cujo cliente não tem orçamento criado depois da
+ * validação. (O orçamento mais recente do cliente basta: se ele é anterior, todos são.) O LAUDO
+ * nunca aguarda orçamento (12/11/2026): não vira proposta, só fica registrado no cliente.
  */
-const aguardaOrcamento = (v: { status: string; projeto: unknown; dispensadaEm: Date | null; validadoEm: Date | null }, ultimoOrcamento: Date | null) =>
-  v.projeto === null && v.status === 'APROVADO' && v.dispensadaEm === null && !(ultimoOrcamento && v.validadoEm && ultimoOrcamento > v.validadoEm);
+const aguardaOrcamento = (v: { tipo: string; status: string; projeto: unknown; dispensadaEm: Date | null; validadoEm: Date | null }, ultimoOrcamento: Date | null) =>
+  v.tipo === 'VISITA_TECNICA' &&
+  v.projeto === null &&
+  v.status === 'APROVADO' &&
+  v.dispensadaEm === null &&
+  !(ultimoOrcamento && v.validadoEm && ultimoOrcamento > v.validadoEm);
 
 rotasVisitas.get(
   '/aguardando-orcamento',
