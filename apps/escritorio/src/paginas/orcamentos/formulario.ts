@@ -1,9 +1,11 @@
 import {
   CONDICOES_PADRAO_DA_PROPOSTA,
+  condicoesAoReabrir,
+  dataDaquiA,
+  DIAS_DE_VALIDADE,
   GARANTIA_PADRAO,
   MARGEM_PADRAO,
   MAXIMO_PARCELAS,
-  partesNoFuso,
   problemaNasParcelas,
   TAXAS_CARTAO,
 } from '@guarusolar/compartilhado';
@@ -83,15 +85,8 @@ export const OPCOES_PARCELAS = [
     rotulo: `${n}x${n === 1 ? ' crédito' : ''} · ${pct(TAXAS_CARTAO.credito[n])}`,
   })),
 ];
-const parcelaValida = (v: string) => OPCOES_PARCELAS.some((o) => o.valor === v);
-export const DIAS_DE_VALIDADE = 30;
-
-/** Data AAAA-MM-DD `dias` à frente de hoje, contando "hoje" no fuso da empresa. */
-export function dataDaquiA(dias: number) {
-  const { ano, mes, dia } = partesNoFuso();
-  const d = new Date(Date.UTC(ano, mes, dia + dias));
-  return d.toISOString().slice(0, 10);
-}
+// a validade de um orçamento novo é a mesma do duplicado (API): as duas vêm do compartilhado
+export { DIAS_DE_VALIDADE, dataDaquiA };
 
 const PADRAO_A_VISTA = CONDICOES_PADRAO_DA_PROPOSTA.descontoAVistaPct == null ? null : formatarQuantidade(CONDICOES_PADRAO_DA_PROPOSTA.descontoAVistaPct);
 const PADRAO_PARCELAS = CONDICOES_PADRAO_DA_PROPOSTA.parcelas == null ? null : String(CONDICOES_PADRAO_DA_PROPOSTA.parcelas);
@@ -408,6 +403,15 @@ export const caminhoDoPdf = (o: Pick<OrcamentoSalvo, 'id' | 'tokenPdf'>) =>
 export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
   const numeroTexto = (v: string | number | null | undefined, padrao: string) =>
     v === null || v === undefined ? padrao : formatarQuantidade(Number(v));
+  const numero = (v: string | number | null | undefined) => (v === null || v === undefined ? null : Number(v));
+  const reaberto = condicoesAoReabrir({
+    condicaoPagamento: o.condicaoPagamento,
+    descontoAVistaPct: numero(o.descontoAVistaPct),
+    propostaAVistaPct: numero(o.propostaAVistaPct),
+    parcelas: numero(o.parcelas),
+    pagamentoDebito: o.pagamentoDebito,
+    propostaCartaoParcelas: numero(o.propostaCartaoParcelas),
+  });
   return {
     cliente: o.cliente,
     // orçamento anterior ao campo abre sem tipo: para salvar, é preciso escolher
@@ -430,24 +434,9 @@ export function valoresDoOrcamento(o: OrcamentoCompleto): FormularioOrcamento {
     impostoPct: numeroTexto(o.impostoPct, '0'),
     mostrarImpostosNoPdf: o.mostrarImpostosNoPdf ?? true,
     condicaoPagamento: o.condicaoPagamento,
-    // fora da condição escolhida, o que está na proposta gravada (propostaAVistaPct /
-    // propostaCartaoParcelas); sem ela, o padrão. Valor gravado da condição não escolhida, de antes
-    // das três condições, era resto de edição: não vale
-    descontoAVistaPct:
-      o.condicaoPagamento === 'A_VISTA'
-        ? numeroTexto(o.descontoAVistaPct, '')
-        : numeroTexto(o.propostaAVistaPct, PADRAO_A_VISTA ?? ''),
-    // os selects só têm estas opções; valores fora delas voltam ao padrão
-    parcelas:
-      o.condicaoPagamento === 'ENTRADA_PARCELAS'
-        ? o.pagamentoDebito
-          ? DEBITO
-          : parcelaValida(String(o.parcelas))
-            ? String(o.parcelas)
-            : ''
-        : o.propostaCartaoParcelas != null && parcelaValida(String(o.propostaCartaoParcelas))
-          ? String(o.propostaCartaoParcelas)
-          : (PADRAO_PARCELAS ?? ''),
+    // a conversão fica no compartilhado (condicoesAoReabrir): o duplicar da API usa a mesma
+    descontoAVistaPct: reaberto.descontoAVistaPct == null ? '' : formatarQuantidade(reaberto.descontoAVistaPct),
+    parcelas: reaberto.debito ? DEBITO : reaberto.parcelas == null ? '' : String(reaberto.parcelas),
     absorverTaxaCartao: o.absorverTaxaCartao,
     // gravada ao meio-dia UTC: os 10 primeiros caracteres são a data certa
     validade: o.validade.slice(0, 10),

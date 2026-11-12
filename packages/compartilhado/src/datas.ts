@@ -19,6 +19,15 @@ export function partesNoFuso(instante: Date = new Date()): Partes {
   return { ano: valor('year'), mes: valor('month') - 1, dia: valor('day') };
 }
 
+/** Dias de validade de um orçamento novo (e de um duplicado), contados a partir de hoje. */
+export const DIAS_DE_VALIDADE = 30;
+
+/** Data AAAA-MM-DD `dias` à frente de hoje, contando "hoje" no fuso da empresa. */
+export function dataDaquiA(dias: number, instante: Date = new Date()) {
+  const { ano, mes, dia } = partesNoFuso(instante);
+  return new Date(Date.UTC(ano, mes, dia + dias)).toISOString().slice(0, 10);
+}
+
 /** Diferença do fuso da empresa para UTC, em minutos, naquele instante (ex.: -180). */
 function deslocamentoMinutos(instante: Date) {
   const nome = new Intl.DateTimeFormat('en-US', { timeZone: FUSO_EMPRESA, timeZoneName: 'longOffset' })

@@ -984,6 +984,21 @@ Usuários do seed (senha `guarusolar123`): `admin@`, `comercial@`, `gestor@`,
 - **Criar orçamento é idempotente** (`idCriacao`, UUID gerado pelo gerador ao abrir "novo"): se a
   resposta do POST se perder e o vendedor salvar de novo, a API acha o mesmo `idCriacao` e atualiza
   aquele orçamento (200) em vez de criar outro. Formulário novo de criação = UUID novo.
+- **Duplicar orçamento** (`POST /api/orcamentos/:id/duplicar` com o `clienteId`; botão na coluna
+  Ações da lista e no cabeçalho do gerador, inclusive do aprovado em modo leitura): vale em
+  QUALQUER status e cria um RASCUNHO NOVO montado pela API, nunca pela tela. Regra geral: o que
+  não poderia entrar num orçamento novo hoje não é copiado e nasce como num novo. Itens como na
+  edição (`prepararItens` com os itens do original como cópias: nada relido do catálogo; produto
+  desativado continua); condições de pagamento por `condicoesAoReabrir` (compartilhado), a mesma
+  conversão do gerador ao reabrir; tipo de serviço desativado ou ausente nasce SEM tipo (duplicar
+  não é porta dos fundos para vender o desativado) e não muda o "último tipo"; prazo e garantia
+  fora do limite atual nascem vazio e padrão; dados do cliente do cadastro do cliente ESCOLHIDO
+  (cliente desativado: 409); `tokenPdf` novo; vendedor = quem duplicou; validade de hoje +
+  `DIAS_DE_VALIDADE`; zera status, datas de envio/decisão, motivo, `modeloEnviado`; sem projeto e
+  sem histórico; totais recalculados. A resposta diz o que não veio (`semTipo`,
+  `prazoDescartado`, `garantiaDescartada`) para o aviso na tela. Também idempotente (`idCriacao`,
+  um por cliente escolhido a cada abertura da janela): duplo clique ou resposta perdida devolvem a
+  mesma cópia (200), inclusive com pedidos simultâneos (P2002 no `idCriacao` = devolve a outra).
 - **Fila de validação quase em tempo real** (`app/AcompanhamentoOperacao.tsx`, só GESTOR/ADMIN):
   pergunta `GET /api/validacao/versao` a cada 20 s (também com a aba em segundo plano) e, quando a
   versão muda, recarrega validação, agenda e projetos; título da aba "(2) …", contador no menu e,

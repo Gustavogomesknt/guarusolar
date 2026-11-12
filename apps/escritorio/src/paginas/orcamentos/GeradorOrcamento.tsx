@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker } from 'react-router';
 import { FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Lock, Save } from 'lucide-react';
+import { Copy, Loader2, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { calcularCondicoesDaProposta, calcularOrcamento, faltaNasCondicoes, formatarHora, ROTULO_STATUS_ORCAMENTO } from '@guarusolar/compartilhado';
 import { api, ErroApi, tokenSalvo, urlDaApi } from '@guarusolar/web/api';
@@ -23,6 +23,7 @@ import { ClassificarTipo, usePreferenciaDeTipo } from '@/lib/tiposDeServico';
 import { CartaoItens } from './CartaoItens';
 import { ResumoOrcamento, type Totais } from './ResumoOrcamento';
 import { useConfirmacaoDaCapa } from './capa';
+import { useDuplicarOrcamento } from './DialogDuplicar';
 import {
   caminhoDoPdf,
   campoDoFormulario,
@@ -71,6 +72,7 @@ export function GeradorOrcamento({
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   // a capa do PDF é do tipo de serviço: tipo sem capa própria avisa antes de gerar ou enviar
   const capa = useConfirmacaoDaCapa();
+  const duplicar = useDuplicarOrcamento();
   const somenteLeitura = salvo?.status === 'APROVADO';
 
   // Orçamento novo já vem com o último tipo que esta pessoa escolheu (preferência no servidor),
@@ -230,23 +232,39 @@ export function GeradorOrcamento({
               </span>
             </div>
           </div>
-          {!somenteLeitura && (
+          {(salvo || !somenteLeitura) && (
             <div className="flex items-center gap-3">
               {situacao && (
                 <span className="text-[13px] text-muted-foreground" role="status">
                   {situacao}
                 </span>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={aoSalvar}
-                disabled={salvar.isPending || confirmado}
-                className="h-11 rounded-[10px] bg-card px-[18px]"
-              >
-                {salvar.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
-                {salvo ? 'Salvar alterações' : 'Salvar rascunho'}
-              </Button>
+              {/* em qualquer status, inclusive o aprovado (só leitura): a cópia sai do que está
+                  SALVO, com o cliente salvo como sugestão */}
+              {salvo && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => duplicar.abrir({ id: salvo.id, codigo: salvo.codigo, clienteId: salvo.clienteId ?? getValues('cliente')?.id ?? '' })}
+                  className="h-11 rounded-[10px] bg-card px-[18px]"
+                >
+                  <Copy aria-hidden />
+                  Duplicar
+                </Button>
+              )}
+              {!somenteLeitura && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={aoSalvar}
+                  disabled={salvar.isPending || confirmado}
+                  className="h-11 rounded-[10px] bg-card px-[18px]"
+                >
+                  {salvar.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
+                  {salvo ? 'Salvar alterações' : 'Salvar rascunho'}
+                </Button>
+              )}
+              {duplicar.dialogo}
             </div>
           )}
         </header>

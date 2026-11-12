@@ -18,6 +18,7 @@
  */
 import { calcularOrcamento, type EntradaCalculo, type PagamentoCartao } from './calculo.js';
 import { MAXIMO_PARCELAS } from './taxasCartao.js';
+import type { CondicaoPagamento } from './enums.js';
 
 export const CONDICOES_PADRAO_DA_PROPOSTA: {
   /**
@@ -102,4 +103,37 @@ export function problemaNasParcelas(
   const cartoes = [calcularOrcamento(entrada).cartao, calcularCondicoesDaProposta(entrada, padroes).cartao?.detalhe ?? null];
   const ruim = cartoes.find((c) => c && !c.debito && c.parcelas > 1 && c.valorCobrado > 0 && c.valorUltimaParcela <= 0);
   return ruim ? `Valor baixo demais para ${ruim.parcelas}x no cartão: use menos parcelas.` : null;
+}
+
+/**
+ * As condições de pagamento de um orçamento GRAVADO como o gerador as REABRE: é a mesma conversão
+ * para abrir um orçamento salvo (escritório, valoresDoOrcamento) e para DUPLICAR (API, POST
+ * /orcamentos/:id/duplicar), para a cópia nascer com o que a pessoa veria ao reabrir o original.
+ * - à vista: na condição à vista, o % gravado (nulo = em branco); fora dela, o da proposta gravada
+ *   (propostaAVistaPct) ou o padrão. O valor da coluna fora da condição escolhida, de antes das
+ *   três condições, era resto de edição: não vale.
+ * - parcelas: na condição "Cartão", débito ou o número gravado (fora de 1 a MAXIMO_PARCELAS = em
+ *   branco); fora dela, o da proposta gravada (propostaCartaoParcelas) ou o padrão.
+ * Números: nulo = campo em branco.
+ */
+export function condicoesAoReabrir(o: {
+  condicaoPagamento: CondicaoPagamento;
+  descontoAVistaPct: number | null;
+  propostaAVistaPct: number | null;
+  parcelas: number | null;
+  pagamentoDebito: boolean;
+  propostaCartaoParcelas: number | null;
+}): { descontoAVistaPct: number | null; parcelas: number | null; debito: boolean } {
+  const valida = (n: number | null): n is number => n != null && Number.isInteger(n) && n >= 1 && n <= MAXIMO_PARCELAS;
+  const descontoAVistaPct =
+    o.condicaoPagamento === 'A_VISTA' ? o.descontoAVistaPct : (o.propostaAVistaPct ?? CONDICOES_PADRAO_DA_PROPOSTA.descontoAVistaPct);
+  if (o.condicaoPagamento === 'ENTRADA_PARCELAS') {
+    if (o.pagamentoDebito) return { descontoAVistaPct, parcelas: 1, debito: true };
+    return { descontoAVistaPct, parcelas: valida(o.parcelas) ? o.parcelas : null, debito: false };
+  }
+  return {
+    descontoAVistaPct,
+    parcelas: valida(o.propostaCartaoParcelas) ? o.propostaCartaoParcelas : CONDICOES_PADRAO_DA_PROPOSTA.parcelas,
+    debito: false,
+  };
 }

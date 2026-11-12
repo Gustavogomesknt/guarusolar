@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Loader2, MessageCircle, Plus, Search } from 'lucide-react';
+import { Copy, FileText, Loader2, MessageCircle, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   formatarData,
@@ -23,10 +23,11 @@ import { opcoesDePeriodo, parametrosDoPeriodo, parametrosDoResumo, periodoNaFras
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 import { FiltroDeTipo, type FiltroTipo } from '@/lib/tiposDeServico';
 import { useConfirmacaoDaCapa } from './capa';
+import { useDuplicarOrcamento } from './DialogDuplicar';
 
 type FiltroStatus = StatusOrcamento | 'TODOS';
 
-const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_100px_100px_136px_170px_96px]';
+const COLUNAS = 'grid-cols-[130px_minmax(0,1fr)_100px_100px_136px_170px_140px]';
 
 export function ListaOrcamentos() {
   const [status, setStatus] = useState<FiltroStatus>('TODOS');
@@ -280,7 +281,7 @@ function Tabela({
 
   return (
     <section aria-label="Lista de orçamentos" className="relative overflow-x-auto rounded-[14px] border bg-card">
-      <div role="table" aria-label="Orçamentos" className="min-w-[960px]">
+      <div role="table" aria-label="Orçamentos" className="min-w-[1000px]">
         <div role="rowgroup">
           <div
             role="row"
@@ -378,6 +379,7 @@ function Linha({
   const clienteConsultas = useQueryClient();
   const abrir = () => navegar(`/orcamentos/${o.id}`);
   const capa = useConfirmacaoDaCapa();
+  const duplicar = useDuplicarOrcamento();
 
   const whatsapp = useMutation({
     mutationFn: () => enviarPeloWhatsApp(o.id),
@@ -449,8 +451,23 @@ function Linha({
             <MessageCircle className="size-[18px]" aria-hidden />
           )}
         </button>
-        {/* o diálogo é portal, mas o clique sobe pela árvore do React: não pode abrir a linha */}
-        <span onClick={(e) => e.stopPropagation()}>{capa.dialogo}</span>
+        <button
+          type="button"
+          aria-label={`Duplicar ${o.codigo}`}
+          title="Duplicar"
+          onClick={(e) => {
+            e.stopPropagation();
+            duplicar.abrir({ id: o.id, codigo: o.codigo, clienteId: o.cliente.id });
+          }}
+          className="flex size-10 items-center justify-center rounded-[10px] border text-foreground/80 hover:bg-muted"
+        >
+          <Copy className="size-[18px]" aria-hidden />
+        </button>
+        {/* os diálogos são portal, mas o clique sobe pela árvore do React: não pode abrir a linha */}
+        <span onClick={(e) => e.stopPropagation()}>
+          {capa.dialogo}
+          {duplicar.dialogo}
+        </span>
       </span>
     </div>
   );

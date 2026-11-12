@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { History, Plus } from 'lucide-react';
@@ -26,16 +26,6 @@ export function CartaoCliente({ gravado, somenteLeitura = false }: { gravado: Or
   const erroCliente = errors.root?.cliente?.message;
   const [termo, setTermo] = useState('');
   const [dialogAberto, setDialogAberto] = useState(false);
-
-  const termoBusca = useValorAtrasado(termo.trim(), 300);
-  const busca = useQuery({
-    queryKey: ['clientes', 'busca', termoBusca],
-    queryFn: ({ signal }) =>
-      api.get<Cliente[]>(`/api/clientes?q=${encodeURIComponent(termoBusca)}`, { signal }),
-    enabled: termoBusca.length >= MINIMO_BUSCA,
-    staleTime: 60_000,
-  });
-  const atualizando = termo.trim() !== termoBusca || busca.isFetching;
 
   function selecionar(escolhido: Cliente | null) {
     setValue('cliente', escolhido, { shouldDirty: true });
@@ -65,29 +55,10 @@ export function CartaoCliente({ gravado, somenteLeitura = false }: { gravado: Or
           onTrocar={() => selecionar(null)}
         />
       ) : (
-        <CampoBusca<Cliente>
-          rotulo="Buscar cliente"
-          placeholder="Buscar por nome, CPF/CNPJ ou WhatsApp"
+        <BuscaDeCliente
           termo={termo}
           onTermoChange={setTermo}
-          resultados={termoBusca === termo.trim() ? busca.data : undefined}
-          carregando={termo.trim().length >= MINIMO_BUSCA && atualizando}
-          minimo={MINIMO_BUSCA}
-          chave={(c) => c.id}
           onEscolher={selecionar}
-          renderItem={(c) => (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{c.nome}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {[documentoParaExibir(c.documento), mascararTelefone(c.whatsapp)].filter(Boolean).join(' · ')}
-                </span>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {[c.cidade, c.uf].filter(Boolean).join(' · ')}
-              </span>
-            </div>
-          )}
           vazio={
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>Nenhum cliente encontrado.</span>
@@ -116,6 +87,61 @@ export function CartaoCliente({ gravado, somenteLeitura = false }: { gravado: Or
         mensagemAoCriar={(nome) => `${nome} cadastrado e selecionado no orçamento`}
       />
     </section>
+  );
+}
+
+/**
+ * A busca de cliente do gerador (nome, CPF/CNPJ ou WhatsApp; só clientes ativos). Usada no cartão
+ * Cliente e na janela de duplicar orçamento.
+ */
+export function BuscaDeCliente({
+  termo,
+  onTermoChange,
+  onEscolher,
+  vazio,
+  rotulo = 'Buscar cliente',
+}: {
+  termo: string;
+  onTermoChange: (termo: string) => void;
+  onEscolher: (cliente: Cliente) => void;
+  vazio: ReactNode;
+  rotulo?: string;
+}) {
+  const termoBusca = useValorAtrasado(termo.trim(), 300);
+  const busca = useQuery({
+    queryKey: ['clientes', 'busca', termoBusca],
+    queryFn: ({ signal }) =>
+      api.get<Cliente[]>(`/api/clientes?q=${encodeURIComponent(termoBusca)}`, { signal }),
+    enabled: termoBusca.length >= MINIMO_BUSCA,
+    staleTime: 60_000,
+  });
+  const atualizando = termo.trim() !== termoBusca || busca.isFetching;
+  return (
+    <CampoBusca<Cliente>
+      rotulo={rotulo}
+      placeholder="Buscar por nome, CPF/CNPJ ou WhatsApp"
+      termo={termo}
+      onTermoChange={onTermoChange}
+      resultados={termoBusca === termo.trim() ? busca.data : undefined}
+      carregando={termo.trim().length >= MINIMO_BUSCA && atualizando}
+      minimo={MINIMO_BUSCA}
+      chave={(c) => c.id}
+      onEscolher={onEscolher}
+      renderItem={(c) => (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-medium">{c.nome}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {[documentoParaExibir(c.documento), mascararTelefone(c.whatsapp)].filter(Boolean).join(' · ')}
+            </span>
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {[c.cidade, c.uf].filter(Boolean).join(' · ')}
+          </span>
+        </div>
+      )}
+      vazio={vazio}
+    />
   );
 }
 

@@ -12,6 +12,10 @@ import {
   type EntradaCalculo,
   AVISO_SEM_PRAZO,
   avisoSemCondicoes,
+  condicoesAoReabrir,
+  dataDaquiA,
+  DIAS_DE_VALIDADE,
+  GARANTIA_PADRAO,
   faltaNasCondicoes,
   GARANTIA_MAXIMO_DE_CARACTERES,
   MAXIMO_PARCELAS,
@@ -172,6 +176,12 @@ function conferirSelos(dados: { prazoExecucao?: string; garantia?: string }, gra
     }
     if (!cabeNoSelo(c.selo, c.valor)) throw new ErroHttp(400, `${c.nome} "${c.valor}" não cabe na proposta: encurte o texto.`);
   }
+}
+
+/** O texto está dentro do limite ATUAL do selo (o que conferirSelos exige de um texto novo). */
+function dentroDoLimite(selo: 'prazo' | 'garantia', texto: string) {
+  const max = selo === 'prazo' ? PRAZO_MAXIMO_DE_CARACTERES : GARANTIA_MAXIMO_DE_CARACTERES;
+  return texto.length <= max && cabeNoSelo(selo, texto);
 }
 
 /**
@@ -687,6 +697,145 @@ rotasOrcamentos.put(
   rota(async (req, res) => {
     const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body), req.usuario!.id);
     res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+  }),
+);
+
+// --------------------------------------------------------------------------
+// Duplicar: um orçamento NOVO a partir de outro, em QUALQUER status (inclusive aprovado), para o
+// cliente escolhido. A cópia é montada aqui, nunca na tela. Regra geral: o que não poderia entrar
+// num orçamento novo hoje não é copiado; o campo nasce como num orçamento novo.
+// - itens: como na edição (prepararItens com os itens do original como cópias): descrição,
+//   unidade, grupo e preço de tabela do original, não do catálogo; produto desativado continua;
+// - tipo de serviço desativado (ou ausente): a cópia nasce sem tipo e a pessoa escolhe. Duplicar
+//   não é porta dos fundos para vender o que foi desativado. Não muda o "último tipo" de ninguém;
+// - prazo e garantia fora do limite atual: nascem como num novo (prazo vazio, garantia padrão);
+// - condições de pagamento: condicoesAoReabrir, a mesma conversão de reabrir o orçamento;
+// - dados do cliente: do cadastro do cliente ESCOLHIDO (copiaDoCliente), nunca do original;
+// - tokenPdf novo (o banco gera): o link público de um nunca abre o PDF do outro;
+// - zera status, datas de envio/decisão, motivo da recusa e modelo enviado; validade de hoje;
+//   código novo; sem projeto e sem histórico; totais recalculados.
+// --------------------------------------------------------------------------
+rotasOrcamentos.post(
+  '/:id/duplicar',
+  rota(async (req, res) => {
+    const { clienteId, idCriacao } = z
+      .object({
+        clienteId: z.string().uuid('Escolha o cliente da cópia'),
+        // gerado pela janela (um por cliente escolhido a cada vez que ela abre): o mesmo pedido
+        // repetido (duplo clique, resposta perdida numa queda de internet) devolve a cópia já
+        // criada em vez de criar outra com outro código
+        idCriacao: z.string().uuid().optional(),
+      })
+      .parse(req.body);
+    const original = await prisma.orcamento.findUnique({
+      where: { id: req.params.id },
+      include: { itens: { orderBy: { ordem: 'asc' } }, tipoDeServico: { select: { ativo: true } } },
+    });
+    if (!original) throw new ErroHttp(404, 'Orçamento não encontrado');
+    const cliente = await clienteDoOrcamento(clienteId);
+    if (!cliente.ativo) throw new ErroHttp(409, `${cliente.nome} está desativado: escolha outro cliente para a cópia.`);
+
+    const tipoDeServicoId = original.tipoDeServicoId && original.tipoDeServico?.ativo ? original.tipoDeServicoId : null;
+    const prazo = original.prazoExecucao?.trim() ?? '';
+    const prazoExecucao = prazo && dentroDoLimite('prazo', prazo) ? prazo : null;
+    // sem garantia gravada, o gerador reabre com a padrão: a cópia também
+    const garantiaOriginal = original.garantia?.trim() || GARANTIA_PADRAO;
+    const garantia = dentroDoLimite('garantia', garantiaOriginal) ? garantiaOriginal : GARANTIA_PADRAO;
+
+    const resposta = (copia: { id: string; codigo: string }) => ({
+      id: copia.id,
+      codigo: copia.codigo,
+      origem: original.codigo,
+      // o que a cópia NÃO trouxe, para o aviso na tela
+      semTipo: tipoDeServicoId === null,
+      prazoDescartado: Boolean(prazo) && prazoExecucao === null,
+      garantiaDescartada: garantia !== garantiaOriginal,
+    });
+    const jaCriada = () =>
+      idCriacao ? prisma.orcamento.findUnique({ where: { idCriacao }, select: { id: true, codigo: true } }) : null;
+    const repetida = await jaCriada();
+    if (repetida) return res.json(resposta(repetida));
+
+    const itens = await prepararItens(
+      original.itens.map((i) => ({
+        produtoId: i.produtoId,
+        quantidade: Number(i.quantidade),
+        precoUnitario: Number(i.precoUnitario),
+        apareceNaProposta: i.apareceNaProposta,
+      })),
+      original.itens,
+    );
+    const numero = (v: Prisma.Decimal | number | null) => (v === null ? null : Number(v));
+    const reaberto = condicoesAoReabrir({
+      condicaoPagamento: original.condicaoPagamento,
+      descontoAVistaPct: numero(original.descontoAVistaPct),
+      propostaAVistaPct: numero(original.propostaAVistaPct),
+      parcelas: original.parcelas,
+      pagamentoDebito: original.pagamentoDebito,
+      propostaCartaoParcelas: original.propostaCartaoParcelas,
+    });
+    // como o gerador envia: débito e taxa absorvida só valem na condição "Cartão"
+    const cartao = original.condicaoPagamento === 'ENTRADA_PARCELAS';
+    const entradaDoCalculo: EntradaCalculo = {
+      itens: itens.map((i) => i._calculo),
+      margem: Number(original.margem),
+      descontoTipo: original.descontoTipo,
+      descontoValor: Number(original.descontoValor),
+      impostoPct: Number(original.impostoPct),
+      condicaoPagamento: original.condicaoPagamento,
+      descontoAVistaPct: reaberto.descontoAVistaPct,
+      parcelas: reaberto.parcelas,
+      debito: cartao && reaberto.debito,
+      absorverTaxaCartao: cartao && original.absorverTaxaCartao,
+    };
+    const parcelasRuins = problemaNasParcelas(entradaDoCalculo);
+    if (parcelasRuins) throw new ErroHttp(400, `Não foi possível duplicar ${original.codigo}: ${parcelasRuins}`);
+    const totais = calcularOrcamento(entradaDoCalculo);
+
+    let copia: { id: string; codigo: string };
+    try {
+      copia = await prisma.$transaction(async (tx) =>
+        tx.orcamento.create({
+          data: {
+            codigo: await gerarCodigoOrcamento(tx),
+            idCriacao,
+            clienteId: cliente.id,
+            tipoDeServicoId,
+            ...copiaDoCliente(cliente),
+            vendedorId: req.usuario!.id,
+            validade: new Date(`${dataDaquiA(DIAS_DE_VALIDADE)}T12:00:00Z`),
+            descontoTipo: original.descontoTipo,
+            descontoValor: original.descontoValor,
+            impostoPct: original.impostoPct,
+            mostrarImpostosNoPdf: original.mostrarImpostosNoPdf,
+            condicaoPagamento: original.condicaoPagamento,
+            descontoAVistaPct: reaberto.descontoAVistaPct,
+            entradaPct: null,
+            parcelas: reaberto.parcelas,
+            observacoes: original.observacoes?.trim() || null,
+            descricaoServico: original.descricaoServico?.trim() || null,
+            detalharPrecosNoPdf: original.detalharPrecosNoPdf,
+            prazoExecucao,
+            garantia,
+            subtotal: totais.subtotal,
+            margem: totais.margem,
+            descontoAplicado: totais.descontoAplicado,
+            impostoAplicado: totais.impostoAplicado,
+            valorTotal: totais.valorTotal,
+            ...pagamentoGravado(original.condicaoPagamento, totais),
+            ...condicoesGravadas(entradaDoCalculo),
+            itens: { create: itens.map(({ _calculo, ...item }) => item) },
+          },
+          select: { id: true, codigo: true },
+        }),
+      );
+    } catch (erro) {
+      // os dois pedidos repetidos chegaram juntos: o outro gravou primeiro (idCriacao é único)
+      const outro = erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002' ? await jaCriada() : null;
+      if (!outro) throw erro;
+      return res.json(resposta(outro));
+    }
+    res.status(201).json(resposta(copia));
   }),
 );
 
