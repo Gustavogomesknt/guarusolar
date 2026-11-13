@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
+import { filtroDoRepresentante } from '../lib/acesso';
 
 /*
  * Tipos de serviço VENDIDOS (instalação fotovoltaica, carregador veicular, manutenção...), o
@@ -28,13 +29,14 @@ async function conferirNomeLivre(nome: string, ignorarId?: string) {
 /** Lista na ordem de exibição. Sem incluirInativos, só os ativos (as escolhas do orçamento). */
 rotasTiposDeServico.get(
   '/',
-  autorizar('COMERCIAL', 'GESTOR'),
+  // o representante escolhe o tipo no gerador; a contagem de uso dele só conta os orçamentos DELE
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const incluirInativos = req.query.incluirInativos === 'true';
     const tipos = await prisma.tipoDeServico.findMany({
       where: incluirInativos ? {} : { ativo: true },
       orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-      include: { _count: { select: { orcamentos: true } } },
+      include: { _count: { select: { orcamentos: { where: filtroDoRepresentante.orcamento(req.usuario!) } } } },
     });
     res.json(tipos.map(({ _count, ...t }) => ({ ...t, usadoEmOrcamentos: _count.orcamentos })));
   }),

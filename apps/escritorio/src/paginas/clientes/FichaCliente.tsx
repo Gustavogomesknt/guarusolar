@@ -14,12 +14,15 @@ import { SeloStatus } from '@/paginas/orcamentos/MenuStatus';
 import { useAtivacaoDeCliente } from './ativarCliente';
 import { ValorDaProposta } from '@/components/ValorDaProposta';
 import { VisitasDoCliente } from '@/components/VisitasTecnicas';
+import { useSessao } from '@guarusolar/web/sessao';
+import { ehRepresentante } from '@/app/permissoes';
 
 export function FichaCliente() {
   const { id = '' } = useParams();
   const navegar = useNavigate();
   const [editando, setEditando] = useState(false);
   const ativacao = useAtivacaoDeCliente();
+  const representante = ehRepresentante(useSessao().usuario?.papel);
 
   const ficha = useQuery({
     queryKey: ['clientes', 'ficha', id],
@@ -181,8 +184,9 @@ export function FichaCliente() {
         )}
       </section>
 
-      {/* todas as visitas técnicas e laudos dele: os avulsos e os dos projetos, com fotos e observações */}
-      <VisitasDoCliente clienteId={c.id} ocultarSemVisitas={false} />
+      {/* todas as visitas técnicas e laudos dele: os avulsos e os dos projetos, com fotos e observações.
+          Fora do escopo do REPRESENTANTE (a API nem deixa): a ficha dele é cadastro e orçamentos */}
+      {!representante && <VisitasDoCliente clienteId={c.id} ocultarSemVisitas={false} />}
 
       {/* ação discreta, com confirmação: desativar não apaga nada */}
       <div className="flex flex-wrap items-center gap-3 border-t pt-4 text-[13px] text-muted-foreground">

@@ -4,10 +4,16 @@ import { Prisma } from '@prisma/client';
 import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
-import { autenticar, autorizar } from '../lib/auth';
+import { autenticar, autorizar, type UsuarioToken } from '../lib/auth';
+import { ehRepresentante, filtroDoRepresentante } from '../lib/acesso';
 
 export const rotasClientes = Router();
-rotasClientes.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
+// Só o login aqui: CADA ROTA diz quem passa. O REPRESENTANTE vê e mexe só nos clientes DELE
+// (Cliente.representanteId); o time interno, em todos. Conferido no build
+// (lib/isolamentoDoRepresentante.ts).
+rotasClientes.use(autenticar);
+
+const CLIENTE_NAO_ENCONTRADO = 'Cliente não encontrado';
 
 const somenteDigitos = (v: string) => v.replace(/\D/g, '');
 
@@ -40,10 +46,16 @@ const clienteSchema = z.object({
  * Documento já usado por outro cliente: 409 com o nome, em vez de erro do banco. É a única
  * conferência de cliente repetido, e só vale quando o documento foi informado.
  */
-async function conferirDocumentoLivre(documento: string, idAtual?: string) {
+async function conferirDocumentoLivre(documento: string, usuario: Pick<UsuarioToken, 'id' | 'papel'>, idAtual?: string) {
   const existente = await prisma.cliente.findUnique({ where: { documento } });
   if (existente && existente.id !== idAtual) {
-    throw new ErroHttp(409, `Já existe cliente com este documento: ${existente.nome}`);
+    // o nome só para quem pode ver aquele cliente: ao representante, o de outro (da casa ou de outro
+    // representante) não se revela. O documento é único na tabela: quem resolve é o escritório
+    const podeVer = !ehRepresentante(usuario) || existente.representanteId === usuario.id;
+    throw new ErroHttp(
+      409,
+      podeVer ? `Já existe cliente com este documento: ${existente.nome}` : 'Já existe um cliente com este documento. Fale com o escritório.',
+    );
   }
 }
 
@@ -52,9 +64,11 @@ async function conferirDocumentoLivre(documento: string, idAtual?: string) {
 // das buscas de novos orçamentos.
 rotasClientes.get(
   '/',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { q = '', incluirInativos, limite } = req.query as Record<string, string | undefined>;
     const where: Prisma.ClienteWhereInput = {
+      ...filtroDoRepresentante.cliente(req.usuario!),
       ...(incluirInativos === 'true' ? {} : { ativo: true }),
       // por palavras, em nome, documento e WhatsApp ("maria 9999", "012.345"): lib/busca.ts
       ...filtroDeBusca(q, (p) => [{ textoBusca: { contains: p } }]),
@@ -64,7 +78,8 @@ rotasClientes.get(
       where,
       orderBy: { nome: 'asc' },
       take,
-      include: { _count: { select: { orcamentos: true } } },
+      // representante: conta só os orçamentos DELE (o interno pode ter feito outros para o cliente)
+      include: { _count: { select: { orcamentos: { where: filtroDoRepresentante.orcamento(req.usuario!) } } } },
     });
     res.json(clientes.map(({ _count, ...c }) => ({ ...c, quantidadeOrcamentos: _count.orcamentos })));
   }),
@@ -72,38 +87,55 @@ rotasClientes.get(
 
 rotasClientes.get(
   '/:id',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
-    const cliente = await prisma.cliente.findUnique({
-      where: { id: req.params.id },
+    const representante = ehRepresentante(req.usuario!);
+    const cliente = await prisma.cliente.findFirst({
+      where: { id: req.params.id, ...filtroDoRepresentante.cliente(req.usuario!) },
       include: {
-        // todos os orçamentos, só com o que a ficha mostra
+        // os orçamentos, só com o que a ficha mostra. Representante: só os DELE e sem o projeto
+        // (projetos não são do escopo dele)
         orcamentos: {
+          where: filtroDoRepresentante.orcamento(req.usuario!),
           orderBy: { criadoEm: 'desc' },
-          select: { id: true, codigo: true, status: true, criadoEm: true, validade: true, valorTotal: true, valorTotalCliente: true, projeto: { select: { id: true, codigo: true, status: true } } },
+          select: {
+            id: true,
+            codigo: true,
+            status: true,
+            criadoEm: true,
+            validade: true,
+            valorTotal: true,
+            valorTotalCliente: true,
+            projeto: representante ? false : { select: { id: true, codigo: true, status: true } },
+          },
         },
       },
     });
-    if (!cliente) throw new ErroHttp(404, 'Cliente não encontrado');
+    if (!cliente) throw new ErroHttp(404, CLIENTE_NAO_ENCONTRADO);
     res.json(cliente);
   }),
 );
 
 rotasClientes.post(
   '/',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const dados = clienteSchema.parse(req.body);
-    if (dados.documento) await conferirDocumentoLivre(dados.documento);
-    res.status(201).json(await prisma.cliente.create({ data: dados }));
+    if (dados.documento) await conferirDocumentoLivre(dados.documento, req.usuario!);
+    // cadastrado por um representante: é DELE (só ele e o time interno veem); pelo interno, da casa
+    const representanteId = ehRepresentante(req.usuario!) ? req.usuario!.id : null;
+    res.status(201).json(await prisma.cliente.create({ data: { ...dados, representanteId } }));
   }),
 );
 
 rotasClientes.put(
   '/:id',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const dados = clienteSchema.partial().parse(req.body);
-    const atual = await prisma.cliente.findUnique({ where: { id: req.params.id } });
-    if (!atual) throw new ErroHttp(404, 'Cliente não encontrado');
-    if (dados.documento) await conferirDocumentoLivre(dados.documento, atual.id);
+    const atual = await prisma.cliente.findFirst({ where: { id: req.params.id, ...filtroDoRepresentante.cliente(req.usuario!) } });
+    if (!atual) throw new ErroHttp(404, CLIENTE_NAO_ENCONTRADO);
+    if (dados.documento) await conferirDocumentoLivre(dados.documento, req.usuario!, atual.id);
     res.json(await prisma.cliente.update({ where: { id: atual.id }, data: dados }));
   }),
 );
@@ -112,10 +144,11 @@ rotasClientes.put(
 // e os orçamentos dele continuam como estão.
 rotasClientes.patch(
   '/:id/ativo',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { ativo } = z.object({ ativo: z.boolean() }).parse(req.body);
-    const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
-    if (!cliente) throw new ErroHttp(404, 'Cliente não encontrado');
+    const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, ...filtroDoRepresentante.cliente(req.usuario!) } });
+    if (!cliente) throw new ErroHttp(404, CLIENTE_NAO_ENCONTRADO);
     res.json(await prisma.cliente.update({ where: { id: cliente.id }, data: { ativo } }));
   }),
 );

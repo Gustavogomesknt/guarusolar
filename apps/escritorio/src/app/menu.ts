@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { Papel } from '@guarusolar/compartilhado';
+import { PAPEIS_DE_VENDA } from './permissoes';
 import { ContadorValidacao } from './ContadorValidacao';
 import { ContadorVisitas } from './ContadorVisitas';
 
@@ -33,13 +34,13 @@ export type ItemMenu = {
 // A ordem segue os próximos passos do CLAUDE.md. Ao criar uma tela, marque disponivel: true
 // e registre a rota em rotas.tsx com os mesmos papéis.
 export const MENU: ItemMenu[] = [
-  { rotulo: 'Orçamentos', caminho: '/orcamentos', icone: FileText, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
-  { rotulo: 'Novo orçamento', caminho: '/orcamentos/novo', icone: FilePlus2, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
-  { rotulo: 'Pipeline', caminho: '/pipeline', icone: KanbanSquare, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
+  { rotulo: 'Orçamentos', caminho: '/orcamentos', icone: FileText, papeis: [...PAPEIS_DE_VENDA], disponivel: true, grupo: 'Comercial' },
+  { rotulo: 'Novo orçamento', caminho: '/orcamentos/novo', icone: FilePlus2, papeis: [...PAPEIS_DE_VENDA], disponivel: true, grupo: 'Comercial' },
+  { rotulo: 'Pipeline', caminho: '/pipeline', icone: KanbanSquare, papeis: [...PAPEIS_DE_VENDA], disponivel: true, grupo: 'Comercial' },
   // visitas técnicas avulsas validadas esperando a proposta (com fotos e medições)
   { rotulo: 'Visitas a orçar', caminho: '/visitas', icone: ClipboardList, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial', contador: ContadorVisitas },
-  { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
-  { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: ['COMERCIAL', 'GESTOR'], disponivel: true, grupo: 'Comercial' },
+  { rotulo: 'Clientes', caminho: '/clientes', icone: Users, papeis: [...PAPEIS_DE_VENDA], disponivel: true, grupo: 'Comercial' },
+  { rotulo: 'Catálogo', caminho: '/catalogo', icone: Package, papeis: [...PAPEIS_DE_VENDA], disponivel: true, grupo: 'Comercial' },
   { rotulo: 'Agenda', caminho: '/agenda', icone: CalendarDays, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação' },
   { rotulo: 'Validação', caminho: '/validacao', icone: ClipboardCheck, papeis: ['GESTOR'], disponivel: true, grupo: 'Operação', contador: ContadorValidacao },
   // comercial consulta ("quando vão instalar?"); só o gestor edita e cancela

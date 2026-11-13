@@ -4,7 +4,7 @@
  * schema do Prisma (apps/api/src/lib/conferencia-enums.ts).
  */
 
-export const PAPEIS = ['ADMIN', 'COMERCIAL', 'GESTOR', 'TECNICO'] as const;
+export const PAPEIS = ['ADMIN', 'COMERCIAL', 'GESTOR', 'TECNICO', 'REPRESENTANTE'] as const;
 export type Papel = (typeof PAPEIS)[number];
 
 export const TIPOS_PESSOA = ['FISICA', 'JURIDICA'] as const;

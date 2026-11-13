@@ -106,9 +106,12 @@ export function autenticar(req: Request, _res: Response, next: NextFunction) {
  * O técnico, por exemplo, só alcança as rotas de /api/tecnico.
  */
 export function autorizar(...papeis: Papel[]) {
-  return (req: Request, _res: Response, next: NextFunction) => {
+  const middleware = (req: Request, _res: Response, next: NextFunction) => {
     if (!req.usuario) throw new ErroHttp(401, 'Faça login para continuar');
     if (req.usuario.papel === 'ADMIN' || papeis.includes(req.usuario.papel)) return next();
     throw new ErroHttp(403, 'Seu usuário não tem acesso a esta função');
   };
+  // os papéis ficam à vista para a conferência das rotas (lib/conferencia-rotas.ts), que calcula
+  // quem alcança cada rota a partir daqui, sem depender do que alguém escreveu à mão
+  return Object.assign(middleware, { papeisLiberados: papeis as readonly Papel[] });
 }

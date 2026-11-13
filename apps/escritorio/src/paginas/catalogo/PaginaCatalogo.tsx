@@ -19,12 +19,16 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Selo } from '@/components/Selo';
+import { useSessao } from '@guarusolar/web/sessao';
+import { ehRepresentante } from '@/app/permissoes';
 import { PainelItem } from './PainelItem';
 
 type FiltroCategoria = CategoriaProduto | 'TODAS';
 type FiltroGrupo = GrupoNaProposta | 'TODOS';
 
 const COLUNAS = 'grid-cols-[minmax(0,1fr)_130px_64px_120px_130px_90px_64px_40px]';
+/** Só consulta (REPRESENTANTE): sem custo, margem, ativo e editar; a API nem manda o custo. */
+const COLUNAS_CONSULTA = 'grid-cols-[minmax(0,1fr)_130px_64px_130px]';
 
 /** Abaixo disso a margem aparece em laranja (atenção), nunca em vermelho de erro. */
 const MARGEM_BAIXA = 15;
@@ -36,15 +40,18 @@ export function PaginaCatalogo() {
   const [incluirInativos, setIncluirInativos] = useState(false);
   const [painel, setPainel] = useState<{ aberto: boolean; item: Produto | null }>({ aberto: false, item: null });
   const buscaAtrasada = useValorAtrasado(busca.trim(), 300);
+  // representante: consulta o catálogo (nome, categoria, unidade, preço de venda), sem editar
+  const consulta = ehRepresentante(useSessao().usuario?.papel);
+  const colunas = consulta ? COLUNAS_CONSULTA : COLUNAS;
 
   const parametros = useMemo(() => {
     const p = new URLSearchParams();
     if (buscaAtrasada) p.set('q', buscaAtrasada);
     if (categoria !== 'TODAS') p.set('categoria', categoria);
     if (grupo !== 'TODOS') p.set('grupo', grupo);
-    if (incluirInativos) p.set('incluirInativos', 'true');
+    if (incluirInativos && !consulta) p.set('incluirInativos', 'true');
     return p.toString();
-  }, [buscaAtrasada, categoria, grupo, incluirInativos]);
+  }, [buscaAtrasada, categoria, grupo, incluirInativos, consulta]);
 
   const itens = useQuery({
     queryKey: ['produtos', 'catalogo', parametros],
@@ -61,10 +68,12 @@ export function PaginaCatalogo() {
           <p className="text-[13px] text-muted-foreground">Itens pré-moldados usados nos orçamentos</p>
           <h1 className="text-4xl font-bold tracking-[-0.02em]">Catálogo de itens</h1>
         </div>
-        <Button className="h-11 rounded-[10px] px-[18px] font-semibold" onClick={() => abrir(null)}>
-          <Plus aria-hidden />
-          Novo item
-        </Button>
+        {!consulta && (
+          <Button className="h-11 rounded-[10px] px-[18px] font-semibold" onClick={() => abrir(null)}>
+            <Plus aria-hidden />
+            Novo item
+          </Button>
+        )}
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -116,38 +125,46 @@ export function PaginaCatalogo() {
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </label>
-          <label htmlFor="mostrar-desativados" className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-foreground/80">
-            <Switch id="mostrar-desativados" checked={incluirInativos} onCheckedChange={setIncluirInativos} />
-            Mostrar desativados
-          </label>
+          {!consulta && (
+            <label htmlFor="mostrar-desativados" className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-foreground/80">
+              <Switch id="mostrar-desativados" checked={incluirInativos} onCheckedChange={setIncluirInativos} />
+              Mostrar desativados
+            </label>
+          )}
         </div>
       </div>
 
       <section aria-label="Itens do catálogo" className="relative overflow-x-auto rounded-[14px] border bg-card">
-        <div role="table" aria-label="Itens do catálogo" className="min-w-[940px]">
+        <div role="table" aria-label="Itens do catálogo" className={consulta ? 'min-w-[600px]' : 'min-w-[940px]'}>
           <div
             role="row"
-            className={`grid ${COLUNAS} gap-3.5 border-b px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase`}
+            className={`grid ${colunas} gap-3.5 border-b px-5 py-3 text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase`}
           >
             <span role="columnheader">Item</span>
             <span role="columnheader">Categoria</span>
             <span role="columnheader">Unid.</span>
-            <span role="columnheader" className="text-right">
-              Custo
-            </span>
+            {!consulta && (
+              <span role="columnheader" className="text-right">
+                Custo
+              </span>
+            )}
             <span role="columnheader" className="text-right">
               Venda padrão
             </span>
-            <span role="columnheader" className="text-right">
-              Margem
-            </span>
-            <span role="columnheader">Ativo</span>
-            <span role="columnheader">
-              <span className="sr-only">Editar</span>
-            </span>
+            {!consulta && (
+              <>
+                <span role="columnheader" className="text-right">
+                  Margem
+                </span>
+                <span role="columnheader">Ativo</span>
+                <span role="columnheader">
+                  <span className="sr-only">Editar</span>
+                </span>
+              </>
+            )}
           </div>
           <div role="rowgroup">
-            {itens.data?.map((item) => <Linha key={item.id} item={item} onEditar={() => abrir(item)} />)}
+            {itens.data?.map((item) => <Linha key={item.id} item={item} consulta={consulta} onEditar={() => abrir(item)} />)}
           </div>
         </div>
 
@@ -162,13 +179,15 @@ export function PaginaCatalogo() {
             <p className="text-sm text-muted-foreground">
               {filtrando ? 'Nenhum item encontrado com esses filtros.' : 'O catálogo ainda está vazio.'}
             </p>
-            <Button className="h-11 rounded-[10px]" onClick={() => abrir(null)}>
-              <Plus aria-hidden />
-              {filtrando ? 'Cadastrar novo item' : 'Cadastrar o primeiro item'}
-            </Button>
+            {!consulta && (
+              <Button className="h-11 rounded-[10px]" onClick={() => abrir(null)}>
+                <Plus aria-hidden />
+                {filtrando ? 'Cadastrar novo item' : 'Cadastrar o primeiro item'}
+              </Button>
+            )}
           </div>
         )}
-        {itens.data && itens.data.length > 0 && (
+        {itens.data && itens.data.length > 0 && !consulta && (
           <p className="px-5 py-3.5 text-[13px] text-muted-foreground">
             Desativar um item só o tira da busca de novos orçamentos. Nada é apagado e os orçamentos
             antigos continuam iguais.
@@ -177,7 +196,7 @@ export function PaginaCatalogo() {
       </section>
 
       <PainelItem
-        aberto={painel.aberto}
+        aberto={painel.aberto && !consulta}
         item={painel.item}
         onFechar={() => setPainel((p) => ({ ...p, aberto: false }))}
       />
@@ -185,7 +204,7 @@ export function PaginaCatalogo() {
   );
 }
 
-function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
+function Linha({ item, consulta, onEditar }: { item: Produto; consulta: boolean; onEditar: () => void }) {
   const clienteConsultas = useQueryClient();
   const alternar = useMutation({
     mutationFn: (ativo: boolean) => api.patch<Produto>(`/api/produtos/${item.id}/ativo`, { ativo }),
@@ -219,17 +238,21 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
   return (
     <div
       role="row"
-      className={cn(`grid min-h-[62px] ${COLUNAS} items-center gap-3.5 border-b px-5 py-2.5`, inativo && 'bg-background/60')}
+      className={cn(`grid min-h-[62px] ${consulta ? COLUNAS_CONSULTA : COLUNAS} items-center gap-3.5 border-b px-5 py-2.5`, inativo && 'bg-background/60')}
     >
       <span role="cell" className={cn('flex min-w-0 flex-col gap-0.5', inativo && 'opacity-60')}>
         <span className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onEditar}
-            className="truncate text-left text-sm font-semibold underline-offset-2 hover:underline"
-          >
-            {item.nome}
-          </button>
+          {consulta ? (
+            <span className="truncate text-sm font-semibold">{item.nome}</span>
+          ) : (
+            <button
+              type="button"
+              onClick={onEditar}
+              className="truncate text-left text-sm font-semibold underline-offset-2 hover:underline"
+            >
+              {item.nome}
+            </button>
+          )}
           {inativo && <Selo className="shrink-0">Desativado</Selo>}
         </span>
         <span className="truncate text-xs text-muted-foreground">
@@ -260,62 +283,68 @@ function Linha({ item, onEditar }: { item: Produto; onEditar: () => void }) {
       <span role="cell" className={cn('text-sm text-foreground/80', inativo && 'opacity-60')}>
         {ROTULO_UNIDADE[item.unidade]}
       </span>
-      <span
-        role="cell"
-        className={cn('text-right font-mono text-sm text-foreground/80', inativo && 'opacity-60')}
-        title={semCusto ? 'Sem custo cadastrado' : undefined}
-      >
-        {semCusto ? (
-          <>
-            <span aria-hidden className="text-muted-foreground">
-              —
-            </span>
-            <span className="sr-only">Sem custo cadastrado</span>
-          </>
-        ) : (
-          formatarBRL(Number(item.precoCusto))
-        )}
-      </span>
+      {!consulta && (
+        <span
+          role="cell"
+          className={cn('text-right font-mono text-sm text-foreground/80', inativo && 'opacity-60')}
+          title={semCusto ? 'Sem custo cadastrado' : undefined}
+        >
+          {semCusto ? (
+            <>
+              <span aria-hidden className="text-muted-foreground">
+                —
+              </span>
+              <span className="sr-only">Sem custo cadastrado</span>
+            </>
+          ) : (
+            formatarBRL(Number(item.precoCusto))
+          )}
+        </span>
+      )}
       <span role="cell" className={cn('text-right font-mono text-sm font-medium', inativo && 'opacity-60')}>
         {formatarBRL(Number(item.precoVenda))}
       </span>
-      <span
-        role="cell"
-        className={cn('text-right font-mono text-sm', margemAtencao ? 'text-destaque-texto' : 'text-foreground/80', inativo && 'opacity-60')}
-        title={semCusto ? 'Sem custo cadastrado: não há margem para mostrar' : `Lucro bruto de ${formatarBRL(item.lucroBruto ?? 0)} por unidade`}
-      >
-        {semCusto ? (
-          <>
-            <span aria-hidden className="text-muted-foreground">
-              —
-            </span>
-            <span className="sr-only">Sem margem: custo não cadastrado</span>
-          </>
-        ) : (
-          <>
-            {item.margemPercentual!.toLocaleString('pt-BR')}%
-            <span className="sr-only">, lucro bruto de {formatarBRL(item.lucroBruto ?? 0)} por unidade</span>
-          </>
-        )}
-      </span>
-      <span role="cell" className="flex items-center">
-        <Switch
-          checked={item.ativo}
-          disabled={alternar.isPending}
-          onCheckedChange={(ativo) => alternar.mutate(ativo)}
-          aria-label={`${item.nome}: ${item.ativo ? 'ativo' : 'desativado'}`}
-        />
-      </span>
-      <span role="cell">
-        <button
-          type="button"
-          onClick={onEditar}
-          aria-label={`Editar ${item.nome}`}
-          className="flex size-10 items-center justify-center rounded-[10px] border text-foreground/80 hover:bg-muted"
-        >
-          <Pencil className="size-4" aria-hidden />
-        </button>
-      </span>
+      {!consulta && (
+        <>
+          <span
+            role="cell"
+            className={cn('text-right font-mono text-sm', margemAtencao ? 'text-destaque-texto' : 'text-foreground/80', inativo && 'opacity-60')}
+            title={semCusto ? 'Sem custo cadastrado: não há margem para mostrar' : `Lucro bruto de ${formatarBRL(item.lucroBruto ?? 0)} por unidade`}
+          >
+            {semCusto ? (
+              <>
+                <span aria-hidden className="text-muted-foreground">
+                  —
+                </span>
+                <span className="sr-only">Sem margem: custo não cadastrado</span>
+              </>
+            ) : (
+              <>
+                {item.margemPercentual!.toLocaleString('pt-BR')}%
+                <span className="sr-only">, lucro bruto de {formatarBRL(item.lucroBruto ?? 0)} por unidade</span>
+              </>
+            )}
+          </span>
+          <span role="cell" className="flex items-center">
+            <Switch
+              checked={item.ativo}
+              disabled={alternar.isPending}
+              onCheckedChange={(ativo) => alternar.mutate(ativo)}
+              aria-label={`${item.nome}: ${item.ativo ? 'ativo' : 'desativado'}`}
+            />
+          </span>
+          <span role="cell">
+            <button
+              type="button"
+              onClick={onEditar}
+              aria-label={`Editar ${item.nome}`}
+              className="flex size-10 items-center justify-center rounded-[10px] border text-foreground/80 hover:bg-muted"
+            >
+              <Pencil className="size-4" aria-hidden />
+            </button>
+          </span>
+        </>
+      )}
     </div>
   );
 }

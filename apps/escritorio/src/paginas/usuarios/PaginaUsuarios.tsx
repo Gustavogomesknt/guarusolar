@@ -340,6 +340,12 @@ function DialogUsuario({
               Você não pode mudar o seu próprio papel.
             </p>
           )}
+          {papel === 'REPRESENTANTE' && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Vendedor de outro estado: vê só os clientes que ele cadastrar e os orçamentos que ele fizer. Os clientes e
+              orçamentos da casa ficam fora; o catálogo aparece sem custo nem margem.
+            </p>
+          )}
           {papel !== 'TECNICO' && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="usuario-cargo">Cargo na proposta</Label>

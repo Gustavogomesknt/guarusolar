@@ -45,6 +45,9 @@ enum Papel {
   COMERCIAL // vendedor: clientes, catálogo, orçamentos
   GESTOR // agenda, projetos, validação de serviços
   TECNICO // apenas a própria agenda e o envio de fotos (PWA no celular)
+  /// vendedor de outro estado: só os clientes e orçamentos DELE (lib/acesso.ts,
+  /// filtroDoRepresentante); o time interno vê tudo, inclusive o dele (13/11/2026)
+  REPRESENTANTE
 }
 
 model Usuario {
@@ -89,6 +92,8 @@ model Usuario {
   fotosEnviadas      FotoServico[]
   videosEnviados     VideoServico[]
   eventosProjeto     EventoProjeto[]
+  /// clientes de um REPRESENTANTE (dono): só ele e o time interno os veem
+  clientesRepresentados Cliente[] @relation("RepresentanteDoCliente")
 
   @@index([papel, ativo])
 }
@@ -131,6 +136,11 @@ model Cliente {
   uf          String?    @db.Char(2)
   observacoes String?
   ativo       Boolean    @default(true)
+  /// DONO do cliente quando quem cadastrou foi um REPRESENTANTE (vendedor de outro estado): só
+  /// ele (e o time interno) vê este cliente. NULO = cliente da casa, que o representante não vê.
+  /// Gravado ao cadastrar (o id de quem cadastrou, se for representante); nenhuma tela o muda
+  representanteId String?
+  representante   Usuario?   @relation("RepresentanteDoCliente", fields: [representanteId], references: [id])
   /// busca por palavras: coluna GERADA pelo banco (texto_de_busca, migration texto_de_busca);
   /// nunca escrever nela. Ver lib/busca.ts
   textoBusca  String?    @default(dbgenerated())
@@ -144,6 +154,7 @@ model Cliente {
 
   @@index([nome])
   @@index([whatsapp])
+  @@index([representanteId])
 }
 
 // ---------------------------------------------------------------------------

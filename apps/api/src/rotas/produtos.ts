@@ -5,10 +5,14 @@ import { filtroDeBusca } from '../lib/busca';
 import { prisma } from '../lib/prisma';
 import { ErroHttp, rota } from '../lib/erros';
 import { autenticar, autorizar } from '../lib/auth';
+import { ehRepresentante, filtroDoRepresentante } from '../lib/acesso';
 import { calcularMargem, CATEGORIAS_PRODUTO, GRUPOS_NA_PROPOSTA, UNIDADES } from '@guarusolar/compartilhado';
 
 export const rotasProdutos = Router();
-rotasProdutos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
+// Só o login aqui: CADA ROTA diz quem passa. O REPRESENTANTE só LÊ o catálogo, sem o preço de
+// custo e sem a margem dos itens (a margem revela o custo); criar, editar e desativar itens é do
+// time interno. Conferido no build (lib/isolamentoDoRepresentante.ts).
+rotasProdutos.use(autenticar);
 
 const produtoSchema = z.object({
   nome: z.string().min(3),
@@ -52,6 +56,7 @@ const comMargem = <T extends { precoCusto: Prisma.Decimal | null; precoVenda: Pr
 
 rotasProdutos.get(
   '/',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { q, categoria, grupo, incluirInativos } = req.query as Record<string, string>;
     const grupoValido = (GRUPOS_NA_PROPOSTA as readonly string[]).includes(grupo) ? (grupo as (typeof GRUPOS_NA_PROPOSTA)[number]) : undefined;
@@ -69,14 +74,19 @@ rotasProdutos.get(
         ]),
       },
       orderBy: [{ categoria: 'asc' }, { nome: 'asc' }],
-      include: { _count: { select: { itensOrcamento: true } } },
+      // representante: conta só as linhas dos orçamentos DELE
+      include: { _count: { select: { itensOrcamento: { where: { orcamento: filtroDoRepresentante.orcamento(req.usuario!) } } } } },
     });
+    const representante = ehRepresentante(req.usuario!);
     res.json(
-      produtos.map(({ _count, ...p }) => ({
-        ...comMargem(p),
+      produtos.map(({ _count, ...p }) => {
         // linhas de orçamento que usam o item (um produto aparece uma vez por orçamento)
-        usadoEmOrcamentos: _count.itensOrcamento,
-      })),
+        const usadoEmOrcamentos = _count.itensOrcamento;
+        if (!representante) return { ...comMargem(p), usadoEmOrcamentos };
+        // sem custo, sem margem e sem lucro: o representante vê o preço de venda (o da proposta)
+        const { precoCusto: _custo, ...semCusto } = p;
+        return { ...semCusto, usadoEmOrcamentos };
+      }),
     );
   }),
 );
@@ -96,6 +106,7 @@ async function conferirCodigoLivre(codigo: string | null | undefined, ignorarId?
 
 rotasProdutos.post(
   '/',
+  autorizar('COMERCIAL', 'GESTOR'),
   rota(async (req, res) => {
     const dados = produtoSchema.parse(req.body);
     if (dados.ativo) await conferirCodigoLivre(dados.codigoFornecedor);
@@ -105,6 +116,7 @@ rotasProdutos.post(
 
 rotasProdutos.put(
   '/:id',
+  autorizar('COMERCIAL', 'GESTOR'),
   rota(async (req, res) => {
     const dados = produtoSchema.partial().parse(req.body);
     const atual = await prisma.produto.findUnique({ where: { id: req.params.id } });
@@ -119,6 +131,7 @@ rotasProdutos.put(
 // Desativar mantém o item nos orçamentos antigos
 rotasProdutos.patch(
   '/:id/ativo',
+  autorizar('COMERCIAL', 'GESTOR'),
   rota(async (req, res) => {
     const { ativo } = z.object({ ativo: z.boolean() }).parse(req.body);
     const produto = await prisma.produto.findUnique({ where: { id: req.params.id } });

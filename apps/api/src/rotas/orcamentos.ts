@@ -31,12 +31,25 @@ import {
 import { cabeNoSelo, planoDaPagina2 } from '../lib/pdf-proposta-nova';
 import { gerarCodigoOrcamento, gerarCodigoProjeto } from '../lib/codigos';
 import { registrarEvento } from '../lib/eventosProjeto';
+import { filtroDoRepresentante } from '../lib/acesso';
+import type { UsuarioToken } from '../lib/auth';
 import { tipoTemCapa } from '../lib/capaDaProposta';
 import { CAPAS_DA_PROPOSTA } from '../conteudo/proposta';
 import { faltaNasCondicoesGravadas, modeloDaProposta, modeloDoOrcamento, type OrcamentoParaPdf } from '../lib/pdf-orcamento';
 
 export const rotasOrcamentos = Router();
-rotasOrcamentos.use(autenticar, autorizar('COMERCIAL', 'GESTOR'));
+// Só o login aqui: CADA ROTA diz quem passa (autorizar na própria rota). O REPRESENTANTE é
+// liberado rota a rota, de propósito, e a rota filtra pelo dono (filtroDoRepresentante): o que não
+// é dele responde 404. Conferido no build (lib/isolamentoDoRepresentante.ts).
+rotasOrcamentos.use(autenticar);
+
+/**
+ * O idCriacao é a chave do "criar" repetido: não sai em resposta nenhuma. Com ele, outro usuário
+ * mandaria um "criar" que caísse sobre o orçamento alheio (o retry também confere o dono).
+ */
+const semIdCriacao = <T extends { idCriacao?: string | null }>({ idCriacao: _, ...o }: T) => o;
+
+const ORCAMENTO_NAO_ENCONTRADO = 'Orçamento não encontrado';
 
 const itemSchema = z.object({
   produtoId: z.string().uuid(),
@@ -211,8 +224,9 @@ function conferirPrazo(orcamento: { prazoExecucao: string | null }) {
   if (!orcamento.prazoExecucao?.trim()) throw new ErroHttp(409, AVISO_SEM_PRAZO);
 }
 
-async function clienteDoOrcamento(id: string) {
-  const cliente = await prisma.cliente.findUnique({ where: { id } });
+/** O cliente escolhido, se quem pede o vê (o representante, só os dele); senão, como inexistente. */
+async function clienteDoOrcamento(id: string, usuario: Pick<UsuarioToken, 'id' | 'papel'>) {
+  const cliente = await prisma.cliente.findFirst({ where: { id, ...filtroDoRepresentante.cliente(usuario) } });
   if (!cliente) throw new ErroHttp(400, 'Cliente não encontrado. Escolha o cliente de novo.');
   return cliente;
 }
@@ -296,6 +310,7 @@ async function prepararItens(itens: z.infer<typeof itemSchema>[], existentes: Co
 // --------------------------------------------------------------------------
 rotasOrcamentos.get(
   '/',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { status, clienteId, de, ate, q, abertosSempre, tipo } = req.query as Record<string, string>;
     const periodo = de || ate ? { ...(de ? { gte: new Date(de) } : {}), ...(ate ? { lte: new Date(ate) } : {}) } : null;
@@ -329,7 +344,8 @@ rotasOrcamentos.get(
     };
 
     const orcamentos = await prisma.orcamento.findMany({
-      where,
+      // representante: só os dele, também na busca por palavras (que olha o cliente)
+      where: { AND: [where, filtroDoRepresentante.orcamento(req.usuario!)] },
       orderBy: { criadoEm: 'desc' },
       include: {
         cliente: { select: { id: true, nome: true, cidade: true, uf: true, whatsapp: true } },
@@ -339,7 +355,7 @@ rotasOrcamentos.get(
       },
     });
 
-    res.json(orcamentos);
+    res.json(orcamentos.map(semIdCriacao));
   }),
 );
 
@@ -365,22 +381,25 @@ rotasOrcamentos.get(
 // --------------------------------------------------------------------------
 rotasOrcamentos.get(
   '/resumo',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { de, ate } = z
       .object({ de: z.coerce.date().optional(), ate: z.coerce.date().optional() })
       .parse(req.query);
     const periodo = de || ate ? { ...(de ? { gte: de } : {}), ...(ate ? { lte: ate } : {}) } : undefined;
-    const criadoNoPeriodo: Prisma.OrcamentoWhereInput = periodo ? { criadoEm: periodo } : {};
+    // representante: os quatro cartões contam SÓ os dele (o time interno, todos)
+    const dele = filtroDoRepresentante.orcamento(req.usuario!);
+    const criadoNoPeriodo: Prisma.OrcamentoWhereInput = { ...dele, ...(periodo ? { criadoEm: periodo } : {}) };
     const aprovadoNoPeriodo: Prisma.OrcamentoWhereInput = periodo
-      ? { status: 'APROVADO', OR: [{ aprovadoEm: periodo }, { aprovadoEm: null, criadoEm: periodo }] }
-      : { status: 'APROVADO' };
+      ? { ...dele, status: 'APROVADO', OR: [{ aprovadoEm: periodo }, { aprovadoEm: null, criadoEm: periodo }] }
+      : { ...dele, status: 'APROVADO' };
 
     const [criados, criadosPorStatus, aprovados, emAberto] = await Promise.all([
       prisma.orcamento.aggregate({ where: criadoNoPeriodo, _sum: { valorTotal: true }, _count: true }),
       prisma.orcamento.groupBy({ by: ['status'], where: criadoNoPeriodo, _count: true }),
       prisma.orcamento.aggregate({ where: aprovadoNoPeriodo, _sum: { valorTotal: true }, _count: true }),
       prisma.orcamento.aggregate({
-        where: { status: { in: ['ENVIADO', 'EM_NEGOCIACAO'] } },
+        where: { ...dele, status: { in: ['ENVIADO', 'EM_NEGOCIACAO'] } },
         _sum: { valorTotal: true },
         _count: true,
       }),
@@ -421,6 +440,7 @@ rotasOrcamentos.get(
 // capa (modelo novo); no modelo atual não há capa e nada é avisado.
 rotasOrcamentos.get(
   '/capas',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (_req, res) => {
     const tipos = await prisma.tipoDeServico.findMany({ select: { id: true, nome: true }, orderBy: { ordem: 'asc' } });
     res.json({
@@ -456,16 +476,19 @@ const CLIENTE_DE_MEDIDA = {
 
 rotasOrcamentos.post(
   '/folhas-da-proposta',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     if (modeloDaProposta() !== 'nova') return res.json({ ativa: false });
     const dados = folhasSchema.parse(req.body);
     const [salvo, cliente, vendedor] = await Promise.all([
       dados.orcamentoId
-        ? prisma.orcamento.findUnique({ where: { id: dados.orcamentoId }, include: { itens: { orderBy: { ordem: 'asc' } }, vendedor: { select: { nome: true, telefone: true, cargoNaProposta: true } } } })
+        ? prisma.orcamento.findFirst({ where: { id: dados.orcamentoId, ...filtroDoRepresentante.orcamento(req.usuario!) }, include: { itens: { orderBy: { ordem: 'asc' } }, vendedor: { select: { nome: true, telefone: true, cargoNaProposta: true } } } })
         : null,
-      dados.clienteId ? prisma.cliente.findUnique({ where: { id: dados.clienteId } }) : null,
+      dados.clienteId ? prisma.cliente.findFirst({ where: { id: dados.clienteId, ...filtroDoRepresentante.cliente(req.usuario!) } }) : null,
       prisma.usuario.findUnique({ where: { id: req.usuario!.id }, select: { nome: true, telefone: true, cargoNaProposta: true } }),
     ]);
+    // orçamento ou cliente que quem pede não vê (o representante, os de outros): como se não existisse
+    if ((dados.orcamentoId && !salvo) || (dados.clienteId && !cliente)) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
     const itens = dados.itens.length > 0 ? await prepararItens(dados.itens.map((i) => ({ ...i, quantidade: 1 })), salvo?.itens ?? []) : [];
     // o cliente: a cópia gravada do orçamento ou, sem ela, o cadastro (o que o PDF usaria)
     const copia = salvo?.clienteNome != null && (!dados.clienteId || dados.clienteId === salvo.clienteId);
@@ -485,6 +508,7 @@ rotasOrcamentos.post(
 
 rotasOrcamentos.get(
   '/preferencias',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const usuario = await prisma.usuario.findUnique({
       where: { id: req.usuario!.id },
@@ -497,21 +521,23 @@ rotasOrcamentos.get(
 
 rotasOrcamentos.get(
   '/:id',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
-    const orcamento = await prisma.orcamento.findUnique({
-      where: { id: req.params.id },
+    const orcamento = await prisma.orcamento.findFirst({
+      where: { id: req.params.id, ...filtroDoRepresentante.orcamento(req.usuario!) },
       include: {
         cliente: true,
         vendedor: { select: { id: true, nome: true, telefone: true } },
         // a categoria fica no produto; o resto do item é cópia gravada no orçamento
         itens: { orderBy: { ordem: 'asc' }, include: { produto: { select: { categoria: true } } } },
         historico: { orderBy: { criadoEm: 'desc' }, include: { usuario: { select: { nome: true } } } },
-        projeto: true,
+        // projetos não são do escopo do representante: o aprovado dele não traz o projeto
+        projeto: req.usuario!.papel !== 'REPRESENTANTE',
         tipoDeServico: { select: { id: true, nome: true, ativo: true } },
       },
     });
-    if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
-    res.json(orcamento);
+    if (!orcamento) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
+    res.json(semIdCriacao(orcamento));
   }),
 );
 
@@ -520,14 +546,18 @@ rotasOrcamentos.get(
 // --------------------------------------------------------------------------
 rotasOrcamentos.post(
   '/',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const dados = orcamentoSchema.parse(req.body);
     // repetição do mesmo "criar" (a resposta se perdeu): grava sobre o orçamento já criado
     if (dados.idCriacao) {
-      const jaCriado = await prisma.orcamento.findUnique({ where: { idCriacao: dados.idCriacao }, select: { id: true } });
+      const jaCriado = await prisma.orcamento.findUnique({ where: { idCriacao: dados.idCriacao }, select: { id: true, vendedorId: true } });
       if (jaCriado) {
-        const { orcamento, totais } = await atualizarOrcamento(jaCriado.id, dados, req.usuario!.id);
-        return res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+        // só quem criou repete o próprio "criar": o idCriacao de outro (que não sai mais em resposta
+        // nenhuma) não reescreve o orçamento alheio. Mensagem neutra: não confirma que ele existe
+        if (jaCriado.vendedorId !== req.usuario!.id) throw new ErroHttp(409, 'Não foi possível salvar. Recarregue a tela e salve de novo.');
+        const { orcamento, totais } = await atualizarOrcamento(jaCriado.id, dados, req.usuario!);
+        return res.json({ ...semIdCriacao(orcamento), resumoPagamento: totais.resumoPagamento });
       }
     }
     if (!dados.tipoDeServicoId) {
@@ -535,7 +565,7 @@ rotasOrcamentos.post(
     }
     await conferirTipoDeServico(dados.tipoDeServicoId);
     conferirSelos(dados);
-    const cliente = await clienteDoOrcamento(dados.clienteId);
+    const cliente = await clienteDoOrcamento(dados.clienteId, req.usuario!);
     const itens = await prepararItens(dados.itens);
     const entradaDoCalculo: EntradaCalculo = {
       itens: itens.map((i) => i._calculo),
@@ -592,7 +622,7 @@ rotasOrcamentos.post(
       });
     });
 
-    res.status(201).json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+    res.status(201).json({ ...semIdCriacao(orcamento), resumoPagamento: totais.resumoPagamento });
   }),
 );
 
@@ -602,12 +632,13 @@ function guardarUltimoTipo(tx: Prisma.TransactionClient, usuarioId: string, tipo
 }
 
 /** Grava a edição de um orçamento (PUT e o "criar" repetido com o mesmo idCriacao). */
-async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSchema>, usuarioId: string) {
-  const atual = await prisma.orcamento.findUnique({
-    where: { id: id },
+async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSchema>, usuario: Pick<UsuarioToken, 'id' | 'papel'>) {
+  const usuarioId = usuario.id;
+  const atual = await prisma.orcamento.findFirst({
+    where: { id: id, ...filtroDoRepresentante.orcamento(usuario) },
     include: { itens: { orderBy: { ordem: 'asc' } } },
   });
-  if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
+  if (!atual) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
   if (atual.status === 'APROVADO') {
     throw new ErroHttp(409, 'Orçamento aprovado não pode ser alterado');
   }
@@ -625,7 +656,7 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
   // itens que já estavam no orçamento mantêm a cópia gravada (regra 2); o cliente também:
   // a cópia só muda ao trocar de cliente ou quando o vendedor pede "usar dados atuais do cadastro"
   const copiarCliente = dados.clienteId !== atual.clienteId || dados.atualizarDadosCliente || atual.clienteNome == null;
-  const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId)) : {};
+  const novaCopia = copiarCliente ? copiaDoCliente(await clienteDoOrcamento(dados.clienteId, usuario)) : {};
   const itens = await prepararItens(dados.itens, atual.itens);
   const entradaDoCalculo: EntradaCalculo = {
     itens: itens.map((i) => i._calculo),
@@ -694,9 +725,10 @@ async function atualizarOrcamento(id: string, dados: z.infer<typeof orcamentoSch
 
 rotasOrcamentos.put(
   '/:id',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
-    const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body), req.usuario!.id);
-    res.json({ ...orcamento, resumoPagamento: totais.resumoPagamento });
+    const { orcamento, totais } = await atualizarOrcamento(req.params.id, orcamentoSchema.parse(req.body), req.usuario!);
+    res.json({ ...semIdCriacao(orcamento), resumoPagamento: totais.resumoPagamento });
   }),
 );
 
@@ -717,6 +749,7 @@ rotasOrcamentos.put(
 // --------------------------------------------------------------------------
 rotasOrcamentos.post(
   '/:id/duplicar',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { clienteId, idCriacao } = z
       .object({
@@ -727,12 +760,13 @@ rotasOrcamentos.post(
         idCriacao: z.string().uuid().optional(),
       })
       .parse(req.body);
-    const original = await prisma.orcamento.findUnique({
-      where: { id: req.params.id },
+    // o representante só duplica o dele; o time interno, qualquer um (e vira dono da cópia)
+    const original = await prisma.orcamento.findFirst({
+      where: { id: req.params.id, ...filtroDoRepresentante.orcamento(req.usuario!) },
       include: { itens: { orderBy: { ordem: 'asc' } }, tipoDeServico: { select: { ativo: true } } },
     });
-    if (!original) throw new ErroHttp(404, 'Orçamento não encontrado');
-    const cliente = await clienteDoOrcamento(clienteId);
+    if (!original) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
+    const cliente = await clienteDoOrcamento(clienteId, req.usuario!);
     if (!cliente.ativo) throw new ErroHttp(409, `${cliente.nome} está desativado: escolha outro cliente para a cópia.`);
 
     const tipoDeServicoId = original.tipoDeServicoId && original.tipoDeServico?.ativo ? original.tipoDeServicoId : null;
@@ -751,8 +785,12 @@ rotasOrcamentos.post(
       prazoDescartado: Boolean(prazo) && prazoExecucao === null,
       garantiaDescartada: garantia !== garantiaOriginal,
     });
-    const jaCriada = () =>
-      idCriacao ? prisma.orcamento.findUnique({ where: { idCriacao }, select: { id: true, codigo: true } }) : null;
+    // a repetição só vale para quem fez a cópia: o idCriacao de outro não devolve a cópia alheia
+    const jaCriada = async () => {
+      const ja = idCriacao ? await prisma.orcamento.findUnique({ where: { idCriacao }, select: { id: true, codigo: true, vendedorId: true } }) : null;
+      if (ja && ja.vendedorId !== req.usuario!.id) throw new ErroHttp(409, 'Não foi possível duplicar. Feche a janela e tente de novo.');
+      return ja;
+    };
     const repetida = await jaCriada();
     if (repetida) return res.json(resposta(repetida));
 
@@ -845,10 +883,14 @@ rotasOrcamentos.post(
 // --------------------------------------------------------------------------
 rotasOrcamentos.patch(
   '/:id/tipo',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { tipoDeServicoId } = z.object({ tipoDeServicoId: z.string().uuid('Escolha o tipo de serviço') }).parse(req.body);
-    const atual = await prisma.orcamento.findUnique({ where: { id: req.params.id }, select: { id: true, tipoDeServicoId: true } });
-    if (!atual) throw new ErroHttp(404, 'Orçamento não encontrado');
+    const atual = await prisma.orcamento.findFirst({
+      where: { id: req.params.id, ...filtroDoRepresentante.orcamento(req.usuario!) },
+      select: { id: true, tipoDeServicoId: true },
+    });
+    if (!atual) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
     await conferirTipoDeServico(tipoDeServicoId, atual.tipoDeServicoId);
     const orcamento = await prisma.$transaction(async (tx) => {
       await tx.projeto.updateMany({ where: { orcamentoId: atual.id }, data: { tipoDeServicoId } });
@@ -868,6 +910,7 @@ rotasOrcamentos.patch(
 // --------------------------------------------------------------------------
 rotasOrcamentos.patch(
   '/:id/status',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
     const { status, observacao } = z
       .object({
@@ -876,8 +919,8 @@ rotasOrcamentos.patch(
       })
       .parse(req.body);
 
-    const orcamento = await prisma.orcamento.findUnique({ where: { id: req.params.id } });
-    if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
+    const orcamento = await prisma.orcamento.findFirst({ where: { id: req.params.id, ...filtroDoRepresentante.orcamento(req.usuario!) } });
+    if (!orcamento) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
     if (!podeMudarStatus(orcamento.status, status)) {
       throw new ErroHttp(
         409,
@@ -895,7 +938,7 @@ rotasOrcamentos.patch(
     );
     // aprovado vira projeto na faixa "A agendar" da agenda
     if (status === 'APROVADO') operacaoMudou();
-    res.json(atualizado);
+    res.json(semIdCriacao(atualizado));
   }),
 );
 
@@ -958,12 +1001,13 @@ async function mudarStatus(
 // --------------------------------------------------------------------------
 rotasOrcamentos.post(
   '/:id/whatsapp',
+  autorizar('COMERCIAL', 'GESTOR', 'REPRESENTANTE'),
   rota(async (req, res) => {
-    const orcamento = await prisma.orcamento.findUnique({
-      where: { id: req.params.id },
+    const orcamento = await prisma.orcamento.findFirst({
+      where: { id: req.params.id, ...filtroDoRepresentante.orcamento(req.usuario!) },
       include: { cliente: true },
     });
-    if (!orcamento) throw new ErroHttp(404, 'Orçamento não encontrado');
+    if (!orcamento) throw new ErroHttp(404, ORCAMENTO_NAO_ENCONTRADO);
     if (orcamento.status !== 'APROVADO') {
       conferirPrazo(orcamento);
       conferirCondicoes(orcamento);

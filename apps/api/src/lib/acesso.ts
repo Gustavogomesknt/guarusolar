@@ -77,3 +77,21 @@ export const filtroDeVisitasDoCliente = (clienteId: string): Prisma.AgendamentoW
   tipo: { in: [...ETAPAS_DE_VISITA] },
   OR: [{ clienteId }, { projeto: { clienteId } }],
 });
+
+// ---------------------------------------------------------------------------------------------
+// REPRESENTANTE (vendedor de outro estado, 13/11/2026): só enxerga o que é DELE. O time interno
+// (COMERCIAL, GESTOR, ADMIN) vê tudo, inclusive o dele. Mesmo trilho do técnico: o filtro vai no
+// where de toda leitura (findFirst com id + filtro), num lugar só. O que não é dele responde 404
+// (nunca 403: 403 confirmaria que existe). Cada rota declara como se isola em
+// lib/isolamentoDoRepresentante.ts (conferido no build).
+// - orçamento: o dele é o que ELE criou (vendedorId);
+// - cliente: o dele é o que ELE cadastrou (Cliente.representanteId); nulo = cliente da casa.
+// ---------------------------------------------------------------------------------------------
+type QuemPede = Pick<UsuarioToken, 'id' | 'papel'>;
+
+export const ehRepresentante = (usuario: QuemPede) => usuario.papel === 'REPRESENTANTE';
+
+export const filtroDoRepresentante = {
+  orcamento: (usuario: QuemPede): Prisma.OrcamentoWhereInput => (ehRepresentante(usuario) ? { vendedorId: usuario.id } : {}),
+  cliente: (usuario: QuemPede): Prisma.ClienteWhereInput => (ehRepresentante(usuario) ? { representanteId: usuario.id } : {}),
+};

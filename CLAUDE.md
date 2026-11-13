@@ -22,6 +22,23 @@ orçamento → aprovação → projeto → agenda das equipes → execução com
 | `GESTOR` | navegador no PC do escritório (site) | agenda das equipes, validação das fotos, projetos |
 | `TECNICO` | navegador do próprio celular (PWA, sem instalar) | **somente** a agenda dele e o envio de fotos |
 | `ADMIN` | ambos | tudo |
+| `REPRESENTANTE` | navegador no PC (site do escritório) | vendedor de outro estado: **só** os clientes e orçamentos DELE, pipeline e PDF dos dele, catálogo sem custo nem margem (sem editar) |
+
+**REPRESENTANTE (13/11/2026).** Só enxerga o que é dele; o time interno (COMERCIAL, GESTOR,
+ADMIN) vê tudo, inclusive o dele. O orçamento dele é o que ele criou (`vendedorId`); o cliente
+dele é o que ele cadastrou (`Cliente.representanteId`; nulo = cliente da casa, que ele não vê).
+Filtro num lugar só (`lib/acesso.ts`, `filtroDoRepresentante`), nos
+`where`, nas contagens (`_count`), na busca `q` e nos quatro cartões do `/resumo`. O que não é
+dele responde **404** (nunca 403). Projetos, visitas, fotos, agenda, validação e usuários ficam
+fora (o `autorizar` não o deixa passar). Documento repetido de cliente que ele não vê: 409 sem o
+nome ("Fale com o escritório"). Interno que duplica o orçamento de um representante vira dono da
+cópia. **Toda rota declara como se isola dele** em `lib/isolamentoDoRepresentante.ts`; o
+`npm run build` roda `lib/conferencia-rotas.ts`, que monta o app (`criarApp`, `app.ts`), lista
+todas as rotas e quebra se faltar linha, sobrar linha, a linha contradisser o `autorizar` ou uma
+rota com login ficar sem `autorizar` (só "dado próprio" pode). Nos roteadores de venda o
+`autorizar` fica em CADA rota (o roteador só exige login). Teste com banco dos dois
+representantes: ver o relatório da implementação. O `idCriacao` não sai em resposta nenhuma, e o
+"criar" repetido só vale para quem criou.
 
 Decisão fechada com o cliente: **o sistema é só web**. O escritório usa o site no navegador do
 PC e os **técnicos usam o site no celular** (PWA), porque usam aparelhos próprios e não devem

@@ -8,7 +8,7 @@ import { CAMINHO_TROCAR_SENHA, TrocarSenha } from '@/paginas/TrocarSenha';
 import { ListaOrcamentos } from '@/paginas/orcamentos/ListaOrcamentos';
 import { Layout } from './Layout';
 import { RotaProtegida } from './RotaProtegida';
-import { PAPEIS_DO_ESCRITORIO } from './permissoes';
+import { PAPEIS_DE_VENDA, PAPEIS_DO_ESCRITORIO } from './permissoes';
 
 // Telas carregadas sob demanda: ficam fora do JavaScript inicial (a lista é a tela de entrada).
 // O <Suspense> fica no Layout. lazyComRecarga: depois de uma publicação, os arquivos antigos somem e a
@@ -55,15 +55,19 @@ export const roteador = createBrowserRouter(
         <Route path={CAMINHO_TROCAR_SENHA} element={<TrocarSenha />} />
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/orcamentos" replace />} />
-          <Route element={<RotaProtegida papeis={['COMERCIAL', 'GESTOR']} />}>
+          {/* venda: o time interno e o REPRESENTANTE (só os clientes e orçamentos dele; a API filtra) */}
+          <Route element={<RotaProtegida papeis={PAPEIS_DE_VENDA} />}>
             <Route path="orcamentos" element={<ListaOrcamentos />} />
             {/* "novo" e o id de um orçamento salvo usam a mesma rota (ver PaginaOrcamento) */}
             <Route path="orcamentos/:id" element={<PaginaOrcamento />} />
             <Route path="pipeline" element={<Pipeline />} />
-            <Route path="visitas" element={<PaginaVisitas />} />
             <Route path="clientes" element={<ListaClientes />} />
             <Route path="clientes/:id" element={<FichaCliente />} />
+            {/* o representante só consulta, sem custo nem margem (a API não manda) */}
             <Route path="catalogo" element={<PaginaCatalogo />} />
+          </Route>
+          <Route element={<RotaProtegida papeis={['COMERCIAL', 'GESTOR']} />}>
+            <Route path="visitas" element={<PaginaVisitas />} />
             {/* comercial consulta; as ações da ficha são só do gestor (a API confere) */}
             <Route path="projetos" element={<ListaProjetos />} />
             <Route path="projetos/:id" element={<FichaProjeto />} />
